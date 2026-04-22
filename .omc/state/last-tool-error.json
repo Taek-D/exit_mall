@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"E:/프로젝트/엑시트몰\\\" && tail -80 \\\"C:\\\\Users\\\\PC\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\E-----------\\\\689f4aaa-e7b5-48dd-850a-039195fd9416\\\\tasks\\\\baeuwwt2v.output\\\" && echo \\\"---UI---\\\" && ls comp...",
-  "error": "Exit code 2\n- Checking registry.\n✔ Checking registry.\n- Installing dependencies.\n- Installing dependencies.\n✔ Installing dependencies.\n- Updating files.\n✔ Created 17 files:\n  - components\\ui\\button.tsx\n  - components\\ui\\input.tsx\n  - components\\ui\\label.tsx\n  - components\\ui\\card.tsx\n  - components\\ui\\dialog.tsx\n  - components\\ui\\table.tsx\n  - components\\ui\\toast.tsx\n  - hooks\\use-toast.ts\n  - components\\ui\\toaster.tsx\n  - components\\ui\\badge.tsx\n  - components\\ui\\select.tsx\n  - components\\ui\\te...",
-  "timestamp": "2026-04-22T10:32:28.373Z",
-  "retry_count": 1
-}

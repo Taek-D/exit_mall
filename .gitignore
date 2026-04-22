@@ -8,3 +8,6 @@ playwright-report
 test-results
 supabase/.branches
 supabase/.temp
+*.tsbuildinfo
+.bkit
+.omc
