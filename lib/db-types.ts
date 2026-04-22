@@ -352,7 +352,57 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      adjust_balance: {
+        Args: {
+          target_user: string
+          delta: number
+          memo: string
+        }
+        Returns: undefined
+      }
+      cancel_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
+      confirm_deposit: {
+        Args: {
+          request_id: string
+        }
+        Returns: undefined
+      }
+      is_active: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      place_order: {
+        Args: {
+          items: Json
+          shipping: Json
+        }
+        Returns: string
+      }
+      reject_deposit: {
+        Args: {
+          request_id: string
+          memo: string
+        }
+        Returns: undefined
+      }
+      transition_order_status: {
+        Args: {
+          order_id: string
+          next_status: string
+          tracking?: string
+          carrier_name?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
