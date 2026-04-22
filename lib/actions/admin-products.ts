@@ -17,7 +17,7 @@ function parseForm(fd: FormData) {
 
 export async function createProductAction(fd: FormData) {
   const parsed = parseForm(fd);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
   const supabase = createClient();
   const { error } = await (supabase.from('products') as any).insert({
     name: parsed.data.name, description: parsed.data.description,
@@ -31,7 +31,7 @@ export async function createProductAction(fd: FormData) {
 
 export async function updateProductAction(id: string, fd: FormData) {
   const parsed = parseForm(fd);
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
   const supabase = createClient();
   const { error } = await (supabase.from('products') as any).update({
     name: parsed.data.name, description: parsed.data.description,

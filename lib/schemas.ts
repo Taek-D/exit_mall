@@ -28,21 +28,21 @@ export const checkoutSchema = z.object({
     quantity: z.number().int().min(1),
   })).min(1, '장바구니가 비어있습니다'),
   shipping: z.object({
-    name: z.string().min(1).max(30),
-    phone: z.string().regex(PHONE_RX),
-    address: z.string().min(1).max(200, '주소는 200자 이하'),
-    memo: z.string().max(200).optional().or(z.literal('')),
+    name: z.string().min(1, '받는 사람을 입력하세요').max(30, '받는 사람은 30자 이하'),
+    phone: z.string().regex(PHONE_RX, '연락처 형식이 올바르지 않습니다 (예: 010-1234-5678)'),
+    address: z.string().min(1, '주소를 입력하세요').max(200, '주소는 200자 이하'),
+    memo: z.string().max(200, '배송 메모는 200자 이하').optional().or(z.literal('')),
   }),
 });
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
 export const productSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().max(1000).default(''),
-  price: z.number().int().min(0),
-  stock: z.number().int().min(-1, '-1 또는 0 이상'),
+  name: z.string().min(1, '이름을 입력하세요').max(100, '이름은 100자 이하'),
+  description: z.string().max(1000, '설명은 1000자 이하').default(''),
+  price: z.number().int('가격은 정수여야 합니다').min(0, '가격은 0 이상'),
+  stock: z.number().int('재고는 정수여야 합니다').min(-1, '재고는 -1(무제한) 또는 0 이상'),
   isActive: z.boolean(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().url('이미지 URL 형식이 올바르지 않습니다').optional().nullable(),
 });
 export type ProductInput = z.infer<typeof productSchema>;
 

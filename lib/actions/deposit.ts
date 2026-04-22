@@ -9,7 +9,7 @@ export async function createDepositRequestAction(formData: FormData) {
     amount: Number(formData.get('amount')),
     depositorName: String(formData.get('depositorName') ?? ''),
   });
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -10,7 +10,7 @@ export async function saveAppSettingsAction(fd: FormData) {
     bankAccountHolder: fd.get('bankAccountHolder') ?? '',
     notice: fd.get('notice') ?? '',
   });
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

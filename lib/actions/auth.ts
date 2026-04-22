@@ -11,7 +11,7 @@ export async function signupAction(formData: FormData) {
     phone: formData.get('phone'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
   }
 
   const supabase = createClient();

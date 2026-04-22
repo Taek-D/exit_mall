@@ -9,7 +9,10 @@ export type PlaceOrderResult =
 
 export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult> {
   const parsed = checkoutSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.errors[0].message };
+  if (!parsed.success) {
+    const msg = parsed.error.errors.map(e => e.message).join(' · ');
+    return { ok: false, error: msg };
+  }
 
   const supabase = createClient();
   const { data, error } = await (supabase.rpc as any)('place_order', {

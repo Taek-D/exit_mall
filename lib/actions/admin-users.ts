@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 export async function adjustBalanceAction(userId: string, fd: FormData) {
   const parsed = adjustBalanceSchema.safeParse({ delta: Number(fd.get('delta')), memo: fd.get('memo') });
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
   const supabase = createClient();
   const { error } = await (supabase.rpc as any)('adjust_balance', {
     target_user: userId, delta: parsed.data.delta, memo: parsed.data.memo,
@@ -20,7 +20,7 @@ export async function adjustBalanceAction(userId: string, fd: FormData) {
 
 export async function updateThresholdAction(userId: string, fd: FormData) {
   const parsed = thresholdSchema.safeParse({ threshold: Number(fd.get('threshold')) });
-  if (!parsed.success) return { error: parsed.error.errors[0].message };
+  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
   const supabase = createClient();
   const { error } = await (supabase.from('profiles') as any).update({ low_balance_threshold: parsed.data.threshold }).eq('id', userId);
   if (error) return { error: error.message };
