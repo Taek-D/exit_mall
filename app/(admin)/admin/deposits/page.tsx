@@ -12,7 +12,7 @@ export default async function AdminDepositsPage() {
   const supabase = createClient();
   const { data } = await supabase
     .from('deposit_requests')
-    .select('id,amount,depositor_name,created_at,user_id,profiles!inner(name,email,phone)')
+    .select('id,amount,depositor_name,created_at,user_id,profiles:profiles!deposit_requests_user_id_fkey(name,email,phone)')
     .eq('status', 'pending').order('created_at');
 
   const rows = (data ?? []) as unknown as Row[];
