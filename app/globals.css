@@ -3,25 +3,76 @@
 @tailwind utilities;
 
 :root {
+  /* shadcn base tokens — slate palette */
   --background: 0 0% 100%;
   --foreground: 222 47% 11%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --primary: 222 47% 11%;
+  --primary: 222 47% 11%;           /* slate-900 */
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
+  --secondary: 210 40% 96%;          /* slate-100 */
   --secondary-foreground: 222 47% 11%;
   --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 84% 60%;
+  --muted-foreground: 215 16% 47%;   /* slate-500 */
+  --accent: 204 86% 32%;             /* sky-700 #0369A1 — CTA/focus */
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 72% 51%;          /* red-600 */
   --destructive-foreground: 210 40% 98%;
-  --border: 214 32% 91%;
+  --border: 214 32% 91%;             /* slate-200 */
   --input: 214 32% 91%;
-  --ring: 222 47% 11%;
+  --ring: 204 86% 32%;               /* sky-700 — focus ring */
   --radius: 0.5rem;
+
+  /* Semantic status (extended) */
+  --success: 160 84% 30%;            /* emerald-600 */
+  --success-foreground: 160 100% 97%;
+  --warning: 32 94% 42%;             /* amber-600 */
+  --warning-foreground: 48 96% 97%;
+  --info: 204 86% 32%;               /* sky-700 */
+  --info-foreground: 210 40% 98%;
+
+  /* Surface scale */
+  --surface: 210 40% 98%;            /* slate-50 */
+  --surface-muted: 210 40% 96%;      /* slate-100 */
 }
-body { @apply bg-background text-foreground; }
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+  /* Tabular numerals by default for .font-mono */
+  .font-mono {
+    font-feature-settings: 'tnum', 'zero';
+  }
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+  /* Consistent focus-visible */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  .dotted-grid {
+    background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
