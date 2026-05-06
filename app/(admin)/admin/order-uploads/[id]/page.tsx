@@ -99,7 +99,10 @@ export default async function AdminOrderUploadDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <OrderUploadStatusBadge status={upload.status} />
-          <DownloadButton storagePath={upload.storage_path} />
+          <DownloadButton
+            storagePath={upload.storage_path}
+            originalName={upload.original_name}
+          />
         </div>
       </header>
 

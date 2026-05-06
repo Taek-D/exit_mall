@@ -49,11 +49,14 @@ export async function rejectOrderUploadAction(
 
 export async function getOrderUploadDownloadUrl(
   storagePath: string,
+  originalName?: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const supabase = createClient();
+  // `download: <name>` adds Content-Disposition: attachment with the original
+  // filename, so the browser saves the file rather than navigating to it.
   const { data, error } = await supabase.storage
     .from('order-uploads')
-    .createSignedUrl(storagePath, 60 * 5); // 5 minutes
+    .createSignedUrl(storagePath, 60 * 5, { download: originalName || true });
   if (error || !data) return { ok: false, error: error?.message ?? '서명 URL 생성 실패' };
   return { ok: true, url: data.signedUrl };
 }
