@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { uploadOrderExcelAction } from '@/lib/actions/order-upload';
@@ -7,7 +7,7 @@ import { AlertCircle, FileSpreadsheet, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const ACCEPT = '.xlsx,.xls';
+const ACCEPT = '.xlsx';
 
 export function UploadForm() {
   const router = useRouter();
@@ -15,14 +15,19 @@ export function UploadForm() {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function resetInput() {
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = '';
+  }
 
   function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
     const f = e.target.files?.[0] ?? null;
     if (f && f.size > MAX_BYTES) {
       setError('파일 크기는 5MB 이하여야 합니다.');
-      e.target.value = '';
-      setFile(null);
+      resetInput();
       return;
     }
     setFile(f);
@@ -47,7 +52,8 @@ export function UploadForm() {
         title: '주문서 업로드 완료',
         description: '관리자 승인 후 주문이 처리됩니다.',
       });
-      setFile(null);
+      // Clear DOM value too — otherwise re-selecting the same file does not fire onChange.
+      resetInput();
       router.refresh();
     });
   }
@@ -68,12 +74,13 @@ export function UploadForm() {
           <>
             <span className="text-sm font-medium">엑셀 파일을 선택하세요</span>
             <span className="text-xs text-muted-foreground">
-              .xlsx 또는 .xls · 5MB 이하
+              .xlsx · 5MB 이하
             </span>
           </>
         )}
         <input
           id="excel-file"
+          ref={inputRef}
           type="file"
           accept={ACCEPT}
           className="sr-only"
