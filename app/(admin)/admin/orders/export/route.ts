@@ -53,6 +53,20 @@ export async function GET(req: Request) {
   const fromParam = url.searchParams.get('from');
   const toParam = url.searchParams.get('to');
 
+  // Date-only filters (YYYY-MM-DD) are interpreted as KST calendar days.
+  // - `from=YYYY-MM-DD` → KST 00:00 of that day
+  // - `to=YYYY-MM-DD`   → strict less-than KST 00:00 of the NEXT day so the
+  //   entire selected day (including late orders) is included.
+  // Full ISO/timestamp values are passed through unchanged so explicit ranges
+  // still work.
+  const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+  const KST_OFFSET = '+09:00';
+  function nextDayKstIso(dateStr: string): string {
+    const start = new Date(`${dateStr}T00:00:00${KST_OFFSET}`);
+    start.setUTCDate(start.getUTCDate() + 1);
+    return start.toISOString();
+  }
+
   let q = supabase
     .from('orders')
     .select(
@@ -60,8 +74,19 @@ export async function GET(req: Request) {
     )
     .order('created_at', { ascending: false });
   if (status && status !== 'all') q = q.eq('status', status);
-  if (fromParam) q = q.gte('created_at', fromParam);
-  if (toParam) q = q.lte('created_at', toParam);
+  if (fromParam) {
+    const lower = DATE_ONLY.test(fromParam)
+      ? `${fromParam}T00:00:00${KST_OFFSET}`
+      : fromParam;
+    q = q.gte('created_at', lower);
+  }
+  if (toParam) {
+    if (DATE_ONLY.test(toParam)) {
+      q = q.lt('created_at', nextDayKstIso(toParam));
+    } else {
+      q = q.lte('created_at', toParam);
+    }
+  }
 
   const { data, error } = await q;
   if (error) return new Response(`DB error: ${error.message}`, { status: 500 });
