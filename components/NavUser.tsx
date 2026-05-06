@@ -5,7 +5,7 @@ import { logoutAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { Wallet, ShoppingBag, ClipboardList, Package, LogOut } from 'lucide-react';
+import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +14,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const NAV = [
+const NAV: { href: string; label: string; Icon: typeof Package; exact?: boolean }[] = [
   { href: '/shop', label: '상품', Icon: Package },
   { href: '/cart', label: '장바구니', Icon: ShoppingBag },
-  { href: '/orders', label: '주문 내역', Icon: ClipboardList },
+  { href: '/orders', label: '주문 내역', Icon: ClipboardList, exact: true },
+  { href: '/orders/upload', label: '주문서 업로드', Icon: Upload },
   { href: '/deposit', label: '예치금', Icon: Wallet },
 ];
 
@@ -36,8 +37,10 @@ export function NavUser({ balance, name }: { balance: number; name: string }) {
             <span className="font-heading font-semibold tracking-tight hidden sm:inline">엑시트몰</span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
-            {NAV.map(({ href, label, Icon }) => {
-              const active = pathname === href || pathname.startsWith(href + '/');
+            {NAV.map(({ href, label, Icon, exact }) => {
+              const active = exact
+                ? pathname === href
+                : pathname === href || pathname.startsWith(href + '/');
               return (
                 <Link
                   key={href}
@@ -108,8 +111,10 @@ export function NavUser({ balance, name }: { balance: number; name: string }) {
       {/* mobile bottom strip for primary nav */}
       <nav className="md:hidden border-t">
         <ul className="mx-auto max-w-7xl px-2 flex">
-          {NAV.map(({ href, label, Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + '/');
+          {NAV.map(({ href, label, Icon, exact }) => {
+            const active = exact
+              ? pathname === href
+              : pathname === href || pathname.startsWith(href + '/');
             return (
               <li key={href} className="flex-1">
                 <Link

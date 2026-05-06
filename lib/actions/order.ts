@@ -36,6 +36,17 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
       const productId = msg.split(':')[1]?.trim();
       return { ok: false, error: '판매 중지된 상품이 있습니다', productId };
     }
+    if (msg.includes('PER_USER_LIMIT_EXCEEDED')) {
+      const parts = msg.split(':');
+      const productId = parts[1]?.trim();
+      const limit = parts[2]?.trim();
+      const already = parts[3]?.trim();
+      return {
+        ok: false,
+        error: `1인 구매 한도를 초과했습니다 (한도 ${limit}개, 누적 ${already}개)`,
+        productId,
+      };
+    }
     if (msg.includes('NOT_ACTIVE')) return { ok: false, error: '계정이 활성 상태가 아닙니다' };
     return { ok: false, error: msg };
   }

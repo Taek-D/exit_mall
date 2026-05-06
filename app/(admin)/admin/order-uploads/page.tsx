@@ -1,53 +1,51 @@
 import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
-import { ORDER_STATUS_LABEL, type OrderStatus } from '@/lib/types';
-import { OrderStatusBadge } from '@/components/StatusBadge';
-import { OrdersRealtime } from '@/components/OrdersRealtime';
 import { cn } from '@/lib/utils';
-import { ChevronRight, Inbox, Download } from 'lucide-react';
+import { OrderUploadStatusBadge } from '@/components/StatusBadge';
+import { ChevronRight, Inbox, FileSpreadsheet } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-const TABS: { key: OrderStatus | 'all'; label: string }[] = [
+const TABS: { key: string; label: string }[] = [
   { key: 'all', label: '전체' },
-  { key: 'placed', label: '접수' },
-  { key: 'preparing', label: '준비중' },
-  { key: 'shipped', label: '배송중' },
-  { key: 'delivered', label: '완료' },
-  { key: 'cancelled', label: '취소' },
+  { key: 'pending', label: '검토 대기' },
+  { key: 'approved', label: '승인' },
+  { key: 'rejected', label: '반려' },
 ];
 
-type OrderRow = {
+type UploadRow = {
   id: string;
   user_id: string;
-  total_amount: number;
+  original_name: string;
   status: string;
-  shipping_name: string;
+  company_name: string | null;
+  contact_person: string | null;
+  total_quantity: number;
+  total_amount: number;
   created_at: string;
   profiles: { name: string } | null;
 };
 
-export default async function AdminOrdersPage({
+export default async function AdminOrderUploadsPage({
   searchParams,
 }: {
   searchParams: { status?: string };
 }) {
   const supabase = createClient();
-  const status = (searchParams.status ?? 'all') as OrderStatus | 'all';
+  const status = searchParams.status ?? 'all';
 
   let q = supabase
-    .from('orders')
+    .from('order_uploads')
     .select(
-      'id,user_id,total_amount,status,shipping_name,created_at,profiles!orders_user_id_fkey(name)',
+      'id,user_id,original_name,status,company_name,contact_person,total_quantity,total_amount,created_at,profiles!order_uploads_user_id_fkey(name)',
     )
     .order('created_at', { ascending: false });
   if (status !== 'all') q = q.eq('status', status);
   const { data } = await q;
-  const rows = (data ?? []) as unknown as OrderRow[];
+  const rows = (data ?? []) as unknown as UploadRow[];
 
-  // Per-tab count for badges
-  const { data: allForCounts } = await supabase.from('orders').select('status');
+  const { data: allForCounts } = await supabase.from('order_uploads').select('status');
   const counts = ((allForCounts ?? []) as { status: string }[]).reduce<Record<string, number>>(
     (acc, r) => {
       acc[r.status] = (acc[r.status] ?? 0) + 1;
@@ -59,22 +57,14 @@ export default async function AdminOrdersPage({
 
   return (
     <div className="space-y-5">
-      <OrdersRealtime />
-
-      <div className="flex items-end justify-between gap-4">
+      <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">전체 {counts.all ?? 0}건의 주문</p>
+          <h1 className="font-heading font-semibold text-2xl tracking-tight">주문서 업로드</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            전체 {counts.all ?? 0}건 · 검토 대기 {counts.pending ?? 0}건
+          </p>
         </div>
-        <a
-          href={`/admin/orders/export${status !== 'all' ? `?status=${status}` : ''}`}
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border bg-background text-sm hover:bg-muted transition-colors"
-          aria-label="현재 필터로 엑셀 다운로드"
-        >
-          <Download className="h-3.5 w-3.5" aria-hidden />
-          <span className="hidden sm:inline">엑셀 다운로드</span>
-          <span className="sm:hidden">엑셀</span>
-        </a>
-      </div>
+      </header>
 
       <div className="rounded-lg border bg-card overflow-hidden">
         <div className="border-b overflow-x-auto">
@@ -85,7 +75,7 @@ export default async function AdminOrdersPage({
               return (
                 <Link
                   key={t.key}
-                  href={`/admin/orders${t.key === 'all' ? '' : `?status=${t.key}`}`}
+                  href={`/admin/order-uploads${t.key === 'all' ? '' : `?status=${t.key}`}`}
                   className={cn(
                     'relative flex items-center gap-2 px-4 h-11 text-sm border-b-2 transition-colors whitespace-nowrap',
                     active
@@ -113,43 +103,57 @@ export default async function AdminOrdersPage({
             <div className="h-11 w-11 rounded-full bg-muted grid place-items-center">
               <Inbox className="h-5 w-5 text-muted-foreground" aria-hidden />
             </div>
-            <p className="text-sm font-medium">
-              {status === 'all' ? '주문이 없습니다' : `${ORDER_STATUS_LABEL[status as OrderStatus]} 상태의 주문이 없습니다`}
-            </p>
+            <p className="text-sm font-medium">업로드된 주문서가 없습니다</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-muted">
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="font-medium px-4 h-10">주문 번호</th>
+                  <th className="font-medium px-4 h-10">파일</th>
                   <th className="font-medium px-3">고객</th>
-                  <th className="font-medium px-3">배송지</th>
+                  <th className="font-medium px-3">상호</th>
+                  <th className="font-medium px-3 text-right">수량</th>
                   <th className="font-medium px-3 text-right">금액</th>
                   <th className="font-medium px-3">상태</th>
-                  <th className="font-medium px-3">주문 시각</th>
+                  <th className="font-medium px-3">업로드</th>
                   <th className="font-medium px-3 w-8" aria-label="이동"></th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((o) => (
-                  <tr key={o.id} className="border-t h-11 hover:bg-surface-muted/60 transition-colors">
+                {rows.map((u) => (
+                  <tr key={u.id} className="border-t h-11 hover:bg-surface-muted/60 transition-colors">
                     <td className="px-4">
                       <Link
-                        href={`/admin/orders/${o.id}`}
-                        className="font-mono text-xs text-accent hover:underline"
+                        href={`/admin/order-uploads/${u.id}`}
+                        className="inline-flex items-center gap-1.5 text-accent hover:underline"
+                        title={u.original_name}
                       >
-                        {o.id.slice(0, 8)}
+                        <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+                        <span className="truncate max-w-[180px]">{u.original_name}</span>
                       </Link>
                     </td>
-                    <td className="px-3">{o.profiles?.name ?? <span className="text-muted-foreground font-mono text-xs">{o.user_id.slice(0, 8)}</span>}</td>
-                    <td className="px-3 text-muted-foreground truncate max-w-[180px]">{o.shipping_name}</td>
-                    <td className="px-3 text-right font-mono tabular">{formatKRW(Number(o.total_amount))}</td>
                     <td className="px-3">
-                      <OrderStatusBadge status={o.status as OrderStatus} />
+                      {u.profiles?.name ?? (
+                        <span className="text-muted-foreground font-mono text-xs">
+                          {u.user_id.slice(0, 8)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 text-muted-foreground truncate max-w-[160px]">
+                      {u.company_name ?? '—'}
+                    </td>
+                    <td className="px-3 text-right font-mono tabular">
+                      {u.total_quantity.toLocaleString()}
+                    </td>
+                    <td className="px-3 text-right font-mono tabular">
+                      {formatKRW(Number(u.total_amount))}
+                    </td>
+                    <td className="px-3">
+                      <OrderUploadStatusBadge status={u.status} />
                     </td>
                     <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(o.created_at).toLocaleString('ko-KR', {
+                      {new Date(u.created_at).toLocaleString('ko-KR', {
                         year: 'numeric',
                         month: '2-digit',
                         day: '2-digit',
@@ -159,7 +163,7 @@ export default async function AdminOrdersPage({
                     </td>
                     <td className="px-3 text-right">
                       <Link
-                        href={`/admin/orders/${o.id}`}
+                        href={`/admin/order-uploads/${u.id}`}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                         aria-label="상세 보기"
                       >

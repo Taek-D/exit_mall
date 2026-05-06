@@ -43,6 +43,13 @@ export const productSchema = z.object({
   stock: z.number().int('재고는 정수여야 합니다').min(-1, '재고는 -1(무제한) 또는 0 이상'),
   isActive: z.boolean(),
   imageUrl: z.string().url('이미지 URL 형식이 올바르지 않습니다').optional().nullable(),
+  perUserLimit: z
+    .number()
+    .int('1인 구매 한도는 정수여야 합니다')
+    .min(1, '1인 구매 한도는 1 이상이거나 비워두세요')
+    .nullable()
+    .optional()
+    .default(null),
 });
 export type ProductInput = z.infer<typeof productSchema>;
 

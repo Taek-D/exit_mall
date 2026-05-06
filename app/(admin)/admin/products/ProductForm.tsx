@@ -16,6 +16,7 @@ type Props = {
     stock: number;
     is_active: boolean;
     image_url: string | null;
+    per_user_limit: number | null;
   };
 };
 
@@ -89,6 +90,24 @@ export function ProductForm({ action, defaults }: Props) {
             />
             <p className="text-[11px] text-muted-foreground">−1 입력 시 무제한</p>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="perUserLimit">1인 구매 한도</Label>
+          <Input
+            id="perUserLimit"
+            name="perUserLimit"
+            type="number"
+            min={1}
+            inputMode="numeric"
+            placeholder="비워두면 무제한"
+            defaultValue={defaults?.per_user_limit ?? ''}
+            className="font-mono tabular"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            한 명의 고객이 이 상품을 누적 구매할 수 있는 최대 수량 (취소된 주문은 제외).
+            비워두면 제한 없음.
+          </p>
         </div>
 
         <label

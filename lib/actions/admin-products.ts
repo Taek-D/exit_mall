@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 function parseForm(fd: FormData) {
+  const rawLimit = (fd.get('perUserLimit') as string | null)?.trim() ?? '';
   return productSchema.safeParse({
     name: fd.get('name'),
     description: fd.get('description') ?? '',
@@ -12,6 +13,7 @@ function parseForm(fd: FormData) {
     stock: Number(fd.get('stock')),
     isActive: fd.get('isActive') === 'on',
     imageUrl: (fd.get('imageUrl') as string) || null,
+    perUserLimit: rawLimit === '' ? null : Number(rawLimit),
   });
 }
 
@@ -23,6 +25,7 @@ export async function createProductAction(fd: FormData) {
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
+    per_user_limit: parsed.data.perUserLimit,
   });
   if (error) return { error: error.message };
   revalidatePath('/admin/products');
@@ -37,6 +40,7 @@ export async function updateProductAction(id: string, fd: FormData) {
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
+    per_user_limit: parsed.data.perUserLimit,
   }).eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/admin/products');

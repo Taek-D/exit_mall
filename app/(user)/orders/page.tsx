@@ -3,9 +3,10 @@ import { formatKRW } from '@/lib/money';
 import { type OrderStatus } from '@/lib/types';
 import { OrderStatusBadge } from '@/components/StatusBadge';
 import { OrderCancelButton } from '@/components/OrderCancelButton';
-import { Inbox, Truck } from 'lucide-react';
+import { Inbox, Truck, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { getTrackingUrl } from '@/lib/tracking';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,11 +97,7 @@ export default async function MyOrdersPage() {
 
               {o.tracking_number && (
                 <div className="px-4 pb-3">
-                  <div className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs">
-                    <Truck className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                    <span className="text-muted-foreground">{o.carrier}</span>
-                    <span className="font-mono tabular">{o.tracking_number}</span>
-                  </div>
+                  <TrackingChip carrier={o.carrier} tracking={o.tracking_number} />
                 </div>
               )}
 
@@ -114,6 +111,35 @@ export default async function MyOrdersPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function TrackingChip({ carrier, tracking }: { carrier: string | null; tracking: string }) {
+  const url = getTrackingUrl(carrier, tracking);
+  const inner = (
+    <>
+      <Truck className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+      {carrier && <span className="text-muted-foreground">{carrier}</span>}
+      <span className="font-mono tabular">{tracking}</span>
+      {url && <ExternalLink className="h-3 w-3 text-muted-foreground" aria-hidden />}
+    </>
+  );
+  if (url) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs hover:bg-muted transition-colors"
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs">
+      {inner}
     </div>
   );
 }

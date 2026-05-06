@@ -15,16 +15,34 @@ type Product = {
   price: number;
   stock: number;
   image_url: string | null;
+  per_user_limit: number | null;
 };
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({
+  product,
+  alreadyBought = 0,
+}: {
+  product: Product;
+  alreadyBought?: number;
+}) {
   const { add } = useCart();
   const { toast } = useToast();
   const [justAdded, setJustAdded] = useState(false);
   const soldOut = product.stock === 0;
   const low = product.stock > 0 && product.stock < 10;
+  const limit = product.per_user_limit;
+  const reached = limit !== null && alreadyBought >= limit;
+  const remaining = limit !== null ? Math.max(0, limit - alreadyBought) : null;
 
   function onAdd() {
+    if (reached) {
+      toast({
+        title: '구매 한도에 도달했어요',
+        description: `이 상품은 1인당 최대 ${limit}개까지 구매할 수 있어요.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     add({
       productId: product.id,
       name: product.name,
@@ -63,6 +81,13 @@ export function ProductCard({ product }: { product: Product }) {
             <StatusPill tone="warning">재고 {product.stock}</StatusPill>
           </div>
         )}
+        {limit !== null && !soldOut && (
+          <div className="absolute top-2 right-2">
+            <StatusPill tone={reached ? 'danger' : 'info'}>
+              {reached ? '한도 도달' : `1인 ${limit}개`}
+            </StatusPill>
+          </div>
+        )}
       </div>
       <div className="flex flex-col flex-1 p-4 gap-1.5">
         <h3 className="font-medium text-[15px] leading-tight line-clamp-1">{product.name}</h3>
@@ -73,18 +98,25 @@ export function ProductCard({ product }: { product: Product }) {
           <span className="font-mono tabular font-semibold text-[15px]">
             {formatKRW(product.price)}
           </span>
+          {limit !== null && remaining !== null && remaining > 0 && remaining <= 5 && (
+            <span className="text-[11px] text-muted-foreground">
+              남은 한도 <span className="font-mono tabular font-medium text-foreground">{remaining}</span>개
+            </span>
+          )}
         </div>
       </div>
       <div className="p-3 pt-0">
         <Button
           className="w-full"
           variant={justAdded ? 'secondary' : 'default'}
-          disabled={soldOut}
+          disabled={soldOut || reached}
           onClick={onAdd}
           aria-label={`${product.name} 장바구니 담기`}
         >
           {soldOut ? (
             '품절'
+          ) : reached ? (
+            '한도 도달'
           ) : justAdded ? (
             <>
               <Check className="h-4 w-4" aria-hidden />

@@ -12,6 +12,7 @@ type Product = {
   stock: number;
   is_active: boolean;
   image_url: string | null;
+  per_user_limit: number | null;
 };
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
@@ -46,6 +47,7 @@ export default async function EditProductPage({ params }: { params: { id: string
           stock: p.stock,
           is_active: p.is_active,
           image_url: p.image_url,
+          per_user_limit: p.per_user_limit,
         }}
       />
     </div>
