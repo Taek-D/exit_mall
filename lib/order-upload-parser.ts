@@ -89,12 +89,15 @@ export function parseOrderExcel(buffer: Buffer | ArrayBuffer | Uint8Array): Pars
     if (qty === null || qty < 1 || !Number.isInteger(qty)) {
       throw new Error(`${r}행 (${name}): 수량이 올바르지 않습니다.`);
     }
-    if (price === null || price < 0) {
-      throw new Error(`${r}행 (${name}): 매입단가가 올바르지 않습니다.`);
+    if (price === null || price < 0 || !Number.isInteger(price)) {
+      throw new Error(`${r}행 (${name}): 매입단가는 0 이상의 정수(원)여야 합니다.`);
     }
 
     const computedAmount = qty * price;
     const explicitAmount = readCellNumber(ws, `H${r}`);
+    if (explicitAmount !== null && (!Number.isInteger(explicitAmount) || explicitAmount < 0)) {
+      throw new Error(`${r}행 (${name}): 금액은 0 이상의 정수(원)여야 합니다.`);
+    }
     const amount = explicitAmount !== null && explicitAmount > 0 ? explicitAmount : computedAmount;
 
     items.push({
