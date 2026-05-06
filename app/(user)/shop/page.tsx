@@ -11,15 +11,40 @@ type ProductRow = {
   price: number;
   stock: number;
   image_url: string | null;
+  per_user_limit: number | null;
+};
+
+type PurchasedRow = {
+  product_id: string | null;
+  quantity: number;
+  orders: { user_id: string; status: string } | null;
 };
 
 export default async function ShopPage() {
   const supabase = createClient();
-  const { data: products, error } = await supabase
-    .from('products')
-    .select('id, name, description, price, stock, image_url')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [productsRes, purchasedRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, description, price, stock, image_url, per_user_limit')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
+    user
+      ? supabase
+          .from('order_items')
+          .select('product_id, quantity, orders!inner(user_id, status)')
+          .eq('orders.user_id', user.id)
+          .neq('orders.status', 'cancelled')
+      : Promise.resolve({ data: null, error: null } as const),
+  ]);
+
+  const { data: products, error } = productsRes;
+  const purchasedMap = new Map<string, number>();
+  for (const r of (purchasedRes.data ?? []) as unknown as PurchasedRow[]) {
+    if (!r.product_id) continue;
+    purchasedMap.set(r.product_id, (purchasedMap.get(r.product_id) ?? 0) + Number(r.quantity ?? 0));
+  }
 
   if (error) {
     return (
@@ -61,7 +86,11 @@ export default async function ShopPage() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
           {visible.map((p) => (
-            <ProductCard key={p.id} product={{ ...p, price: Number(p.price) }} />
+            <ProductCard
+              key={p.id}
+              product={{ ...p, price: Number(p.price) }}
+              alreadyBought={purchasedMap.get(p.id) ?? 0}
+            />
           ))}
         </div>
       )}

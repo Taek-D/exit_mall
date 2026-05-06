@@ -5,8 +5,9 @@ import { formatKRW } from '@/lib/money';
 import { type OrderStatus } from '@/lib/types';
 import { OrderStatusBadge } from '@/components/StatusBadge';
 import { TransitionButtons } from './TransitionButtons';
-import { ArrowLeft, User, MapPin, Truck, Package } from 'lucide-react';
+import { ArrowLeft, User, MapPin, Truck, Package, ExternalLink } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { getTrackingUrl } from '@/lib/tracking';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,6 +100,22 @@ export default async function AdminOrderDetailPage({
               <Row label="송장번호" mono>
                 {order.tracking_number}
               </Row>
+              {(() => {
+                const url = getTrackingUrl(order.carrier, order.tracking_number);
+                return url ? (
+                  <div className="pt-2">
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border bg-background text-xs hover:bg-muted transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" aria-hidden />
+                      배송조회
+                    </a>
+                  </div>
+                ) : null;
+              })()}
             </dl>
           ) : (
             <p className="text-sm text-muted-foreground">송장번호가 입력되지 않았습니다.</p>

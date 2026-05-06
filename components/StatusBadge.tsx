@@ -5,11 +5,12 @@ import { ORDER_STATUS_LABEL, DEPOSIT_STATUS_LABEL } from '@/lib/types';
 type Tone = 'info' | 'success' | 'warning' | 'danger' | 'neutral' | 'violet';
 
 const TONE_CLASS: Record<Tone, string> = {
-  info: 'bg-sky-50 text-sky-700 ring-sky-200',
-  success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  warning: 'bg-amber-50 text-amber-700 ring-amber-200',
-  danger: 'bg-red-50 text-red-700 ring-red-200',
-  neutral: 'bg-slate-100 text-slate-700 ring-slate-200',
+  info: 'bg-info/10 text-info ring-info/20',
+  success: 'bg-success/10 text-success ring-success/20',
+  warning: 'bg-warning/10 text-warning ring-warning/20',
+  danger: 'bg-destructive/10 text-destructive ring-destructive/20',
+  neutral: 'bg-muted text-muted-foreground ring-border',
+  // violet은 시맨틱 토큰이 없어 보조 색상 유지 (배송중 상태 시각 구분용)
   violet: 'bg-violet-50 text-violet-700 ring-violet-200',
 };
 
@@ -63,6 +64,39 @@ const USER_LABEL: Record<UserStatus, string> = {
 
 export function UserStatusBadge({ status }: { status: UserStatus }) {
   return <Pill tone={USER_TONE[status]}>{USER_LABEL[status]}</Pill>;
+}
+
+export type OrderUploadStatus = 'pending' | 'approved' | 'rejected' | 'failed';
+
+const ORDER_UPLOAD_TONE: Record<OrderUploadStatus, Tone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  failed: 'danger',
+};
+
+const ORDER_UPLOAD_LABEL: Record<OrderUploadStatus, string> = {
+  pending: '검토 대기',
+  approved: '승인 완료',
+  rejected: '반려',
+  failed: '처리 실패',
+};
+
+export function OrderUploadStatusBadge({
+  status,
+  className,
+}: {
+  status: string;
+  className?: string;
+}) {
+  const key = (
+    ['pending', 'approved', 'rejected', 'failed'].includes(status) ? status : 'pending'
+  ) as OrderUploadStatus;
+  return (
+    <Pill tone={ORDER_UPLOAD_TONE[key]} className={className}>
+      {ORDER_UPLOAD_LABEL[key]}
+    </Pill>
+  );
 }
 
 export { Pill as StatusPill };

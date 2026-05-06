@@ -177,6 +177,103 @@ export type Database = {
           },
         ]
       }
+      order_uploads: {
+        Row: {
+          admin_memo: string | null
+          buyer_email: string | null
+          buyer_order_number: string | null
+          buyer_phone: string | null
+          company_name: string | null
+          contact_person: string | null
+          created_at: string
+          id: string
+          items: Json
+          order_date: string | null
+          order_id: string | null
+          original_name: string
+          parse_error: string | null
+          request_memo: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shipping_address: string | null
+          status: string
+          storage_path: string
+          total_amount: number
+          total_quantity: number
+          user_id: string
+        }
+        Insert: {
+          admin_memo?: string | null
+          buyer_email?: string | null
+          buyer_order_number?: string | null
+          buyer_phone?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          order_date?: string | null
+          order_id?: string | null
+          original_name: string
+          parse_error?: string | null
+          request_memo?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shipping_address?: string | null
+          status?: string
+          storage_path: string
+          total_amount?: number
+          total_quantity?: number
+          user_id: string
+        }
+        Update: {
+          admin_memo?: string | null
+          buyer_email?: string | null
+          buyer_order_number?: string | null
+          buyer_phone?: string | null
+          company_name?: string | null
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          order_date?: string | null
+          order_id?: string | null
+          original_name?: string
+          parse_error?: string | null
+          request_memo?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shipping_address?: string | null
+          status?: string
+          storage_path?: string
+          total_amount?: number
+          total_quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_uploads_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_uploads_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_uploads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           id: string
@@ -283,6 +380,7 @@ export type Database = {
           image_url: string | null
           is_active: boolean
           name: string
+          per_user_limit: number | null
           price: number
           stock: number
         }
@@ -293,6 +391,7 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           name: string
+          per_user_limit?: number | null
           price: number
           stock?: number
         }
@@ -303,6 +402,7 @@ export type Database = {
           image_url?: string | null
           is_active?: boolean
           name?: string
+          per_user_limit?: number | null
           price?: number
           stock?: number
         }
@@ -352,6 +452,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_order_upload: {
+        Args: {
+          upload_id: string
+        }
+        Returns: string
+      }
+      reject_order_upload: {
+        Args: {
+          upload_id: string
+          memo: string
+        }
+        Returns: undefined
+      }
       adjust_balance: {
         Args: {
           target_user: string
