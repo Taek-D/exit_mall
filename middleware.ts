@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@/lib/supabase/middleware-client';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/pending', '/favicon.ico'];
+const PUBLIC_PATHS = [
+  '/login',
+  '/signup',
+  '/pending',
+  '/find-account',
+  '/forgot-password',
+  '/reset-password',
+  '/auth/callback',
+  '/favicon.ico',
+];
 const ADMIN_PREFIX = '/admin';
 
 export async function middleware(request: NextRequest) {

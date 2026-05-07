@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Menu, ChevronDown } from 'lucide-react';
+import { LogOut, Menu, ChevronDown, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { MobileAdminNav } from '@/components/MobileAdminNav';
@@ -23,6 +23,7 @@ const TITLES: Record<string, string> = {
   '/admin/users': '사용자 관리',
   '/admin/low-balance': '잔액 부족 고객',
   '/admin/settings': '설정',
+  '/admin/account/password': '비밀번호 변경',
 };
 
 export function AdminHeader({ name, email }: { name: string; email?: string | null }) {
@@ -75,6 +76,12 @@ export function AdminHeader({ name, email }: { name: string; email?: string | nu
             <DropdownMenuItem asChild>
               <Link href="/admin/settings">
                 <span>설정</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/account/password">
+                <KeyRound className="h-4 w-4" aria-hidden />
+                <span>비밀번호 변경</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

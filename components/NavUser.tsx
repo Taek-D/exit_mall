@@ -5,7 +5,7 @@ import { logoutAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload } from 'lucide-react';
+import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload, KeyRound } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,6 +93,12 @@ export function NavUser({ balance, name }: { balance: number; name: string }) {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/orders">주문 내역</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/account/password">
+                  <KeyRound className="h-4 w-4" aria-hidden />
+                  <span>비밀번호 변경</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <form action={logoutAction}>
