@@ -57,7 +57,15 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">비밀번호</Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="password">비밀번호</Label>
+                <Link
+                  href="/find-account"
+                  className="text-xs text-accent font-medium hover:underline"
+                >
+                  아이디/비밀번호 찾기
+                </Link>
+              </div>
               <div className="relative">
                 <Lock
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"

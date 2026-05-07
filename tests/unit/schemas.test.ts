@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  signupSchema, depositRequestSchema, checkoutSchema, productSchema, adjustBalanceSchema,
+  signupSchema,
+  passwordChangeSchema,
+  findAccountSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
+  depositRequestSchema,
+  checkoutSchema,
+  productSchema,
+  adjustBalanceSchema,
 } from '@/lib/schemas';
 
 describe('signupSchema', () => {
@@ -8,6 +16,52 @@ describe('signupSchema', () => {
   it('passes valid', () => expect(signupSchema.safeParse(valid).success).toBe(true));
   it('rejects short password', () => expect(signupSchema.safeParse({ ...valid, password: 'pw' }).success).toBe(false));
   it('rejects invalid phone', () => expect(signupSchema.safeParse({ ...valid, phone: '12345' }).success).toBe(false));
+});
+
+describe('passwordChangeSchema', () => {
+  const valid = {
+    currentPassword: 'oldpassword123',
+    newPassword: 'newpassword123',
+    confirmPassword: 'newpassword123',
+  };
+  it('passes valid', () => expect(passwordChangeSchema.safeParse(valid).success).toBe(true));
+  it('rejects missing current password', () =>
+    expect(passwordChangeSchema.safeParse({ ...valid, currentPassword: '' }).success).toBe(false));
+  it('rejects short new password', () =>
+    expect(passwordChangeSchema.safeParse({ ...valid, newPassword: 'short', confirmPassword: 'short' }).success).toBe(false));
+  it('rejects mismatched confirmation', () =>
+    expect(passwordChangeSchema.safeParse({ ...valid, confirmPassword: 'different123' }).success).toBe(false));
+  it('rejects unchanged password', () =>
+    expect(passwordChangeSchema.safeParse({
+      currentPassword: 'samepassword123',
+      newPassword: 'samepassword123',
+      confirmPassword: 'samepassword123',
+    }).success).toBe(false));
+});
+
+describe('findAccountSchema', () => {
+  it('passes valid', () =>
+    expect(findAccountSchema.safeParse({ name: '홍길동', phone: '010-1234-5678' }).success).toBe(true));
+  it('rejects empty name', () =>
+    expect(findAccountSchema.safeParse({ name: '', phone: '010-1234-5678' }).success).toBe(false));
+  it('rejects invalid phone', () =>
+    expect(findAccountSchema.safeParse({ name: '홍길동', phone: '12345' }).success).toBe(false));
+});
+
+describe('passwordResetRequestSchema', () => {
+  it('passes valid email', () =>
+    expect(passwordResetRequestSchema.safeParse({ email: 'a@b.com' }).success).toBe(true));
+  it('rejects invalid email', () =>
+    expect(passwordResetRequestSchema.safeParse({ email: 'not-email' }).success).toBe(false));
+});
+
+describe('passwordResetSchema', () => {
+  const valid = { newPassword: 'newpassword123', confirmPassword: 'newpassword123' };
+  it('passes valid', () => expect(passwordResetSchema.safeParse(valid).success).toBe(true));
+  it('rejects short new password', () =>
+    expect(passwordResetSchema.safeParse({ newPassword: 'short', confirmPassword: 'short' }).success).toBe(false));
+  it('rejects mismatched confirmation', () =>
+    expect(passwordResetSchema.safeParse({ ...valid, confirmPassword: 'different123' }).success).toBe(false));
 });
 
 describe('depositRequestSchema', () => {

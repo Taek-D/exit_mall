@@ -16,6 +16,44 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, '현재 비밀번호를 입력하세요'),
+    newPassword: z.string().min(8, '새 비밀번호는 8자 이상').max(72),
+    confirmPassword: z.string().min(1, '새 비밀번호 확인을 입력하세요'),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    path: ['confirmPassword'],
+    message: '새 비밀번호가 일치하지 않습니다',
+  })
+  .refine((v) => v.currentPassword !== v.newPassword, {
+    path: ['newPassword'],
+    message: '현재 비밀번호와 다른 새 비밀번호를 입력하세요',
+  });
+export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
+
+export const findAccountSchema = z.object({
+  name: z.string().min(1, '이름을 입력하세요').max(30),
+  phone: z.string().regex(PHONE_RX, '휴대폰 번호 형식이 아닙니다'),
+});
+export type FindAccountInput = z.infer<typeof findAccountSchema>;
+
+export const passwordResetRequestSchema = z.object({
+  email: z.string().email('이메일 형식이 아닙니다'),
+});
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+
+export const passwordResetSchema = z
+  .object({
+    newPassword: z.string().min(8, '새 비밀번호는 8자 이상').max(72),
+    confirmPassword: z.string().min(1, '새 비밀번호 확인을 입력하세요'),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    path: ['confirmPassword'],
+    message: '새 비밀번호가 일치하지 않습니다',
+  });
+export type PasswordResetInput = z.infer<typeof passwordResetSchema>;
+
 export const depositRequestSchema = z.object({
   amount: z.number().int().min(1000, '1,000원 이상부터 가능합니다'),
   depositorName: z.string().min(1).max(30),
