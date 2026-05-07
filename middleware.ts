@@ -18,6 +18,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/_next') || pathname.startsWith('/api/public')) return response;
+  if (pathname.startsWith('/api/orders/') && pathname.endsWith('/tracking')) return response;
   if (PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))) return response;
 
   const { data: { user } } = await supabase.auth.getUser();
