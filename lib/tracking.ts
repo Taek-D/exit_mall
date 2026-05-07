@@ -3,7 +3,7 @@
  * Returns null when the carrier is unknown or the inputs are missing.
  */
 
-type CarrierKey =
+export type CarrierKey =
   | 'cj'
   | 'hanjin'
   | 'lotte'
@@ -34,16 +34,21 @@ const CARRIER_ALIASES: Record<string, CarrierKey> = {
   경동택배: 'kdexp',
 };
 
-function normalize(name: string): CarrierKey | null {
+export function normalizeCarrier(name: string | null | undefined): CarrierKey | null {
+  if (!name) return null;
   const key = name.replace(/\s+/g, '').toLowerCase();
   return CARRIER_ALIASES[key] ?? null;
+}
+
+export function isCjCarrier(carrier: string | null | undefined): boolean {
+  return normalizeCarrier(carrier) === 'cj';
 }
 
 export function getTrackingUrl(carrier: string | null | undefined, trackingNumber: string | null | undefined): string | null {
   if (!carrier || !trackingNumber) return null;
   const t = trackingNumber.replace(/[^0-9A-Za-z]/g, '');
   if (!t) return null;
-  const k = normalize(carrier);
+  const k = normalizeCarrier(carrier);
   switch (k) {
     case 'cj':
       return `https://trace.cjlogistics.com/web/detail.jsp?slipno=${t}`;

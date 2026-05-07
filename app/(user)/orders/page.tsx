@@ -6,7 +6,8 @@ import { OrderCancelButton } from '@/components/OrderCancelButton';
 import { Inbox, Truck, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { getTrackingUrl } from '@/lib/tracking';
+import { getTrackingUrl, isCjCarrier } from '@/lib/tracking';
+import { DeliveryTrackingLookup } from '@/components/DeliveryTrackingLookup';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,8 +97,9 @@ export default async function MyOrdersPage() {
               </div>
 
               {o.tracking_number && (
-                <div className="px-4 pb-3">
+                <div className="px-4 pb-3 space-y-2">
                   <TrackingChip carrier={o.carrier} tracking={o.tracking_number} />
+                  {isCjCarrier(o.carrier) && <DeliveryTrackingLookup orderId={o.id} />}
                 </div>
               )}
 

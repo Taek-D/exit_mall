@@ -7,7 +7,8 @@ import { OrderStatusBadge } from '@/components/StatusBadge';
 import { TransitionButtons } from './TransitionButtons';
 import { ArrowLeft, User, MapPin, Truck, Package, ExternalLink } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { getTrackingUrl } from '@/lib/tracking';
+import { getTrackingUrl, isCjCarrier } from '@/lib/tracking';
+import { DeliveryTrackingLookup } from '@/components/DeliveryTrackingLookup';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,7 +104,7 @@ export default async function AdminOrderDetailPage({
               {(() => {
                 const url = getTrackingUrl(order.carrier, order.tracking_number);
                 return url ? (
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-2">
                     <a
                       href={url}
                       target="_blank"
@@ -113,6 +114,7 @@ export default async function AdminOrderDetailPage({
                       <ExternalLink className="h-3 w-3" aria-hidden />
                       배송조회
                     </a>
+                    {isCjCarrier(order.carrier) && <DeliveryTrackingLookup orderId={order.id} />}
                   </div>
                 ) : null;
               })()}
