@@ -4,6 +4,8 @@
 
 Next.js 14 + Supabase 기반입니다.
 
+최종 업데이트: 2026-05-07
+
 ## 현재 구현 상태
 
 ### 주문자
@@ -12,7 +14,9 @@ Next.js 14 + Supabase 기반입니다.
 - 상품별 1인 누적 구매 한도 표시 및 제한
 - 예치금 잔액 확인, 이체 요청, 이체 요청 내역 확인
 - 내 주문 내역 확인 및 `placed` 상태 주문 취소
-- 송장번호가 입력된 주문의 택배 조회 링크 제공
+- 송장번호가 입력된 주문의 택배 조회
+  - CJ대한통운은 앱 안에서 수동 배송 상태 조회
+  - 비CJ 택배사는 기존 외부 배송조회 링크 제공
 - 엑셀 주문서 양식 다운로드 및 `.xlsx` 주문서 업로드
 - 계정 메뉴에서 현재 비밀번호 확인 후 비밀번호 변경
 - 로그인 화면에서 아이디 찾기 및 비밀번호 재설정 메일 요청
@@ -24,6 +28,7 @@ Next.js 14 + Supabase 기반입니다.
 - 상품별 1인 구매 한도 설정
 - 주문 목록 상태 탭, 주문 상세, 상태 전이
 - 발송 처리 시 택배사/송장번호 입력
+- 주문 상세에서 CJ대한통운 배송 상태 수동 조회
 - 주문 목록 엑셀 다운로드
 - 업로드된 주문서 검토, 원본 다운로드, 승인/반려
 - 주문서 승인 시 예치금 차감 및 정식 주문 생성
@@ -35,8 +40,9 @@ Next.js 14 + Supabase 기반입니다.
 ### 아직 구현 범위가 아닌 것
 - 상품 가격 비공개 후 문의 유도 UI
 - 상품별 담당 구매자/담당자 자동 매칭
-- 택배사 실시간 API 연동
-  - 현재는 CJ대한통운, 한진택배, 롯데택배, 로젠택배, 우체국택배, 경동택배 조회 URL로 연결합니다.
+- CJ대한통운 외 택배사의 앱 내 배송 상태 조회
+  - 한진택배, 롯데택배, 로젠택배, 우체국택배, 경동택배는 현재 외부 조회 URL로 연결합니다.
+- 배송조회 결과 DB 캐싱 및 배송완료 자동 상태 전환
 - 사진/OCR 기반 상품 자동 등록
 
 ## 로컬 개발 환경 셋업
@@ -95,7 +101,7 @@ pnpm dev   # http://localhost:3000
 
 ```bash
 pnpm typecheck            # TypeScript 타입 검사
-pnpm test                 # 단위 테스트 (money, Zod schemas, order upload parser) - 40개
+pnpm test                 # 단위 테스트 (money, Zod schemas, order upload parser, CJ 배송조회) - 53개
 pnpm test:e2e             # Playwright (추후 추가 예정)
 ```
 
@@ -115,7 +121,7 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 ### 주문자
 - `/shop` 상품 목록 / `/cart` 장바구니 / `/checkout` 주문서
 - `/deposit` 예치금 잔액·이체 내역 / `/deposit/new` 이체 요청
-- `/orders` 내 주문 내역 (placed 상태만 취소 가능, 송장번호가 있으면 배송조회)
+- `/orders` 내 주문 내역 (placed 상태만 취소 가능, CJ대한통운 앱 내 조회, 비CJ 외부 배송조회)
 - `/orders/upload` 엑셀 주문서 양식 다운로드·업로드
 - `/account/password` 비밀번호 변경
 - `/find-account` 아이디 찾기·비밀번호 재설정 메일 요청
@@ -126,6 +132,7 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 - `/admin/approvals` 가입 승인
 - `/admin/deposits` 입금 확인
 - `/admin/orders` 주문 관리 (탭 + 상세 + 상태 전이 + 송장 입력 + 엑셀 다운로드)
+- `/admin/orders/[id]` 주문 상세 및 CJ대한통운 앱 내 배송조회
 - `/admin/order-uploads` 엑셀 주문서 검토/승인/반려
 - `/admin/products` 상품 CRUD (이미지 Supabase Storage 업로드, 1인 구매 한도)
 - `/admin/users` 사용자 관리 (잔액 조정·상태 변경·임계치)
@@ -140,7 +147,8 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 2. `/checkout`에서 배송 정보를 입력하고 주문합니다.
 3. 주문 시 예치금이 차감되고 재고가 감소합니다.
 4. 관리자가 `/admin/orders`에서 `접수 -> 준비중 -> 배송중 -> 완료`로 상태를 변경합니다.
-5. `배송중` 처리 시 택배사와 송장번호를 입력하면 주문자 주문 내역에서 배송조회 링크가 표시됩니다.
+5. `배송중` 처리 시 택배사와 송장번호를 입력하면 주문자 주문 내역에서 배송조회가 표시됩니다.
+6. CJ대한통운 주문은 앱 안에서 최신 배송 상태를 수동 조회하고, 비CJ 주문은 외부 조회 링크로 이동합니다.
 
 ### 예치금 충전
 1. 주문자가 `/deposit/new`에서 이체 금액과 입금자명을 제출합니다.
@@ -159,6 +167,7 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 - **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Next.js Route Handlers + Server Actions
 - **DB/Auth**: Supabase (Postgres + Auth + Realtime + Storage)
+- **배송조회**: CJ대한통운 공식 조회 endpoint 연동, 비CJ 외부 조회 URL
 - **엑셀 처리**: xlsx
 - **검증**: Zod
 - **테스트**: Vitest (단위), Playwright (E2E 예정)
