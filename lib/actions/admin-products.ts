@@ -1,8 +1,8 @@
 'use server';
-import { createClient } from '@/lib/supabase/server';
 import { productSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { requireAdmin } from '@/lib/actions/_guards';
 
 function parseForm(fd: FormData) {
   const rawLimit = (fd.get('perUserLimit') as string | null)?.trim() ?? '';
@@ -18,39 +18,51 @@ function parseForm(fd: FormData) {
 }
 
 export async function createProductAction(fd: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
   if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
-  const supabase = createClient();
-  const { error } = await (supabase.from('products') as any).insert({
+  const { error } = await (guard.supabase.from('products') as any).insert({
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
     per_user_limit: parsed.data.perUserLimit,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    console.error('[admin-products] create', error);
+    return { error: '상품을 등록하지 못했습니다.' };
+  }
   revalidatePath('/admin/products');
   redirect('/admin/products');
 }
 
 export async function updateProductAction(id: string, fd: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
   if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
-  const supabase = createClient();
-  const { error } = await (supabase.from('products') as any).update({
+  const { error } = await (guard.supabase.from('products') as any).update({
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
     per_user_limit: parsed.data.perUserLimit,
   }).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error('[admin-products] update', { id, error });
+    return { error: '상품을 수정하지 못했습니다.' };
+  }
   revalidatePath('/admin/products');
   redirect('/admin/products');
 }
 
 export async function deleteProductAction(id: string) {
-  const supabase = createClient();
-  const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) return { error: error.message };
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  const { error } = await guard.supabase.from('products').delete().eq('id', id);
+  if (error) {
+    console.error('[admin-products] delete', { id, error });
+    return { error: '상품을 삭제하지 못했습니다.' };
+  }
   revalidatePath('/admin/products');
   return { ok: true };
 }

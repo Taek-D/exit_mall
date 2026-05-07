@@ -20,7 +20,10 @@ export async function createDepositRequestAction(formData: FormData) {
     amount: parsed.data.amount,
     depositor_name: parsed.data.depositorName,
   } as never);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error('[deposit] create', error);
+    return { error: '입금 요청을 저장하지 못했습니다.' };
+  }
 
   revalidatePath('/deposit');
   redirect('/deposit');

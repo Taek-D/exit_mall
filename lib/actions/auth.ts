@@ -104,7 +104,13 @@ function maskEmail(email: string) {
   if (!local || !domain) return email;
   const head = local.slice(0, Math.min(2, local.length));
   const tail = local.length > 3 ? local.slice(-1) : '';
-  return `${head}${'*'.repeat(Math.max(3, local.length - head.length - tail.length))}${tail}@${domain}`;
+  const maskedLocal = `${head}${'*'.repeat(Math.max(3, local.length - head.length - tail.length))}${tail}`;
+  const dot = domain.lastIndexOf('.');
+  const maskedDomain =
+    dot > 1
+      ? `${domain[0]}${'*'.repeat(Math.max(2, dot - 1))}${domain.slice(dot)}`
+      : domain;
+  return `${maskedLocal}@${maskedDomain}`;
 }
 
 function getAppOrigin() {

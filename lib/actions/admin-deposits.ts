@@ -1,13 +1,15 @@
 'use server';
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { requireAdmin } from '@/lib/actions/_guards';
 
 export async function confirmDepositAction(requestId: string) {
-  const supabase = createClient();
-  const { error } = await (supabase.rpc as any)('confirm_deposit', { request_id: requestId });
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  const { error } = await (guard.supabase.rpc as any)('confirm_deposit', { request_id: requestId });
   if (error) {
     if (error.message.includes('ALREADY_PROCESSED')) return { error: '이미 처리된 요청입니다' };
-    return { error: error.message };
+    console.error('[admin-deposits] confirm', { requestId, error });
+    return { error: '입금을 확인하지 못했습니다.' };
   }
   revalidatePath('/admin/deposits');
   revalidatePath('/admin');
@@ -15,9 +17,13 @@ export async function confirmDepositAction(requestId: string) {
 }
 
 export async function rejectDepositAction(requestId: string, memo: string) {
-  const supabase = createClient();
-  const { error } = await (supabase.rpc as any)('reject_deposit', { request_id: requestId, memo });
-  if (error) return { error: error.message };
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  const { error } = await (guard.supabase.rpc as any)('reject_deposit', { request_id: requestId, memo });
+  if (error) {
+    console.error('[admin-deposits] reject', { requestId, error });
+    return { error: '입금 요청을 반려하지 못했습니다.' };
+  }
   revalidatePath('/admin/deposits');
   return { ok: true };
 }

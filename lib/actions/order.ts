@@ -48,7 +48,8 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
       };
     }
     if (msg.includes('NOT_ACTIVE')) return { ok: false, error: '계정이 활성 상태가 아닙니다' };
-    return { ok: false, error: msg };
+    console.error('[order] place', error);
+    return { ok: false, error: '주문을 처리하지 못했습니다.' };
   }
 
   revalidatePath('/orders');
@@ -61,7 +62,8 @@ export async function cancelOrderAction(orderId: string): Promise<{ ok: boolean;
   const { error } = await (supabase.rpc as any)('cancel_order', { order_id: orderId });
   if (error) {
     if (error.message.includes('NOT_CANCELLABLE')) return { ok: false, error: '이미 처리되어 취소할 수 없습니다' };
-    return { ok: false, error: error.message };
+    console.error('[order] cancel', { orderId, error });
+    return { ok: false, error: '주문을 취소하지 못했습니다.' };
   }
   revalidatePath('/orders');
   return { ok: true };
