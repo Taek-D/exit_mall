@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Minus, Plus, Trash2, ShoppingBag, ImageOff, ArrowRight } from 'lucide-react';
 
 export default function CartPage() {
-  const { items, updateQty, remove, total, clear } = useCart();
+  const { items, updateQty, remove, getLimitInfo, total, clear } = useCart();
 
   if (items.length === 0) {
     return (
@@ -45,6 +45,9 @@ export default function CartPage() {
         <section aria-label="주문 항목" className="lg:col-span-8 rounded-lg border bg-card divide-y">
           {items.map((item) => {
             const sub = item.price * item.quantity;
+            const limitInfo = getLimitInfo(item.productId);
+            const hasLimit = limitInfo.perUserLimit !== null;
+            const plusDisabled = hasLimit && limitInfo.reached;
             return (
               <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-4">
                 <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-md bg-surface-muted overflow-hidden">
@@ -61,6 +64,20 @@ export default function CartPage() {
                   <p className="text-xs text-muted-foreground font-mono tabular mt-0.5">
                     {formatKRW(item.price)}
                   </p>
+                  {hasLimit && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      1인 한도 {limitInfo.perUserLimit}개
+                      {limitInfo.remaining !== null && (
+                        <>
+                          {' '}· 남은 한도{' '}
+                          <span className="font-mono tabular text-foreground">
+                            {Math.max(0, limitInfo.remaining - item.quantity)}
+                          </span>
+                          개
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <div className="inline-flex items-center h-9 rounded-md border">
@@ -82,8 +99,9 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() => updateQty(item.productId, item.quantity + 1)}
-                    className="h-9 w-9 grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-r-md"
-                    aria-label="수량 증가"
+                    disabled={plusDisabled}
+                    className="h-9 w-9 grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-r-md"
+                    aria-label={plusDisabled ? '구매 한도에 도달했습니다' : '수량 증가'}
                   >
                     <Plus className="h-3.5 w-3.5" aria-hidden />
                   </button>

@@ -5,6 +5,17 @@ import { LowBalanceBanner } from '@/components/LowBalanceBanner';
 import { CartProvider } from '@/components/CartProvider';
 import { Toaster } from '@/components/ui/toaster';
 
+type ProductLimitRow = {
+  id: string;
+  per_user_limit: number | null;
+};
+
+type PurchasedRow = {
+  product_id: string | null;
+  quantity: number;
+  orders: { user_id: string; status: string } | null;
+};
+
 export default async function UserLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const {
@@ -18,8 +29,32 @@ export default async function UserLayout({ children }: { children: React.ReactNo
     .single<{ name: string; deposit_balance: number; low_balance_threshold: number }>();
   if (!profile) redirect('/login');
 
+  const [{ data: products }, { data: purchased }] = await Promise.all([
+    supabase.from('products').select('id,per_user_limit'),
+    supabase
+      .from('order_items')
+      .select('product_id, quantity, orders!inner(user_id, status)')
+      .eq('orders.user_id', user.id)
+      .neq('orders.status', 'cancelled'),
+  ]);
+
+  const purchasedMap = new Map<string, number>();
+  for (const row of (purchased ?? []) as unknown as PurchasedRow[]) {
+    if (!row.product_id) continue;
+    purchasedMap.set(row.product_id, (purchasedMap.get(row.product_id) ?? 0) + Number(row.quantity ?? 0));
+  }
+  const cartLimits = Object.fromEntries(
+    ((products ?? []) as ProductLimitRow[]).map((product) => [
+      product.id,
+      {
+        perUserLimit: product.per_user_limit,
+        alreadyBought: purchasedMap.get(product.id) ?? 0,
+      },
+    ]),
+  );
+
   return (
-    <CartProvider>
+    <CartProvider limits={cartLimits}>
       <div className="min-h-screen flex flex-col bg-surface">
         <NavUser balance={Number(profile.deposit_balance)} name={profile.name} />
         <LowBalanceBanner

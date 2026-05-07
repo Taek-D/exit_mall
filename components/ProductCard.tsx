@@ -25,14 +25,15 @@ export function ProductCard({
   product: Product;
   alreadyBought?: number;
 }) {
-  const { add } = useCart();
+  const { add, items } = useCart();
   const { toast } = useToast();
   const [justAdded, setJustAdded] = useState(false);
   const soldOut = product.stock === 0;
   const low = product.stock > 0 && product.stock < 10;
   const limit = product.per_user_limit;
-  const reached = limit !== null && alreadyBought >= limit;
-  const remaining = limit !== null ? Math.max(0, limit - alreadyBought) : null;
+  const inCart = items.find((item) => item.productId === product.id)?.quantity ?? 0;
+  const reached = limit !== null && alreadyBought + inCart >= limit;
+  const remaining = limit !== null ? Math.max(0, limit - alreadyBought - inCart) : null;
 
   function onAdd() {
     if (reached) {
@@ -43,13 +44,23 @@ export function ProductCard({
       });
       return;
     }
-    add({
+    const added = add({
       productId: product.id,
       name: product.name,
       price: product.price,
       quantity: 1,
       imageUrl: product.image_url,
+      perUserLimit: limit,
+      alreadyBought,
     });
+    if (!added) {
+      toast({
+        title: '구매 한도에 도달했어요',
+        description: `이 상품은 1인당 최대 ${limit}개까지 구매할 수 있어요.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     toast({ title: '장바구니에 담겼습니다', description: product.name });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1400);
