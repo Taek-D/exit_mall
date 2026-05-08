@@ -177,96 +177,44 @@ export type Database = {
           },
         ]
       }
-      order_uploads: {
+      inventory_movements: {
         Row: {
-          admin_memo: string | null
-          buyer_email: string | null
-          buyer_order_number: string | null
-          buyer_phone: string | null
-          company_name: string | null
-          contact_person: string | null
           created_at: string
+          delta: number
           id: string
-          items: Json
-          order_date: string | null
-          order_id: string | null
-          original_name: string
-          parse_error: string | null
-          request_memo: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          shipping_address: string | null
-          status: string
-          storage_path: string
-          total_amount: number
-          total_quantity: number
+          product_id: string
+          source_id: string | null
+          source_type: string
           user_id: string
         }
         Insert: {
-          admin_memo?: string | null
-          buyer_email?: string | null
-          buyer_order_number?: string | null
-          buyer_phone?: string | null
-          company_name?: string | null
-          contact_person?: string | null
           created_at?: string
+          delta: number
           id?: string
-          items?: Json
-          order_date?: string | null
-          order_id?: string | null
-          original_name: string
-          parse_error?: string | null
-          request_memo?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          shipping_address?: string | null
-          status?: string
-          storage_path: string
-          total_amount?: number
-          total_quantity?: number
+          product_id: string
+          source_id?: string | null
+          source_type: string
           user_id: string
         }
         Update: {
-          admin_memo?: string | null
-          buyer_email?: string | null
-          buyer_order_number?: string | null
-          buyer_phone?: string | null
-          company_name?: string | null
-          contact_person?: string | null
           created_at?: string
+          delta?: number
           id?: string
-          items?: Json
-          order_date?: string | null
-          order_id?: string | null
-          original_name?: string
-          parse_error?: string | null
-          request_memo?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          shipping_address?: string | null
-          status?: string
-          storage_path?: string
-          total_amount?: number
-          total_quantity?: number
+          product_id?: string
+          source_id?: string | null
+          source_type?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "order_uploads_order_id_fkey"
-            columns: ["order_id"]
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
             isOneToOne: false
-            referencedRelation: "orders"
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_uploads_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_uploads_user_id_fkey"
+            foreignKeyName: "inventory_movements_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -315,6 +263,115 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_uploads: {
+        Row: {
+          admin_memo: string | null
+          admin_storage_path: string | null
+          buyer_email: string | null
+          buyer_order_number: string | null
+          buyer_phone: string | null
+          company_name: string | null
+          completed_at: string | null
+          contact_person: string | null
+          created_at: string
+          id: string
+          items: Json
+          order_date: string | null
+          order_id: string | null
+          original_name: string
+          parse_error: string | null
+          request_memo: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shipped_at: string | null
+          shipping_address: string | null
+          shipping_fee_total: number
+          status: string
+          storage_path: string
+          total_amount: number
+          total_quantity: number
+          user_id: string
+        }
+        Insert: {
+          admin_memo?: string | null
+          admin_storage_path?: string | null
+          buyer_email?: string | null
+          buyer_order_number?: string | null
+          buyer_phone?: string | null
+          company_name?: string | null
+          completed_at?: string | null
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          order_date?: string | null
+          order_id?: string | null
+          original_name: string
+          parse_error?: string | null
+          request_memo?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shipped_at?: string | null
+          shipping_address?: string | null
+          shipping_fee_total?: number
+          status?: string
+          storage_path: string
+          total_amount?: number
+          total_quantity?: number
+          user_id: string
+        }
+        Update: {
+          admin_memo?: string | null
+          admin_storage_path?: string | null
+          buyer_email?: string | null
+          buyer_order_number?: string | null
+          buyer_phone?: string | null
+          company_name?: string | null
+          completed_at?: string | null
+          contact_person?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          order_date?: string | null
+          order_id?: string | null
+          original_name?: string
+          parse_error?: string | null
+          request_memo?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shipped_at?: string | null
+          shipping_address?: string | null
+          shipping_fee_total?: number
+          status?: string
+          storage_path?: string
+          total_amount?: number
+          total_quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_uploads_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_uploads_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_uploads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -447,24 +504,98 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_orders: {
+        Row: {
+          admin_memo: string | null
+          created_at: string
+          id: string
+          items: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          total_amount: number
+          user_id: string
+        }
+        Insert: {
+          admin_memo?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          total_amount?: number
+          user_id: string
+        }
+        Update: {
+          admin_memo?: string | null
+          created_at?: string
+          id?: string
+          items?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          total_amount?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_orders_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_inventory: {
+        Row: {
+          product_id: string
+          quantity: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          product_id: string
+          quantity?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_inventory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      approve_order_upload: {
-        Args: {
-          upload_id: string
-        }
-        Returns: string
-      }
-      reject_order_upload: {
-        Args: {
-          upload_id: string
-          memo: string
-        }
-        Returns: undefined
-      }
       adjust_balance: {
         Args: {
           target_user: string
@@ -473,9 +604,62 @@ export type Database = {
         }
         Returns: undefined
       }
+      adjust_user_inventory: {
+        Args: {
+          target_user: string
+          product_id: string
+          delta: number
+          memo?: string
+        }
+        Returns: undefined
+      }
+      approve_order_upload: {
+        Args: {
+          upload_id: string
+        }
+        Returns: string
+      }
+      approve_shipping_upload: {
+        Args: {
+          upload_id: string
+        }
+        Returns: undefined
+      }
+      approve_stock_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
+      attach_tracking: {
+        Args: {
+          upload_id: string
+          storage_path: string
+          parsed_items: Json
+        }
+        Returns: undefined
+      }
       cancel_order: {
         Args: {
           order_id: string
+        }
+        Returns: undefined
+      }
+      cancel_shipping_upload: {
+        Args: {
+          upload_id: string
+        }
+        Returns: undefined
+      }
+      cancel_stock_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
+      complete_shipping_upload: {
+        Args: {
+          upload_id: string
         }
         Returns: undefined
       }
@@ -506,6 +690,33 @@ export type Database = {
           memo: string
         }
         Returns: undefined
+      }
+      reject_order_upload: {
+        Args: {
+          upload_id: string
+          memo: string
+        }
+        Returns: undefined
+      }
+      reject_shipping_upload: {
+        Args: {
+          upload_id: string
+          memo: string
+        }
+        Returns: undefined
+      }
+      reject_stock_order: {
+        Args: {
+          order_id: string
+          memo: string
+        }
+        Returns: undefined
+      }
+      request_stock_order: {
+        Args: {
+          items: Json
+        }
+        Returns: string
       }
       transition_order_status: {
         Args: {
