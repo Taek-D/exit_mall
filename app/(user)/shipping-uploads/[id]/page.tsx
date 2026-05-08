@@ -3,7 +3,10 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
 import { CancelButton } from './CancelButton';
+import { TrackingDownloadButton } from './TrackingDownloadButton';
 import { type ShippingUploadStatus, SHIPPING_UPLOAD_STATUS_LABEL } from '@/lib/types';
+import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
+import { InvoiceLookupButton } from '@/components/InvoiceLookupButton';
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +31,9 @@ type Upload = {
   total_quantity: number;
   shipping_fee_total: number;
   admin_memo: string | null;
+  admin_storage_path: string | null;
+  shipped_at: string | null;
+  completed_at: string | null;
   created_at: string;
 };
 
@@ -36,7 +42,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
   const { data } = await supabase
     .from('order_uploads')
     .select(
-      'id, original_name, status, items, total_quantity, shipping_fee_total, admin_memo, created_at',
+      'id, original_name, status, items, total_quantity, shipping_fee_total, admin_memo, admin_storage_path, shipped_at, completed_at, created_at',
     )
     .eq('id', params.id)
     .single<Upload>();
@@ -52,20 +58,28 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
         업로드 목록
       </Link>
 
-      <header className="pb-4 border-b flex items-start justify-between gap-4">
+      <header className="pb-4 border-b flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="h-5 w-5 text-accent" aria-hidden />
           <div>
             <h1 className="font-heading font-semibold text-2xl tracking-tight break-all">
               {data.original_name}
             </h1>
-            <p className="text-xs text-muted-foreground mt-1">
-              {new Date(data.created_at).toLocaleString('ko-KR')} ·{' '}
-              {SHIPPING_UPLOAD_STATUS_LABEL[data.status as ShippingUploadStatus] ?? data.status}
+            <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-2">
+              <ShippingUploadStatusBadge status={data.status as ShippingUploadStatus} />
+              <span>· {new Date(data.created_at).toLocaleString('ko-KR')}</span>
             </p>
           </div>
         </div>
-        {data.status === 'pending' && <CancelButton uploadId={data.id} />}
+        <div className="flex flex-wrap gap-2">
+          {data.status === 'pending' && <CancelButton uploadId={data.id} />}
+          {data.admin_storage_path && (
+            <TrackingDownloadButton
+              storagePath={data.admin_storage_path}
+              originalName={`tracking-${data.original_name}`}
+            />
+          )}
+        </div>
       </header>
 
       <section className="rounded-lg border bg-card overflow-hidden">
@@ -77,6 +91,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
               <th className="font-medium px-3">상품 (코드 / 옵션)</th>
               <th className="font-medium px-3 text-right">수량</th>
               <th className="font-medium px-3 text-right">배송비</th>
+              <th className="font-medium px-3">송장 / 조회</th>
             </tr>
           </thead>
           <tbody>
@@ -97,6 +112,16 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular">{it.quantity}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">{formatKRW(3300)}</td>
+                <td className="px-3 py-2 text-xs">
+                  {it.tracking_number ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono">{it.tracking_number}</span>
+                      <InvoiceLookupButton tracking={it.tracking_number} />
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">미발송</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -109,6 +134,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
               <td className="px-3 py-3 text-right font-mono tabular text-base font-semibold">
                 {formatKRW(Number(data.shipping_fee_total))}
               </td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
