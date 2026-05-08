@@ -26,5 +26,9 @@ export function mapShippingUploadError(message: string): string {
   if (message.startsWith('LEGACY_ITEMS_NOT_SUPPORTED')) {
     return '구 양식(주문서 업로드)으로 등록된 행이라 새 흐름에서 처리할 수 없습니다. 반려 후 고객에게 새 양식 재업로드를 안내해주세요.';
   }
+  if (message.startsWith('FEE_TAMPERED')) {
+    const parts = message.split(':');
+    return `배송비가 행수×₩3,300 과 다릅니다 (예상 ${parts[1]}, 저장값 ${parts[2]}). 반려 후 다시 업로드 받아주세요.`;
+  }
   return '처리 중 오류가 발생했습니다.';
 }
