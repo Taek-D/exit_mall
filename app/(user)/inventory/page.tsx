@@ -16,7 +16,7 @@ type InvJoin = {
 };
 
 type ShippingPendingItem = {
-  items: Array<{ product_code?: string; quantity?: number }>;
+  items: Array<{ product_id?: string; product_code?: string; quantity?: number }>;
 };
 
 export default async function InventoryPage() {
@@ -45,30 +45,13 @@ export default async function InventoryPage() {
     .eq('user_id', user.id)
     .eq('status', 'pending');
 
-  const codes = new Set<string>();
-  for (const u of (pendingRaw ?? []) as unknown as ShippingPendingItem[]) {
-    for (const it of u.items ?? []) {
-      if (it.product_code) codes.add(it.product_code);
-    }
-  }
-
-  const productIdByCode = new Map<string, string>();
-  if (codes.size > 0) {
-    const { data: codeProducts } = await supabase
-      .from('products')
-      .select('id, name')
-      .in('name', Array.from(codes));
-    for (const p of (codeProducts ?? []) as Array<{ id: string; name: string }>) {
-      productIdByCode.set(p.name, p.id);
-    }
-  }
-
+  // 신규 흐름은 server action 이 INSERT 시점에 product_id 를 캡처하므로
+  // 직접 사용. (옛 흐름의 product_code 매칭은 비결정적이라 제거)
   const pendingShipments: PendingShippingRow[] = [];
   for (const u of (pendingRaw ?? []) as unknown as ShippingPendingItem[]) {
     for (const it of u.items ?? []) {
-      const pid = it.product_code ? productIdByCode.get(it.product_code) : undefined;
-      if (!pid) continue;
-      pendingShipments.push({ product_id: pid, quantity: Number(it.quantity ?? 0) });
+      if (!it.product_id) continue;
+      pendingShipments.push({ product_id: it.product_id, quantity: Number(it.quantity ?? 0) });
     }
   }
 

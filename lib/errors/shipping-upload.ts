@@ -30,5 +30,9 @@ export function mapShippingUploadError(message: string): string {
     const parts = message.split(':');
     return `배송비가 행수×₩3,300 과 다릅니다 (예상 ${parts[1]}, 저장값 ${parts[2]}). 반려 후 다시 업로드 받아주세요.`;
   }
+  if (message.startsWith('PRODUCT_MISMATCH')) {
+    const parts = message.split(':');
+    return `상품 ID 와 관리코드가 일치하지 않는 행이 있습니다 (코드 ${parts[2]}, 실제 상품명 ${parts[3] ?? '?'}). 반려 후 새 양식으로 다시 업로드 받아주세요.`;
+  }
   return '처리 중 오류가 발생했습니다.';
 }
