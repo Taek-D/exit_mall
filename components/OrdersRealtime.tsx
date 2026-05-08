@@ -11,16 +11,33 @@ export function OrdersRealtime() {
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel('orders-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
-        toast({ title: '새 주문 접수' });
+      .channel('admin-new-orders')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'stock_orders' },
+        () => {
+          toast({ title: '새 검토 요청', description: '주문관리에서 확인하세요.' });
+          router.refresh();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'order_uploads' },
+        () => {
+          toast({ title: '새 배송대행 업로드', description: '검토대기 항목이 추가됐습니다.' });
+          router.refresh();
+        },
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stock_orders' }, () => {
         router.refresh();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_uploads' }, () => {
         router.refresh();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [router, toast]);
 
   return null;
