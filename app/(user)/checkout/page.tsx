@@ -2,11 +2,9 @@
 import { useCart } from '@/components/CartProvider';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { placeOrderAction } from '@/lib/actions/order';
+import { requestStockOrderAction } from '@/lib/actions/stock-order';
+import { cartToStockOrderPayload } from '@/lib/cart-to-stock-order';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { formatKRW } from '@/lib/money';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -18,7 +16,6 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
-  const [shipping, setShipping] = useState({ name: '', phone: '', address: '', memo: '' });
 
   if (items.length === 0) {
     return (
@@ -37,17 +34,17 @@ export default function CheckoutPage() {
   function submit() {
     setError(null);
     start(async () => {
-      const result = await placeOrderAction({
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-        shipping,
-      });
+      const result = await requestStockOrderAction(cartToStockOrderPayload(items));
       if (!result.ok) {
         setError(result.error);
         if (result.productId) remove(result.productId);
         return;
       }
       clear();
-      toast({ title: '주문이 접수되었습니다', description: '주문 내역에서 진행 상황을 확인하세요.' });
+      toast({
+        title: '검토 요청이 접수되었습니다',
+        description: '관리자가 승인하면 보유 재고에 적립됩니다.',
+      });
       router.push('/orders');
     });
   }
@@ -55,7 +52,7 @@ export default function CheckoutPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4 pb-4 border-b">
-        <h1 className="font-heading font-semibold text-2xl tracking-tight">주문서 작성</h1>
+        <h1 className="font-heading font-semibold text-2xl tracking-tight">검토 요청</h1>
         <Link
           href="/cart"
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
@@ -69,64 +66,25 @@ export default function CheckoutPage() {
         <section className="lg:col-span-8 space-y-6">
           <div className="rounded-lg border bg-card">
             <div className="p-5 border-b">
-              <h2 className="font-heading font-semibold">배송 정보</h2>
-            </div>
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="name">받는 사람 *</Label>
-                <Input
-                  id="name"
-                  required
-                  value={shipping.name}
-                  onChange={(e) => setShipping({ ...shipping, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">연락처 *</Label>
-                <Input
-                  id="phone"
-                  required
-                  placeholder="010-1234-5678"
-                  value={shipping.phone}
-                  onChange={(e) => setShipping({ ...shipping, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="address">주소 *</Label>
-                <Input
-                  id="address"
-                  required
-                  value={shipping.address}
-                  onChange={(e) => setShipping({ ...shipping, address: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="memo">배송 메모</Label>
-                <Textarea
-                  id="memo"
-                  rows={3}
-                  placeholder="문 앞에 두어주세요"
-                  value={shipping.memo}
-                  onChange={(e) => setShipping({ ...shipping, memo: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border bg-card">
-            <div className="p-5 border-b">
               <h2 className="font-heading font-semibold">결제 수단</h2>
             </div>
-            <div className="p-5">
+            <div className="p-5 space-y-3">
               <div className="rounded-md border bg-accent/5 p-4 flex items-center gap-3">
                 <Wallet className="h-5 w-5 text-accent" aria-hidden />
                 <div className="flex-1">
-                  <p className="font-medium text-sm">예치금 결제</p>
+                  <p className="font-medium text-sm">예치금 결제 (검토 시 차감)</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    보유 예치금에서 주문 금액만큼 차감됩니다.
+                    승인 시점에 예치금이 차감되고 보유 재고에 적립됩니다. 검토대기 동안은 가용 잔액에서 예약만 됩니다.
                   </p>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                실제 발송은{' '}
+                <Link href="/shipping-uploads" className="underline">
+                  배송대행 업로드
+                </Link>{' '}
+                메뉴에서 받는사람 명단을 올리면 진행됩니다. 이 단계에서는 배송지를 입력하지 않습니다.
+              </p>
             </div>
           </div>
         </section>
@@ -150,7 +108,7 @@ export default function CheckoutPage() {
               ))}
             </ul>
             <div className="px-5 py-4 border-t flex items-baseline justify-between">
-              <span className="font-medium">총 결제 금액</span>
+              <span className="font-medium">예상 차감액</span>
               <span className="font-mono tabular text-xl font-semibold">{formatKRW(total)}</span>
             </div>
           </div>
@@ -167,7 +125,7 @@ export default function CheckoutPage() {
           )}
 
           <Button onClick={submit} disabled={pending} className="w-full h-11">
-            {pending ? '주문 처리 중…' : `${formatKRW(total)} 결제`}
+            {pending ? '요청 중…' : `${formatKRW(total)} 검토 요청`}
           </Button>
         </aside>
       </div>
