@@ -1,0 +1,157 @@
+import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
+import { formatKRW } from '@/lib/money';
+import { cn } from '@/lib/utils';
+import {
+  type ShippingUploadStatus,
+  SHIPPING_UPLOAD_STATUS_LABEL,
+} from '@/lib/types';
+import { OrdersRealtime } from '@/components/OrdersRealtime';
+import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
+import { ChevronRight, Inbox, FileSpreadsheet } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
+
+const TABS: { key: string; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'pending', label: '검토대기' },
+  { key: 'approved', label: '승인' },
+  { key: 'shipped', label: '발송중' },
+  { key: 'completed', label: '완료' },
+  { key: 'rejected', label: '반려' },
+  { key: 'cancelled', label: '취소' },
+];
+
+type Row = {
+  id: string;
+  user_id: string;
+  original_name: string;
+  status: string;
+  total_quantity: number;
+  shipping_fee_total: number;
+  created_at: string;
+  profiles: { name: string } | null;
+};
+
+export default async function AdminShippingUploadsPage({
+  searchParams,
+}: {
+  searchParams: { status?: string };
+}) {
+  const supabase = createClient();
+  const status = searchParams.status ?? 'all';
+
+  let q = supabase
+    .from('order_uploads')
+    .select(
+      'id, user_id, original_name, status, total_quantity, shipping_fee_total, created_at, profiles!order_uploads_user_id_fkey(name)',
+    )
+    .order('created_at', { ascending: false });
+  if (status !== 'all') q = q.eq('status', status);
+  const { data } = await q;
+  const rows = (data ?? []) as unknown as Row[];
+
+  const { data: counts } = await supabase.from('order_uploads').select('status');
+  const c = ((counts ?? []) as { status: string }[]).reduce<Record<string, number>>(
+    (acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      acc.all = (acc.all ?? 0) + 1;
+      return acc;
+    },
+    {},
+  );
+
+  return (
+    <div className="space-y-5">
+      <OrdersRealtime />
+
+      <header>
+        <h1 className="font-heading font-semibold text-2xl tracking-tight">배송대행 업로드</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          전체 {c.all ?? 0}건 · 검토대기 {c.pending ?? 0}건
+        </p>
+      </header>
+
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="border-b overflow-x-auto">
+          <div className="flex min-w-max">
+            {TABS.map((t) => {
+              const active = status === t.key;
+              return (
+                <Link
+                  key={t.key}
+                  href={`/admin/shipping-uploads${t.key === 'all' ? '' : `?status=${t.key}`}`}
+                  className={cn(
+                    'flex items-center gap-2 px-4 h-11 text-sm border-b-2 whitespace-nowrap',
+                    active
+                      ? 'border-primary text-foreground font-medium'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <span>{t.label}</span>
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] bg-muted">
+                    {c[t.key] ?? 0}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="p-16 flex flex-col items-center gap-3 text-center">
+            <Inbox className="h-5 w-5 text-muted-foreground" aria-hidden />
+            <p className="text-sm">업로드가 없습니다</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-muted">
+                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="font-medium px-4 h-10">파일</th>
+                  <th className="font-medium px-3">고객</th>
+                  <th className="font-medium px-3 text-right">수량</th>
+                  <th className="font-medium px-3 text-right">배송비</th>
+                  <th className="font-medium px-3">상태</th>
+                  <th className="font-medium px-3">업로드</th>
+                  <th className="px-3 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((u) => (
+                  <tr key={u.id} className="border-t h-11 hover:bg-surface-muted/60">
+                    <td className="px-4">
+                      <Link
+                        href={`/admin/shipping-uploads/${u.id}`}
+                        className="inline-flex items-center gap-1.5 text-accent hover:underline"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+                        <span className="truncate max-w-[200px]">{u.original_name}</span>
+                      </Link>
+                    </td>
+                    <td className="px-3">{u.profiles?.name ?? '—'}</td>
+                    <td className="px-3 text-right font-mono tabular">{u.total_quantity}</td>
+                    <td className="px-3 text-right font-mono tabular">
+                      {formatKRW(Number(u.shipping_fee_total))}
+                    </td>
+                    <td className="px-3">
+                      <ShippingUploadStatusBadge status={u.status as ShippingUploadStatus} />
+                    </td>
+                    <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(u.created_at).toLocaleString('ko-KR')}
+                    </td>
+                    <td className="px-3 text-right">
+                      <Link href={`/admin/shipping-uploads/${u.id}`} aria-label="상세">
+                        <ChevronRight className="h-4 w-4" aria-hidden />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
