@@ -4,7 +4,7 @@
 
 Next.js 14 + Supabase 기반입니다.
 
-최종 업데이트: 2026-05-08
+최종 업데이트: 2026-05-09
 
 ## 두 흐름 개요
 
@@ -34,6 +34,14 @@ Next.js 14 + Supabase 기반입니다.
 - Legacy 주문 화면(`/admin/orders-legacy`) — 구 일반 주문 열람 전용 (URL 직접 접근)
 - Realtime: 새 `stock_orders` / `order_uploads` 검토대기 토스트 알림
 - 비밀번호 변경
+
+### 보안/안정화
+- Next.js 14.2.25 적용 및 기본 보안 헤더(`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`) 설정
+- `stock_orders` / `order_uploads` 직접 삽입 정책 보강: 일반 사용자는 서버 RPC가 검증한 흐름으로만 주문·배송대행 요청 생성
+- 예치금 가용액 계산 시 상품 구매 검토대기 금액과 배송대행 검토대기 배송비를 함께 예약 처리
+- 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·관리코드 불일치, 동시 승인 재고 경합을 방어
+- 송장 재업로드 RPC는 송장 필드만 갱신하도록 제한해 업로드 원본 데이터 무결성 유지
+- Storage 정책은 관리자가 업로드한 송장 파일을 해당 업로드 소유자와 관리자만 조회하도록 제한
 
 ### 아직 구현 범위가 아닌 것
 - CJ 자동 폴링/캐싱
@@ -73,7 +81,7 @@ SUPABASE_SERVICE_ROLE_KEY=<로컬 service_role key>
 ./node_modules/supabase/bin/supabase.exe gen types typescript --local > lib/db-types.ts
 ```
 
-현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 보안 보강에 더해, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC 8종이 포함되어 있습니다.
+현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC, 2026-05-09 기준 보안·동시성 보강분이 포함되어 있습니다.
 
 ### 4. 개발 서버
 
@@ -102,7 +110,7 @@ pnpm test                 # 단위 테스트 (money, Zod schemas, parser, CJ 배
 pnpm test:e2e             # Playwright (추후 추가 예정)
 ```
 
-최근 확인: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build` 통과.
+릴리즈 전 권장 확인: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
 
 ## 배포 (프로덕션)
 
@@ -112,6 +120,8 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 4. Supabase Auth Redirect URLs에 배포 도메인의 `/auth/callback` 추가.
 5. Supabase 대시보드에서 Point-in-Time Recovery(PITR) 활성화(유료).
 6. 프로덕션 환경에서 관리자 부트스트랩 (위 SQL).
+
+배송대행 흐름 재구성 배포 시에는 기존 검토대기 업로드와 legacy 주문 잔여분을 먼저 정리해야 합니다. 상세 체크리스트는 `docs/operations/2026-05-08-shipping-flow-deployment.md`를 참고하세요.
 
 ## 주요 경로
 
@@ -176,6 +186,8 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 - 신규 흐름 구현 계획: `docs/superpowers/plans/2026-05-08-shipping-flow-phase{1..5}-*.md`
 - 초기 폐쇄몰 설계: `docs/superpowers/specs/2026-04-22-closed-mall-design.md`
 - 초기 폐쇄몰 구현 계획: `docs/superpowers/plans/2026-04-22-closed-mall.md`, `-part2.md`
+- 운영 배포 체크리스트: `docs/operations/2026-05-08-shipping-flow-deployment.md`
+- 보안 감사 리포트: `SECURITY_AUDIT.md`
 
 ## Windows 주의사항
 
