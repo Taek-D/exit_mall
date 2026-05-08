@@ -5,7 +5,7 @@ import { logoutAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload, KeyRound } from 'lucide-react';
+import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload, KeyRound, Boxes } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,7 @@ const NAV: { href: string; label: string; Icon: typeof Package; exact?: boolean 
   { href: '/shop', label: '상품', Icon: Package },
   { href: '/cart', label: '장바구니', Icon: ShoppingBag },
   { href: '/orders', label: '주문 내역', Icon: ClipboardList, exact: true },
+  { href: '/inventory', label: '보유 재고', Icon: Boxes },
   { href: '/orders/upload', label: '주문서 업로드', Icon: Upload },
   { href: '/deposit', label: '예치금', Icon: Wallet },
 ];
