@@ -13,7 +13,8 @@ import {
   StatusPill,
 } from '@/components/StatusBadge';
 import type { UserStatus, OrderStatus, DepositStatus, BalanceTxType } from '@/lib/types';
-import { ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowLeft, TrendingDown, TrendingUp, Boxes } from 'lucide-react';
+import { InventoryAdjuster } from './InventoryAdjuster';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,14 @@ export default async function AdminUserDetailPage({
   params: { id: string };
 }) {
   const supabase = createClient();
-  const [{ data: u }, { data: orders }, { data: deposits }, { data: txs }] = await Promise.all([
+  const [
+    { data: u },
+    { data: orders },
+    { data: deposits },
+    { data: txs },
+    { data: invRaw },
+    { data: productsRaw },
+  ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', params.id).single<Profile>(),
     supabase
       .from('orders')
@@ -74,8 +82,20 @@ export default async function AdminUserDetailPage({
       .select('*')
       .eq('user_id', params.id)
       .order('created_at', { ascending: false }),
+    (supabase.from('user_inventory' as any) as any)
+      .select('product_id, quantity, products(name)')
+      .eq('user_id', params.id)
+      .gt('quantity', 0),
+    supabase.from('products').select('id, name').eq('is_active', true).order('name'),
   ]);
   if (!u) notFound();
+
+  const inventory = (invRaw ?? []) as Array<{
+    product_id: string;
+    quantity: number;
+    products: { name: string } | null;
+  }>;
+  const productList = (productsRaw ?? []) as Array<{ id: string; name: string }>;
 
   const ol = (orders ?? []) as unknown as Order[];
   const dl = (deposits ?? []) as unknown as DepositReq[];
@@ -127,6 +147,26 @@ export default async function AdminUserDetailPage({
         <ThresholdForm userId={u.id} defaultValue={Number(u.low_balance_threshold)} />
         <UserStatusButtons userId={u.id} status={u.status as UserStatus} />
       </section>
+
+      <section className="rounded-lg border bg-card">
+        <header className="h-11 px-5 flex items-center gap-2 border-b">
+          <Boxes className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <h2 className="font-heading font-semibold text-sm">보유 재고</h2>
+        </header>
+        <ul className="p-5 space-y-2 text-sm">
+          {inventory.length === 0 && (
+            <li className="text-muted-foreground">보유 재고가 없습니다.</li>
+          )}
+          {inventory.map((r) => (
+            <li key={r.product_id} className="flex justify-between">
+              <span>{r.products?.name ?? '(이름 없음)'}</span>
+              <span className="font-mono tabular">{r.quantity}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <InventoryAdjuster userId={u.id} products={productList} />
 
       <Tabs defaultValue="orders" className="space-y-3">
         <TabsList>
