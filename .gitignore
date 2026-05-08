@@ -19,5 +19,8 @@ supabase/.temp
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# Superpowers brainstorming sessions
+.superpowers/
+
 # UI design preview screenshots (root-level only)
 /*.png
