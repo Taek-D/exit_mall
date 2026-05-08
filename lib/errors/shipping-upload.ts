@@ -23,5 +23,8 @@ export function mapShippingUploadError(message: string): string {
     return `현재 상태에서는 처리할 수 없습니다 (${cur}).`;
   }
   if (message.startsWith('NOT_CANCELLABLE')) return '취소할 수 없는 상태입니다.';
+  if (message.startsWith('LEGACY_ITEMS_NOT_SUPPORTED')) {
+    return '구 양식(주문서 업로드)으로 등록된 행이라 새 흐름에서 처리할 수 없습니다. 반려 후 고객에게 새 양식 재업로드를 안내해주세요.';
+  }
   return '처리 중 오류가 발생했습니다.';
 }

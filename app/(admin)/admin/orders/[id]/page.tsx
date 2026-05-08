@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
 import { type StockOrderStatus } from '@/lib/types';
@@ -34,9 +34,19 @@ export default async function AdminStockOrderDetail({ params }: { params: { id: 
   const { data } = await (supabase.from('stock_orders' as any) as any)
     .select('*,profiles!stock_orders_user_id_fkey(name,email,phone,deposit_balance)')
     .eq('id', params.id)
-    .single();
+    .maybeSingle();
   const order = data as StockOrder | null;
-  if (!order) notFound();
+
+  // 책갈피 호환: stock_orders 에 없으면 구 일반 주문(orders)에 있는지 확인 후 legacy 화면으로 redirect.
+  if (!order) {
+    const { data: legacy } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (legacy) redirect(`/admin/orders-legacy/${params.id}`);
+    notFound();
+  }
 
   const balance = Number(order.profiles?.deposit_balance ?? 0);
   const insufficient = order.status === 'pending' && balance < Number(order.total_amount);
