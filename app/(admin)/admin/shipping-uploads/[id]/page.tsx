@@ -10,6 +10,8 @@ import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, FileSpreadsheet, User } from 'lucide-react';
 import { ReviewActions } from './ReviewActions';
 import { DownloadButton } from './DownloadButton';
+import { AttachTrackingForm } from './AttachTrackingForm';
+import { CompleteButton } from './CompleteButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,10 +84,18 @@ export default async function AdminShippingUploadDetail({
             </p>
           </div>
         </div>
-        <DownloadButton
-          storagePath={data.storage_path}
-          originalName={data.original_name}
-        />
+        <div className="flex flex-wrap gap-2">
+          <DownloadButton
+            storagePath={data.storage_path}
+            originalName={data.original_name}
+          />
+          {data.admin_storage_path && (
+            <DownloadButton
+              storagePath={data.admin_storage_path}
+              originalName={`tracking-${data.original_name}`}
+            />
+          )}
+        </div>
       </header>
 
       <div className="rounded-lg border bg-card p-5 space-y-3">
@@ -124,6 +134,7 @@ export default async function AdminShippingUploadDetail({
               <th className="font-medium px-3">상품 (코드 / 옵션)</th>
               <th className="font-medium px-3 text-right">수량</th>
               <th className="font-medium px-3 text-right">배송비</th>
+              <th className="font-medium px-3">송장번호</th>
             </tr>
           </thead>
           <tbody>
@@ -144,6 +155,7 @@ export default async function AdminShippingUploadDetail({
                 </td>
                 <td className="px-3 py-2 text-right font-mono tabular">{it.quantity}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">{formatKRW(3300)}</td>
+                <td className="px-3 py-2 font-mono text-xs">{it.tracking_number ?? '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -156,6 +168,7 @@ export default async function AdminShippingUploadDetail({
               <td className="px-3 py-3 text-right font-mono tabular text-base font-semibold">
                 {formatKRW(Number(data.shipping_fee_total))}
               </td>
+              <td></td>
             </tr>
           </tfoot>
         </table>
@@ -177,6 +190,11 @@ export default async function AdminShippingUploadDetail({
           <ReviewActions uploadId={data.id} />
         </>
       )}
+
+      {(data.status === 'approved' || data.status === 'shipped') && (
+        <AttachTrackingForm uploadId={data.id} />
+      )}
+      {data.status === 'shipped' && <CompleteButton uploadId={data.id} />}
     </div>
   );
 }
