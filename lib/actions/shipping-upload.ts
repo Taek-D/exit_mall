@@ -41,20 +41,40 @@ export async function requestShippingUploadAction(
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
 
-  // 관리코드(=products.name) 매칭 — 매칭 안 되는 코드가 있으면 미리 거부
+  // 관리코드(=products.name) 매칭 — 업로드 시점에 product_id 캡처해 결정적으로 고정.
+  // products.name 에 unique 제약이 없어 같은 이름 여러 행이 있으면 RPC 매칭이 비결정적이 됨.
   const codes = Array.from(new Set(parsed.items.map((it) => it.product_code)));
-  const { data: products } = await supabase
+  const { data: productRows } = await supabase
     .from('products')
     .select('id, name')
     .in('name', codes);
-  const known = new Set(((products ?? []) as Array<{ id: string; name: string }>).map((p) => p.name));
-  const unknown = codes.filter((c) => !known.has(c));
+  const productList = (productRows ?? []) as Array<{ id: string; name: string }>;
+  const productByName = new Map<string, string>();
+  const duplicates: string[] = [];
+  for (const p of productList) {
+    if (productByName.has(p.name)) {
+      if (!duplicates.includes(p.name)) duplicates.push(p.name);
+    } else {
+      productByName.set(p.name, p.id);
+    }
+  }
+  if (duplicates.length > 0) {
+    return {
+      ok: false,
+      error: `같은 관리코드의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ' …' : ''}`,
+    };
+  }
+  const unknown = codes.filter((c) => !productByName.has(c));
   if (unknown.length > 0) {
     return {
       ok: false,
       error: `존재하지 않는 관리코드가 있습니다: ${unknown.slice(0, 3).join(', ')}${unknown.length > 3 ? ' …' : ''}`,
     };
   }
+  const itemsWithProductId = parsed.items.map((it) => ({
+    ...it,
+    product_id: productByName.get(it.product_code)!,
+  }));
 
   // Storage 업로드
   const safeName = file.name.replace(/[^\w가-힣\.\-]+/g, '_');
@@ -78,7 +98,7 @@ export async function requestShippingUploadAction(
       contact_person: parsed.uploader_company,
       buyer_phone: parsed.uploader_phone,
       request_memo: parsed.request_memo,
-      items: parsed.items,
+      items: itemsWithProductId,
       total_quantity: parsed.total_quantity,
       total_amount: 0,
       shipping_fee_total: fee,

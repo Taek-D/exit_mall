@@ -43,7 +43,7 @@ export async function attachTrackingAction(
     .from('order_uploads')
     .select('items, status, user_id')
     .eq('id', uploadId)
-    .single<{ items: unknown[]; status: string; user_id: string }>();
+    .single<{ items: Array<{ product_id?: string; product_code?: string }>; status: string; user_id: string }>();
   if (!existing) return { ok: false, error: '업로드를 찾을 수 없습니다.' };
   if (!['approved', 'shipped'].includes(existing.status)) {
     return { ok: false, error: `현재 상태(${existing.status})에서는 송장 등록이 불가합니다.` };
@@ -54,6 +54,13 @@ export async function attachTrackingAction(
       error: `원본 ${existing.items.length}행과 새 파일 ${parsed.items.length}행이 다릅니다.`,
     };
   }
+
+  // 원본 items 의 product_id 를 행 인덱스 기준으로 보존해 재업로드 후에도
+  // 향후 호출(approve 등)이 결정적 매칭을 유지하도록 한다.
+  const itemsWithProductId = parsed.items.map((it, i) => ({
+    ...it,
+    product_id: existing.items[i]?.product_id ?? null,
+  }));
 
   const safeName = file.name.replace(/[^\w가-힣\.\-]+/g, '_');
   const storagePath = `admin/${uploadId}/${Date.now()}-${safeName}`;
@@ -68,7 +75,7 @@ export async function attachTrackingAction(
   const { error: rpcErr } = await (guard.supabase.rpc as any)('attach_tracking', {
     upload_id: uploadId,
     storage_path: storagePath,
-    parsed_items: parsed.items,
+    parsed_items: itemsWithProductId,
   });
   if (rpcErr) {
     await guard.supabase.storage.from('order-uploads').remove([storagePath]);
