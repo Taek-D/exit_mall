@@ -1,6 +1,17 @@
 import { cn } from '@/lib/utils';
-import type { OrderStatus, DepositStatus, UserStatus } from '@/lib/types';
-import { ORDER_STATUS_LABEL, DEPOSIT_STATUS_LABEL } from '@/lib/types';
+import type {
+  OrderStatus,
+  DepositStatus,
+  UserStatus,
+  StockOrderStatus,
+  ShippingUploadStatus,
+} from '@/lib/types';
+import {
+  ORDER_STATUS_LABEL,
+  DEPOSIT_STATUS_LABEL,
+  STOCK_ORDER_STATUS_LABEL,
+  SHIPPING_UPLOAD_STATUS_LABEL,
+} from '@/lib/types';
 
 type Tone = 'info' | 'success' | 'warning' | 'danger' | 'neutral' | 'violet';
 
@@ -95,6 +106,41 @@ export function OrderUploadStatusBadge({
   return (
     <Pill tone={ORDER_UPLOAD_TONE[key]} className={className}>
       {ORDER_UPLOAD_LABEL[key]}
+    </Pill>
+  );
+}
+
+const STOCK_ORDER_TONE: Record<StockOrderStatus, Tone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  cancelled: 'neutral',
+};
+
+export function StockOrderStatusBadge({ status }: { status: StockOrderStatus }) {
+  return <Pill tone={STOCK_ORDER_TONE[status]}>{STOCK_ORDER_STATUS_LABEL[status]}</Pill>;
+}
+
+const SHIPPING_UPLOAD_TONE: Record<ShippingUploadStatus, Tone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  failed: 'danger',
+  shipped: 'violet',
+  completed: 'info',
+  cancelled: 'neutral',
+};
+
+export function ShippingUploadStatusBadge({
+  status,
+  className,
+}: {
+  status: ShippingUploadStatus;
+  className?: string;
+}) {
+  return (
+    <Pill tone={SHIPPING_UPLOAD_TONE[status]} className={className}>
+      {SHIPPING_UPLOAD_STATUS_LABEL[status]}
     </Pill>
   );
 }

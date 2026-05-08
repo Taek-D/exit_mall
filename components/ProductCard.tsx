@@ -29,7 +29,7 @@ export function ProductCard({
   const { toast } = useToast();
   const [justAdded, setJustAdded] = useState(false);
   const soldOut = product.stock === 0;
-  const low = product.stock > 0 && product.stock < 10;
+  const lowStock = product.stock > 0 && product.stock <= 9;
   const limit = product.per_user_limit;
   const inCart = items.find((item) => item.productId === product.id)?.quantity ?? 0;
   const reached = limit !== null && alreadyBought + inCart >= limit;
@@ -87,9 +87,9 @@ export function ProductCard({
             <StatusPill tone="neutral">품절</StatusPill>
           </div>
         )}
-        {low && !soldOut && (
+        {lowStock && !soldOut && (
           <div className="absolute top-2 left-2">
-            <StatusPill tone="warning">재고 {product.stock}</StatusPill>
+            <StatusPill tone="warning">품절 임박</StatusPill>
           </div>
         )}
         {limit !== null && !soldOut && (

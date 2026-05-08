@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { type DepositStatus } from '@/lib/types';
 import { DepositStatusBadge } from '@/components/StatusBadge';
+import { computeAvailableDeposit } from '@/lib/inventory';
 import Link from 'next/link';
 import { Wallet, Plus, Inbox } from 'lucide-react';
 
@@ -23,20 +24,41 @@ export default async function DepositListPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('deposit_balance,low_balance_threshold')
-    .eq('id', user!.id)
-    .single<{ deposit_balance: number; low_balance_threshold: number }>();
-  const { data: requests } = await supabase
-    .from('deposit_requests')
-    .select('id,amount,depositor_name,status,admin_memo,created_at,confirmed_at')
-    .order('created_at', { ascending: false });
+  const [profileRes, requestsRes, stockPendingRes, shippingPendingRes] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('deposit_balance,low_balance_threshold')
+      .eq('id', user!.id)
+      .single<{ deposit_balance: number; low_balance_threshold: number }>(),
+    supabase
+      .from('deposit_requests')
+      .select('id,amount,depositor_name,status,admin_memo,created_at,confirmed_at')
+      .order('created_at', { ascending: false }),
+    (supabase.from('stock_orders' as any) as any)
+      .select('id, total_amount')
+      .eq('user_id', user!.id)
+      .eq('status', 'pending'),
+    supabase
+      .from('order_uploads')
+      .select('id, shipping_fee_total')
+      .eq('user_id', user!.id)
+      .eq('status', 'pending'),
+  ]);
 
-  const reqs = (requests ?? []) as unknown as Req[];
-  const balance = Number(profile?.deposit_balance ?? 0);
-  const threshold = Number(profile?.low_balance_threshold ?? 0);
-  const low = balance <= threshold;
+  const reqs = (requestsRes.data ?? []) as unknown as Req[];
+  const balance = Number(profileRes.data?.deposit_balance ?? 0);
+  const threshold = Number(profileRes.data?.low_balance_threshold ?? 0);
+  const stockPending = (stockPendingRes.data ?? []) as Array<{ id: string; total_amount: number }>;
+  const shippingPending = (shippingPendingRes.data ?? []) as Array<{
+    id: string;
+    shipping_fee_total: number;
+  }>;
+  const dep = computeAvailableDeposit(
+    balance,
+    stockPending.map((s) => ({ id: s.id, total_amount: Number(s.total_amount) })),
+    shippingPending.map((s) => ({ id: s.id, shipping_fee_total: Number(s.shipping_fee_total ?? 0) })),
+  );
+  const low = dep.available <= threshold;
 
   return (
     <div className="space-y-6">
@@ -54,13 +76,28 @@ export default async function DepositListPage() {
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">
-              현재 잔액
+              가용 예치금
             </p>
             <p className="font-mono tabular text-3xl font-semibold mt-1 leading-none">
-              {formatKRW(balance)}
+              {formatKRW(dep.available)}
             </p>
-            {threshold > 0 && (
+            {(dep.stockReserved > 0 || dep.shippingReserved > 0) && (
               <p className="text-xs text-muted-foreground mt-1.5">
+                잔액 <span className="font-mono tabular text-foreground">{formatKRW(dep.balance)}</span> ·
+                검토대기 예약{' '}
+                <span className="font-mono tabular text-warning">
+                  {formatKRW(dep.stockReserved + dep.shippingReserved)}
+                </span>
+                {dep.stockReserved > 0 && (
+                  <span className="ml-1 text-[11px]">(재고 {formatKRW(dep.stockReserved)})</span>
+                )}
+                {dep.shippingReserved > 0 && (
+                  <span className="ml-1 text-[11px]">(배송 {formatKRW(dep.shippingReserved)})</span>
+                )}
+              </p>
+            )}
+            {threshold > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
                 알림 임계치{' '}
                 <span className={`font-mono tabular ${low ? 'text-warning font-medium' : ''}`}>
                   {formatKRW(threshold)}

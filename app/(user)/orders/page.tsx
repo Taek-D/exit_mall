@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { formatKRW } from '@/lib/money';
-import { type OrderStatus } from '@/lib/types';
-import { OrderStatusBadge } from '@/components/StatusBadge';
+import { type OrderStatus, type StockOrderStatus } from '@/lib/types';
+import { OrderStatusBadge, StockOrderStatusBadge } from '@/components/StatusBadge';
 import { OrderCancelButton } from '@/components/OrderCancelButton';
+import { StockOrderCancelButton } from './StockOrderCancelButton';
 import { Inbox, Truck, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,13 +12,18 @@ import { DeliveryTrackingLookup } from '@/components/DeliveryTrackingLookup';
 
 export const dynamic = 'force-dynamic';
 
-type OrderItem = {
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  subtotal: number;
+type StockItem = { product_id: string; product_name: string; qty: number; subtotal: number };
+type StockOrder = {
+  id: string;
+  total_amount: number;
+  status: string;
+  items: StockItem[];
+  admin_memo: string | null;
+  created_at: string;
 };
-type Order = {
+
+type LegacyOrderItem = { product_name: string; quantity: number; subtotal: number };
+type LegacyOrder = {
   id: string;
   total_amount: number;
   status: string;
@@ -25,84 +31,151 @@ type Order = {
   tracking_number: string | null;
   carrier: string | null;
   created_at: string;
-  order_items: OrderItem[];
+  order_items: LegacyOrderItem[];
 };
 
 export default async function MyOrdersPage() {
   const supabase = createClient();
-  const { data: orders } = await supabase
-    .from('orders')
-    .select(
-      'id,total_amount,status,shipping_name,tracking_number,carrier,created_at,order_items(product_name,quantity,unit_price,subtotal)',
-    )
-    .order('created_at', { ascending: false });
-
-  const list = (orders ?? []) as unknown as Order[];
+  const [stockRes, legacyRes] = await Promise.all([
+    (supabase.from('stock_orders' as any) as any)
+      .select('id,total_amount,status,items,admin_memo,created_at')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('orders')
+      .select(
+        'id,total_amount,status,shipping_name,tracking_number,carrier,created_at,order_items(product_name,quantity,unit_price,subtotal)',
+      )
+      .order('created_at', { ascending: false }),
+  ]);
+  const stockOrders = (stockRes.data ?? []) as unknown as StockOrder[];
+  const legacy = (legacyRes.data ?? []) as unknown as LegacyOrder[];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex items-end justify-between gap-4 pb-4 border-b">
         <div>
           <h1 className="font-heading font-semibold text-2xl tracking-tight">주문 내역</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            <span className="font-mono tabular font-medium text-foreground">{list.length}</span>건
+            <span className="font-mono tabular font-medium text-foreground">
+              {stockOrders.length + legacy.length}
+            </span>
+            건
           </p>
         </div>
       </header>
 
-      {list.length === 0 ? (
-        <div className="rounded-lg border bg-card p-12 flex flex-col items-center gap-3 text-center">
-          <div className="h-12 w-12 rounded-full bg-muted grid place-items-center">
-            <Inbox className="h-6 w-6 text-muted-foreground" aria-hidden />
+      <section className="space-y-3">
+        <h2 className="font-heading font-semibold text-lg">엑시트몰 상품 (재고 적립)</h2>
+        {stockOrders.length === 0 ? (
+          <div className="rounded-lg border bg-card p-8 flex flex-col items-center gap-3 text-center">
+            <div className="h-12 w-12 rounded-full bg-muted grid place-items-center">
+              <Inbox className="h-6 w-6 text-muted-foreground" aria-hidden />
+            </div>
+            <p className="text-sm text-muted-foreground">검토 요청 내역이 없습니다</p>
+            <Button asChild variant="outline" size="sm" className="mt-1">
+              <Link href="/shop">상품 보러가기</Link>
+            </Button>
           </div>
-          <h2 className="font-medium">주문 내역이 없습니다</h2>
-          <Button asChild variant="outline" size="sm" className="mt-1">
-            <Link href="/shop">상품 보러가기</Link>
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {list.map((o) => (
+        ) : (
+          stockOrders.map((o) => (
             <article key={o.id} className="rounded-lg border bg-card">
               <header className="flex items-center justify-between gap-3 p-4 border-b">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="font-mono text-xs text-muted-foreground truncate">
-                    주문번호 {o.id.slice(0, 8)}
-                  </span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(o.created_at).toLocaleString('ko-KR', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
+                <span className="font-mono text-xs text-muted-foreground truncate">
+                  주문번호 {o.id.slice(0, 8)} ·{' '}
+                  {new Date(o.created_at).toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <StockOrderStatusBadge status={o.status as StockOrderStatus} />
+              </header>
+              <div className="p-4 space-y-1 text-sm">
+                {o.items.map((it, i) => (
+                  <div key={i} className="flex justify-between gap-3">
+                    <span>
+                      <span className="text-foreground">{it.product_name}</span>
+                      <span className="text-muted-foreground"> × {it.qty}</span>
+                    </span>
+                    <span className="font-mono tabular text-muted-foreground">
+                      {formatKRW(it.subtotal)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {o.status === 'rejected' && o.admin_memo && (
+                <p className="px-4 pb-3 text-xs text-destructive">반려 사유: {o.admin_memo}</p>
+              )}
+              <footer className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-surface-muted/40">
+                <span className="font-mono tabular text-lg font-semibold">
+                  {formatKRW(Number(o.total_amount))}
+                </span>
+                {o.status === 'pending' && <StockOrderCancelButton orderId={o.id} />}
+              </footer>
+            </article>
+          ))
+        )}
+      </section>
+
+      {legacy.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-heading font-semibold text-lg text-muted-foreground">
+            Legacy 주문 (구 일반 주문)
+          </h2>
+          {legacy.map((o) => (
+            <article key={o.id} className="rounded-lg border bg-card">
+              <header className="flex items-center justify-between gap-3 p-4 border-b">
+                <span className="font-mono text-xs text-muted-foreground truncate">
+                  주문번호 {o.id.slice(0, 8)} ·{' '}
+                  {new Date(o.created_at).toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
                 <OrderStatusBadge status={o.status as OrderStatus} />
               </header>
-
-              <div className="p-4 space-y-2 text-sm">
+              <div className="p-4 space-y-1 text-sm">
                 {o.order_items.map((it, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-3">
-                    <span className="min-w-0">
+                  <div key={i} className="flex justify-between gap-3">
+                    <span>
                       <span className="text-foreground">{it.product_name}</span>
                       <span className="text-muted-foreground"> × {it.quantity}</span>
                     </span>
-                    <span className="font-mono tabular text-muted-foreground whitespace-nowrap">
+                    <span className="font-mono tabular text-muted-foreground">
                       {formatKRW(Number(it.subtotal))}
                     </span>
                   </div>
                 ))}
               </div>
-
               {o.tracking_number && (
                 <div className="px-4 pb-3 space-y-2">
-                  <TrackingChip carrier={o.carrier} tracking={o.tracking_number} />
+                  <span className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs">
+                    <Truck className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                    {o.carrier && <span className="text-muted-foreground">{o.carrier}</span>}
+                    <span className="font-mono tabular">{o.tracking_number}</span>
+                    {(() => {
+                      const url = getTrackingUrl(o.carrier, o.tracking_number);
+                      return url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent inline-flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                          조회
+                        </a>
+                      ) : null;
+                    })()}
+                  </span>
                   {isCjCarrier(o.carrier) && <DeliveryTrackingLookup orderId={o.id} />}
                 </div>
               )}
-
               <footer className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-surface-muted/40">
                 <span className="font-mono tabular text-lg font-semibold">
                   {formatKRW(Number(o.total_amount))}
@@ -111,37 +184,8 @@ export default async function MyOrdersPage() {
               </footer>
             </article>
           ))}
-        </div>
+        </section>
       )}
-    </div>
-  );
-}
-
-function TrackingChip({ carrier, tracking }: { carrier: string | null; tracking: string }) {
-  const url = getTrackingUrl(carrier, tracking);
-  const inner = (
-    <>
-      <Truck className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-      {carrier && <span className="text-muted-foreground">{carrier}</span>}
-      <span className="font-mono tabular">{tracking}</span>
-      {url && <ExternalLink className="h-3 w-3 text-muted-foreground" aria-hidden />}
-    </>
-  );
-  if (url) {
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs hover:bg-muted transition-colors"
-      >
-        {inner}
-      </a>
-    );
-  }
-  return (
-    <div className="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-surface-muted text-xs">
-      {inner}
     </div>
   );
 }

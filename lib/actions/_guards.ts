@@ -1,11 +1,12 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { Database } from '@/lib/db-types';
+import type { User } from '@supabase/supabase-js';
+
+type SupabaseServerClient = ReturnType<typeof createClient>;
 
 type AdminContext = {
   ok: true;
-  supabase: SupabaseClient<Database>;
+  supabase: SupabaseServerClient;
   user: User;
   profile: { role: string; status: string };
 };

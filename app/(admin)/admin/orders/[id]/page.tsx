@@ -1,44 +1,55 @@
 import { createClient } from '@/lib/supabase/server';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
-import { type OrderStatus } from '@/lib/types';
-import { OrderStatusBadge } from '@/components/StatusBadge';
-import { TransitionButtons } from './TransitionButtons';
-import { ArrowLeft, User, MapPin, Truck, Package, ExternalLink } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { getTrackingUrl, isCjCarrier } from '@/lib/tracking';
-import { DeliveryTrackingLookup } from '@/components/DeliveryTrackingLookup';
+import { type StockOrderStatus } from '@/lib/types';
+import { StockOrderStatusBadge } from '@/components/StatusBadge';
+import { ArrowLeft, User, Package } from 'lucide-react';
+import { ReviewActions } from './ReviewActions';
 
 export const dynamic = 'force-dynamic';
 
-type Order = {
-  id: string;
-  total_amount: number;
-  status: string;
-  shipping_name: string;
-  shipping_phone: string;
-  shipping_address: string;
-  shipping_memo: string | null;
-  tracking_number: string | null;
-  carrier: string | null;
-  created_at: string;
-  order_items: { id: string; product_name: string; quantity: number; subtotal: number }[];
-  profiles: { name: string; email: string; phone: string } | null;
+type Item = {
+  product_id: string;
+  product_name: string;
+  qty: number;
+  unit_price: number;
+  subtotal: number;
 };
 
-export default async function AdminOrderDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+type StockOrder = {
+  id: string;
+  user_id: string;
+  total_amount: number;
+  status: string;
+  items: Item[];
+  admin_memo: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  profiles: { name: string; email: string; phone: string; deposit_balance: number } | null;
+};
+
+export default async function AdminStockOrderDetail({ params }: { params: { id: string } }) {
   const supabase = createClient();
-  const { data: order } = await supabase
-    .from('orders')
-    .select('*,order_items(*),profiles!orders_user_id_fkey(name,email,phone)')
+  const { data } = await (supabase.from('stock_orders' as any) as any)
+    .select('*,profiles!stock_orders_user_id_fkey(name,email,phone,deposit_balance)')
     .eq('id', params.id)
-    .single<Order>();
-  if (!order) notFound();
+    .maybeSingle();
+  const order = data as StockOrder | null;
+
+  // 책갈피 호환: stock_orders 에 없으면 구 일반 주문(orders)에 있는지 확인 후 legacy 화면으로 redirect.
+  if (!order) {
+    const { data: legacy } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (legacy) redirect(`/admin/orders-legacy/${params.id}`);
+    notFound();
+  }
+
+  const balance = Number(order.profiles?.deposit_balance ?? 0);
+  const insufficient = order.status === 'pending' && balance < Number(order.total_amount);
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -47,151 +58,110 @@ export default async function AdminOrderDetailPage({
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        주문 목록
+        주문관리 목록
       </Link>
 
       <header className="pb-4 border-b flex items-center justify-between gap-4">
         <div>
           <h1 className="font-heading font-semibold text-2xl tracking-tight">
-            주문 상세
+            주문 상세 (재고 적립)
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             <span className="font-mono tabular">{order.id.slice(0, 8)}</span> ·{' '}
-            {order.created_at &&
-              new Date(order.created_at).toLocaleString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+            {new Date(order.created_at).toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </p>
         </div>
-        <OrderStatusBadge status={order.status as OrderStatus} />
+        <StockOrderStatusBadge status={order.status as StockOrderStatus} />
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Panel title="주문자" Icon={User}>
-          <dl className="space-y-2 text-sm">
-            <Row label="이름">{order.profiles?.name ?? '—'}</Row>
-            <Row label="이메일" mono>
-              {order.profiles?.email ?? '—'}
-            </Row>
-            <Row label="연락처" mono>
-              {order.profiles?.phone ?? '—'}
-            </Row>
-          </dl>
-        </Panel>
-
-        <Panel title="배송 정보" Icon={MapPin}>
-          <dl className="space-y-2 text-sm">
-            <Row label="받는 사람">{order.shipping_name}</Row>
-            <Row label="연락처" mono>
-              {order.shipping_phone}
-            </Row>
-            <Row label="주소">{order.shipping_address}</Row>
-            {order.shipping_memo && <Row label="메모">{order.shipping_memo}</Row>}
-          </dl>
-        </Panel>
-
-        <Panel title="배송 정보" Icon={Truck}>
-          {order.tracking_number ? (
-            <dl className="space-y-2 text-sm">
-              <Row label="택배사">{order.carrier}</Row>
-              <Row label="송장번호" mono>
-                {order.tracking_number}
-              </Row>
-              {(() => {
-                const url = getTrackingUrl(order.carrier, order.tracking_number);
-                return url ? (
-                  <div className="pt-2 space-y-2">
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border bg-background text-xs hover:bg-muted transition-colors"
-                    >
-                      <ExternalLink className="h-3 w-3" aria-hidden />
-                      배송조회
-                    </a>
-                    {isCjCarrier(order.carrier) && <DeliveryTrackingLookup orderId={order.id} />}
-                  </div>
-                ) : null;
-              })()}
-            </dl>
-          ) : (
-            <p className="text-sm text-muted-foreground">송장번호가 입력되지 않았습니다.</p>
-          )}
-        </Panel>
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <h2 className="font-medium">고객</h2>
+        </div>
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt className="text-muted-foreground text-xs">이름</dt>
+            <dd>{order.profiles?.name ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">이메일</dt>
+            <dd className="font-mono">{order.profiles?.email ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">연락처</dt>
+            <dd className="font-mono">{order.profiles?.phone ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground text-xs">예치금</dt>
+            <dd className={`font-mono ${insufficient ? 'text-destructive font-medium' : ''}`}>
+              {formatKRW(balance)}
+            </dd>
+          </div>
+        </dl>
       </div>
 
-      <Panel title="주문 항목" Icon={Package}>
-        <ul className="divide-y -mx-5">
-          {order.order_items.map((it) => (
-            <li
-              key={it.id}
-              className="px-5 py-3 flex items-center justify-between gap-3 text-sm"
-            >
-              <div className="min-w-0">
-                <p className="font-medium truncate">{it.product_name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  수량 <span className="font-mono tabular text-foreground">{it.quantity}</span>
-                </p>
-              </div>
-              <span className="font-mono tabular whitespace-nowrap">
-                {formatKRW(Number(it.subtotal))}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 pt-3 border-t flex items-baseline justify-between">
-          <span className="font-medium">합계</span>
-          <span className="font-mono tabular text-xl font-semibold">
-            {formatKRW(Number(order.total_amount))}
-          </span>
+      <div className="rounded-lg border bg-card">
+        <header className="h-11 px-5 flex items-center gap-2 border-b">
+          <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <h2 className="font-medium">주문 항목</h2>
+        </header>
+        <table className="w-full text-sm">
+          <thead className="bg-surface-muted">
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <th className="font-medium px-5 h-10">상품</th>
+              <th className="font-medium px-3 text-right">수량</th>
+              <th className="font-medium px-3 text-right">단가</th>
+              <th className="font-medium px-3 text-right">소계</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.items.map((it, i) => (
+              <tr key={i} className="border-t">
+                <td className="px-5 py-2">{it.product_name}</td>
+                <td className="px-3 py-2 text-right font-mono tabular">{it.qty}</td>
+                <td className="px-3 py-2 text-right font-mono tabular">
+                  {formatKRW(it.unit_price)}
+                </td>
+                <td className="px-3 py-2 text-right font-mono tabular">{formatKRW(it.subtotal)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t bg-surface-muted/40">
+              <td colSpan={3} className="px-5 py-3 font-medium text-right">
+                합계
+              </td>
+              <td className="px-3 py-3 text-right font-mono tabular text-base font-semibold">
+                {formatKRW(Number(order.total_amount))}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {order.status === 'rejected' && order.admin_memo && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-4 text-sm">
+          <strong>반려 사유:</strong> {order.admin_memo}
         </div>
-      </Panel>
+      )}
 
-      <TransitionButtons orderId={order.id} status={order.status as OrderStatus} />
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  Icon,
-  children,
-}: {
-  title: string;
-  Icon: LucideIcon;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border bg-card">
-      <header className="h-11 px-5 flex items-center gap-2 border-b">
-        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <h2 className="font-heading font-semibold text-sm">{title}</h2>
-      </header>
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
-
-function Row({
-  label,
-  children,
-  mono,
-}: {
-  label: string;
-  children: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-[90px_1fr] items-baseline gap-3">
-      <dt className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-        {label}
-      </dt>
-      <dd className={mono ? 'font-mono tabular text-sm' : 'text-sm'}>{children}</dd>
+      {order.status === 'pending' && (
+        <>
+          {insufficient && (
+            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+              고객의 가용 예치금이 부족합니다. 승인 시 차감 단계에서 실패할 수 있습니다.
+            </div>
+          )}
+          <ReviewActions orderId={order.id} />
+        </>
+      )}
     </div>
   );
 }
