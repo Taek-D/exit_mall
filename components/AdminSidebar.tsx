@@ -20,7 +20,7 @@ const NAV = [
   { href: '/admin/approvals', label: '가입 승인', Icon: UserCheck },
   { href: '/admin/deposits', label: '입금 확인', Icon: Wallet },
   { href: '/admin/orders', label: '주문관리', Icon: ShoppingCart, exact: true },
-  { href: '/admin/order-uploads', label: '주문서 업로드', Icon: FileSpreadsheet },
+  { href: '/admin/shipping-uploads', label: '배송대행 업로드', Icon: FileSpreadsheet },
   { href: '/admin/products', label: '상품 관리', Icon: Package },
   { href: '/admin/users', label: '사용자', Icon: Users },
   { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },

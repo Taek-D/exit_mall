@@ -19,7 +19,7 @@ const NAV: { href: string; label: string; Icon: typeof Package; exact?: boolean 
   { href: '/cart', label: '장바구니', Icon: ShoppingBag },
   { href: '/orders', label: '주문 내역', Icon: ClipboardList, exact: true },
   { href: '/inventory', label: '보유 재고', Icon: Boxes },
-  { href: '/orders/upload', label: '주문서 업로드', Icon: Upload },
+  { href: '/shipping-uploads', label: '배송대행 업로드', Icon: Upload },
   { href: '/deposit', label: '예치금', Icon: Wallet },
 ];
 
