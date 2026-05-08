@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
-import { mapStockOrderError } from '@/lib/actions/stock-order';
+import { mapStockOrderError } from '@/lib/errors/stock-order';
 
 export async function approveStockOrderAction(
   orderId: string,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapStockOrderError } from '@/lib/actions/stock-order';
+import { mapStockOrderError } from '@/lib/errors/stock-order';
 
 describe('mapStockOrderError', () => {
   it('UNAUTHORIZED', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapShippingUploadError } from '@/lib/actions/admin-shipping-uploads';
+import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
 describe('mapShippingUploadError', () => {
   it('FORBIDDEN', () => {

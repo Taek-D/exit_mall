@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { parseShippingExcel } from '@/lib/shipping-upload-parser';
-import { mapShippingUploadError } from '@/lib/actions/admin-shipping-uploads';
+import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const OOXML_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
