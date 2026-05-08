@@ -12,7 +12,6 @@ import {
   Users,
   AlertTriangle,
   Settings,
-  Archive,
 } from 'lucide-react';
 
 const NAV = [
@@ -24,7 +23,6 @@ const NAV = [
   { href: '/admin/products', label: '상품 관리', Icon: Package },
   { href: '/admin/users', label: '사용자', Icon: Users },
   { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
-  { href: '/admin/orders-legacy', label: 'Legacy 주문', Icon: Archive, muted: true },
   { href: '/admin/settings', label: '설정', Icon: Settings },
 ];
 
@@ -43,7 +41,7 @@ export function AdminSidebar() {
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-0.5">
-          {NAV.map(({ href, label, Icon, exact, muted }) => {
+          {NAV.map(({ href, label, Icon, exact }) => {
             const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
             return (
               <li key={href}>
@@ -53,9 +51,7 @@ export function AdminSidebar() {
                     'flex items-center gap-2.5 px-3 h-9 rounded-md text-sm transition-colors duration-150 ease-out-expo',
                     active
                       ? 'bg-primary text-primary-foreground'
-                      : muted
-                        ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        : 'text-foreground hover:bg-muted',
+                      : 'text-foreground hover:bg-muted',
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />

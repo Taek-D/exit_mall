@@ -1,3 +1,8 @@
+/**
+ * @deprecated 2026-05-08 부터 사용하지 않음.
+ * 새 흐름은 lib/actions/shipping-upload.ts 를 사용한다.
+ * 이 파일은 legacy 데이터 호환성 검토를 위해 보존 중이며, 어느 코드에서도 import 하지 않는다.
+ */
 'use server';
 import { createClient } from '@/lib/supabase/server';
 import { parseOrderExcel } from '@/lib/order-upload-parser';
