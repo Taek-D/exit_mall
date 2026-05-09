@@ -41,7 +41,11 @@ export default async function AdminDashboard() {
       .select('id,user_id,total_amount,status,created_at')
       .order('created_at', { ascending: false })
       .limit(10),
-    supabase.from('profiles').select('deposit_balance,low_balance_threshold').eq('role', 'user'),
+    supabase
+      .from('profiles')
+      .select('deposit_balance,low_balance_threshold')
+      .eq('role', 'user')
+      .eq('status', 'active'),
   ]);
 
   const lbList = (lbUsers ?? []) as unknown as BalanceRow[];
