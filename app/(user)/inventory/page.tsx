@@ -29,7 +29,7 @@ export default async function InventoryPage() {
   }
 
   const { data: invRaw } = await supabase
-    .from('user_inventory' as any)
+    .from('user_inventory')
     .select('product_id, quantity, products(name)')
     .eq('user_id', user.id)
     .gt('quantity', 0);

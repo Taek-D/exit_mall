@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ORDER_STATUS_LABEL, type OrderStatus } from '@/lib/types';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,10 +33,18 @@ function formatDate(s: string | null): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
+function nextDayKstIso(dateStr: string): string {
+  const start = new Date(`${dateStr}T00:00:00+09:00`);
+  start.setUTCDate(start.getUTCDate() + 1);
+  return start.toISOString();
+}
+
 export async function GET(req: Request) {
   const supabase = createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorized', { status: 401 });
 
   const { data: profile } = await supabase
@@ -52,43 +60,28 @@ export async function GET(req: Request) {
   const status = url.searchParams.get('status');
   const fromParam = url.searchParams.get('from');
   const toParam = url.searchParams.get('to');
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
 
-  // Date-only filters (YYYY-MM-DD) are interpreted as KST calendar days.
-  // - `from=YYYY-MM-DD` → KST 00:00 of that day
-  // - `to=YYYY-MM-DD`   → strict less-than KST 00:00 of the NEXT day so the
-  //   entire selected day (including late orders) is included.
-  // Full ISO/timestamp values are passed through unchanged so explicit ranges
-  // still work.
-  const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-  const KST_OFFSET = '+09:00';
-  function nextDayKstIso(dateStr: string): string {
-    const start = new Date(`${dateStr}T00:00:00${KST_OFFSET}`);
-    start.setUTCDate(start.getUTCDate() + 1);
-    return start.toISOString();
-  }
-
-  let q = supabase
+  let query = supabase
     .from('orders')
     .select(
       'id,total_amount,status,shipping_name,shipping_phone,shipping_address,shipping_memo,tracking_number,carrier,created_at,shipped_at,user_id,profiles!orders_user_id_fkey(name,email,phone),order_items(product_name,quantity,unit_price,subtotal)',
     )
     .order('created_at', { ascending: false });
-  if (status && status !== 'all') q = q.eq('status', status);
+  if (status && status !== 'all') query = query.eq('status', status);
   if (fromParam) {
-    const lower = DATE_ONLY.test(fromParam)
-      ? `${fromParam}T00:00:00${KST_OFFSET}`
-      : fromParam;
-    q = q.gte('created_at', lower);
+    query = query.gte(
+      'created_at',
+      dateOnly.test(fromParam) ? `${fromParam}T00:00:00+09:00` : fromParam,
+    );
   }
   if (toParam) {
-    if (DATE_ONLY.test(toParam)) {
-      q = q.lt('created_at', nextDayKstIso(toParam));
-    } else {
-      q = q.lte('created_at', toParam);
-    }
+    query = dateOnly.test(toParam)
+      ? query.lt('created_at', nextDayKstIso(toParam))
+      : query.lte('created_at', toParam);
   }
 
-  const { data, error } = await q;
+  const { data, error } = await query;
   if (error) return new Response(`DB error: ${error.message}`, { status: 500 });
   const rows = (data ?? []) as unknown as OrderRow[];
 
@@ -113,56 +106,56 @@ export async function GET(req: Request) {
     ],
   ];
 
-  for (const o of rows) {
-    const itemsText = (o.order_items ?? [])
-      .map((it) => `${it.product_name} × ${it.quantity}`)
+  for (const order of rows) {
+    const itemsText = (order.order_items ?? [])
+      .map((item) => `${item.product_name} × ${item.quantity}`)
       .join(' / ');
-    const totalQty = (o.order_items ?? []).reduce((s, it) => s + Number(it.quantity ?? 0), 0);
-    const statusLabel = ORDER_STATUS_LABEL[o.status as OrderStatus] ?? o.status;
+    const totalQty = (order.order_items ?? []).reduce(
+      (sum, item) => sum + Number(item.quantity ?? 0),
+      0,
+    );
     sheetData.push([
-      o.id,
-      formatDate(o.created_at),
-      statusLabel,
-      o.profiles?.name ?? '',
-      o.profiles?.email ?? '',
-      o.profiles?.phone ?? '',
-      o.shipping_name,
-      o.shipping_phone,
-      o.shipping_address,
-      o.shipping_memo ?? '',
+      order.id,
+      formatDate(order.created_at),
+      ORDER_STATUS_LABEL[order.status as OrderStatus] ?? order.status,
+      order.profiles?.name ?? '',
+      order.profiles?.email ?? '',
+      order.profiles?.phone ?? '',
+      order.shipping_name,
+      order.shipping_phone,
+      order.shipping_address,
+      order.shipping_memo ?? '',
       itemsText,
       totalQty,
-      Number(o.total_amount),
-      o.carrier ?? '',
-      o.tracking_number ?? '',
-      formatDate(o.shipped_at),
+      Number(order.total_amount),
+      order.carrier ?? '',
+      order.tracking_number ?? '',
+      formatDate(order.shipped_at),
     ]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
-  // Column widths
-  ws['!cols'] = [
-    { wch: 38 }, // 주문번호
-    { wch: 18 }, // 주문일시
-    { wch: 8 }, // 상태
-    { wch: 12 }, // 고객명
-    { wch: 28 }, // 이메일
-    { wch: 14 }, // 전화
-    { wch: 12 }, // 받는사람
-    { wch: 14 }, // 연락처
-    { wch: 40 }, // 주소
-    { wch: 24 }, // 메모
-    { wch: 50 }, // 상품
-    { wch: 10 }, // 수량
-    { wch: 14 }, // 금액
-    { wch: 14 }, // 택배사
-    { wch: 18 }, // 송장
-    { wch: 18 }, // 발송일
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('주문');
+  worksheet.addRows(sheetData);
+  worksheet.columns = [
+    { width: 38 },
+    { width: 18 },
+    { width: 8 },
+    { width: 12 },
+    { width: 28 },
+    { width: 14 },
+    { width: 12 },
+    { width: 14 },
+    { width: 40 },
+    { width: 24 },
+    { width: 50 },
+    { width: 10 },
+    { width: 14 },
+    { width: 14 },
+    { width: 18 },
+    { width: 18 },
   ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '주문');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  const buffer = await workbook.xlsx.writeBuffer();
 
   const today = new Date();
   const tag =
@@ -170,11 +163,10 @@ export async function GET(req: Request) {
     (status && status !== 'all' ? `_${status}` : '');
   const filename = encodeURIComponent(`exitmall_orders_${tag}.xlsx`);
 
-  return new Response(new Uint8Array(buf), {
+  return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
-      'Content-Type':
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${filename}`,
       'Cache-Control': 'no-store',
     },

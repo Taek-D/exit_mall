@@ -11,6 +11,7 @@ import {
 import { PASSWORD_RECOVERY_COOKIE } from '@/lib/auth-constants';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
 
 export async function signupAction(formData: FormData) {
   const parsed = signupSchema.safeParse({
@@ -20,7 +21,7 @@ export async function signupAction(formData: FormData) {
     phone: formData.get('phone'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
+    return { error: formatZodPathError(parsed.error) };
   }
 
   const supabase = createClient();
@@ -70,7 +71,7 @@ export async function changePasswordAction(formData: FormData) {
     confirmPassword: formData.get('confirmPassword'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+    return { error: formatZodError(parsed.error) };
   }
 
   const supabase = createClient();
@@ -131,7 +132,7 @@ export async function findAccountAction(formData: FormData) {
     phone: formData.get('phone'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+    return { error: formatZodError(parsed.error) };
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -166,7 +167,7 @@ export async function requestPasswordResetAction(formData: FormData) {
     email: formData.get('email'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+    return { error: formatZodError(parsed.error) };
   }
 
   const supabase = createClient();
@@ -185,7 +186,7 @@ export async function resetRecoveredPasswordAction(formData: FormData) {
     confirmPassword: formData.get('confirmPassword'),
   });
   if (!parsed.success) {
-    return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+    return { error: formatZodError(parsed.error) };
   }
 
   const cookieStore = cookies();

@@ -1,6 +1,6 @@
 'use server';
-import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { callRpc, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 
 export type ApproveResult =
   | { ok: true; orderId: string }
@@ -9,7 +9,7 @@ export type ApproveResult =
 export async function approveOrderUploadAction(uploadId: string): Promise<ApproveResult> {
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
-  const { data, error } = await (guard.supabase.rpc as any)('approve_order_upload', {
+  const { data, error } = await callRpc(guard.supabase, 'approve_order_upload', {
     upload_id: uploadId,
   });
   if (error) {
@@ -25,19 +25,18 @@ export async function approveOrderUploadAction(uploadId: string): Promise<Approv
     if (msg.includes('INVALID_PRICE')) return { ok: false, error: '단가 값이 올바르지 않은 항목이 있습니다.' };
     return { ok: false, error: msg };
   }
-  revalidatePath('/admin/order-uploads');
-  revalidatePath('/admin/orders');
+  revalidatePaths(['/admin/order-uploads', '/admin/orders']);
   return { ok: true, orderId: data as string };
 }
 
 export async function rejectOrderUploadAction(
   uploadId: string,
   memo: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ActionResult> {
   if (!memo.trim()) return { ok: false, error: '반려 사유를 입력해주세요.' };
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
-  const { error } = await (guard.supabase.rpc as any)('reject_order_upload', {
+  const { error } = await callRpc(guard.supabase, 'reject_order_upload', {
     upload_id: uploadId,
     memo: memo.trim(),
   });
@@ -45,7 +44,7 @@ export async function rejectOrderUploadAction(
     if (error.message.includes('ALREADY_PROCESSED')) return { ok: false, error: '이미 처리된 업로드입니다.' };
     return { ok: false, error: error.message };
   }
-  revalidatePath('/admin/order-uploads');
+  revalidatePaths(['/admin/order-uploads']);
   return { ok: true };
 }
 

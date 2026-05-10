@@ -1,6 +1,6 @@
 'use server';
-import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { callRpc, revalidatePaths } from '@/lib/actions/_shared';
 import { parseShippingExcel } from '@/lib/shipping-upload-parser';
 import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
@@ -34,7 +34,7 @@ export async function attachTrackingAction(
 
   let parsed;
   try {
-    parsed = parseShippingExcel(buffer);
+    parsed = await parseShippingExcel(buffer);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
@@ -72,7 +72,7 @@ export async function attachTrackingAction(
     });
   if (upErr) return { ok: false, error: `파일 업로드 실패: ${upErr.message}` };
 
-  const { error: rpcErr } = await (guard.supabase.rpc as any)('attach_tracking', {
+  const { error: rpcErr } = await callRpc(guard.supabase, 'attach_tracking', {
     upload_id: uploadId,
     storage_path: storagePath,
     parsed_items: itemsWithProductId,
@@ -83,10 +83,12 @@ export async function attachTrackingAction(
     return { ok: false, error: mapShippingUploadError(rpcErr.message) };
   }
 
-  revalidatePath(`/admin/shipping-uploads/${uploadId}`);
-  revalidatePath(`/shipping-uploads/${uploadId}`);
-  revalidatePath('/admin/shipping-uploads');
-  revalidatePath('/shipping-uploads');
+  revalidatePaths([
+    `/admin/shipping-uploads/${uploadId}`,
+    `/shipping-uploads/${uploadId}`,
+    '/admin/shipping-uploads',
+    '/shipping-uploads',
+  ]);
   return { ok: true };
 }
 

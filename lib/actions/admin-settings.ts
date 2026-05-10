@@ -1,7 +1,7 @@
 'use server';
 import { appSettingsSchema } from '@/lib/schemas';
-import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { formatZodError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 
 export async function saveAppSettingsAction(fd: FormData) {
   const guard = await requireAdmin();
@@ -13,9 +13,9 @@ export async function saveAppSettingsAction(fd: FormData) {
     bankAccountHolder: fd.get('bankAccountHolder') ?? '',
     notice: fd.get('notice') ?? '',
   });
-  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
 
-  const { error } = await (guard.supabase.from('app_settings') as any).update({
+  const { error } = await mutationTable(guard.supabase, 'app_settings').update({
     bank_name: parsed.data.bankName,
     bank_account_number: parsed.data.bankAccountNumber,
     bank_account_holder: parsed.data.bankAccountHolder,
@@ -27,6 +27,6 @@ export async function saveAppSettingsAction(fd: FormData) {
     console.error('[admin-settings] save', error);
     return { error: '설정을 저장하지 못했습니다.' };
   }
-  revalidatePath('/admin/settings'); revalidatePath('/deposit/new');
+  revalidatePaths(['/admin/settings', '/deposit/new']);
   return { ok: true };
 }

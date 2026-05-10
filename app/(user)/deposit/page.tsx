@@ -34,7 +34,8 @@ export default async function DepositListPage() {
       .from('deposit_requests')
       .select('id,amount,depositor_name,status,admin_memo,created_at,confirmed_at')
       .order('created_at', { ascending: false }),
-    (supabase.from('stock_orders' as any) as any)
+    supabase
+      .from('stock_orders')
       .select('id, total_amount')
       .eq('user_id', user!.id)
       .eq('status', 'pending'),

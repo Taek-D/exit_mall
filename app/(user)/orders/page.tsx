@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { formatKRW } from '@/lib/money';
 import { type OrderStatus, type StockOrderStatus } from '@/lib/types';
 import { OrderStatusBadge, StockOrderStatusBadge } from '@/components/StatusBadge';
@@ -9,46 +8,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getTrackingUrl, isCjCarrier } from '@/lib/tracking';
 import { DeliveryTrackingLookup } from '@/components/DeliveryTrackingLookup';
+import { formatDateTimeKR } from '@/lib/dates';
+import { fetchMyOrders } from '@/lib/orders/queries';
 
 export const dynamic = 'force-dynamic';
 
-type StockItem = { product_id: string; product_name: string; qty: number; subtotal: number };
-type StockOrder = {
-  id: string;
-  total_amount: number;
-  status: string;
-  items: StockItem[];
-  admin_memo: string | null;
-  created_at: string;
-};
-
-type LegacyOrderItem = { product_name: string; quantity: number; subtotal: number };
-type LegacyOrder = {
-  id: string;
-  total_amount: number;
-  status: string;
-  shipping_name: string;
-  tracking_number: string | null;
-  carrier: string | null;
-  created_at: string;
-  order_items: LegacyOrderItem[];
-};
-
 export default async function MyOrdersPage() {
-  const supabase = createClient();
-  const [stockRes, legacyRes] = await Promise.all([
-    (supabase.from('stock_orders' as any) as any)
-      .select('id,total_amount,status,items,admin_memo,created_at')
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('orders')
-      .select(
-        'id,total_amount,status,shipping_name,tracking_number,carrier,created_at,order_items(product_name,quantity,unit_price,subtotal)',
-      )
-      .order('created_at', { ascending: false }),
-  ]);
-  const stockOrders = (stockRes.data ?? []) as unknown as StockOrder[];
-  const legacy = (legacyRes.data ?? []) as unknown as LegacyOrder[];
+  const { stockOrders, legacyOrders: legacy } = await fetchMyOrders();
 
   return (
     <div className="space-y-8">
@@ -82,13 +48,7 @@ export default async function MyOrdersPage() {
               <header className="flex items-center justify-between gap-3 p-4 border-b">
                 <span className="font-mono text-xs text-muted-foreground truncate">
                   주문번호 {o.id.slice(0, 8)} ·{' '}
-                  {new Date(o.created_at).toLocaleString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatDateTimeKR(o.created_at)}
                 </span>
                 <StockOrderStatusBadge status={o.status as StockOrderStatus} />
               </header>
@@ -129,13 +89,7 @@ export default async function MyOrdersPage() {
               <header className="flex items-center justify-between gap-3 p-4 border-b">
                 <span className="font-mono text-xs text-muted-foreground truncate">
                   주문번호 {o.id.slice(0, 8)} ·{' '}
-                  {new Date(o.created_at).toLocaleString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatDateTimeKR(o.created_at)}
                 </span>
                 <OrderStatusBadge status={o.status as OrderStatus} />
               </header>

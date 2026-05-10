@@ -1,8 +1,8 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { mapStockOrderError } from '@/lib/errors/stock-order';
+import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 
 const requestStockOrderSchema = z.object({
   items: z
@@ -17,10 +17,10 @@ export type StockOrderResult =
 export async function requestStockOrderAction(input: unknown): Promise<StockOrderResult> {
   const parsed = requestStockOrderSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.errors.map((e) => e.message).join(' · ') };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
   const supabase = createClient();
-  const { data, error } = await (supabase.rpc as any)('request_stock_order', {
+  const { data, error } = await callRpc(supabase, 'request_stock_order', {
     items: parsed.data.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
   });
   if (error) {
@@ -32,22 +32,19 @@ export async function requestStockOrderAction(input: unknown): Promise<StockOrde
     console.error('[stock-order] request', error);
     return { ok: false, error: mapStockOrderError(msg), productId };
   }
-  revalidatePath('/orders');
-  revalidatePath('/shop');
-  revalidatePath('/deposit');
+  revalidatePaths(['/orders', '/shop', '/deposit']);
   return { ok: true, orderId: data as string };
 }
 
 export async function cancelStockOrderAction(
   orderId: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = createClient();
-  const { error } = await (supabase.rpc as any)('cancel_stock_order', { order_id: orderId });
+  const { error } = await callRpc(supabase, 'cancel_stock_order', { order_id: orderId });
   if (error) {
     console.error('[stock-order] cancel', { orderId, error });
     return { ok: false, error: mapStockOrderError(error.message) };
   }
-  revalidatePath('/orders');
-  revalidatePath('/deposit');
+  revalidatePaths(['/orders', '/deposit']);
   return { ok: true };
 }

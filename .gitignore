@@ -24,3 +24,9 @@ supabase/.temp
 
 # UI design preview screenshots (root-level only)
 /*.png
+
+# Local generated outputs
+/outputs/
+
+# Local smoke-test logs
+/.next-smoke.*.log

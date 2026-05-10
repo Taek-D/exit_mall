@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { depositRequestSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
+import { formatZodError } from '@/lib/actions/_shared';
 import { redirect } from 'next/navigation';
 
 export async function createDepositRequestAction(formData: FormData) {
@@ -9,7 +10,7 @@ export async function createDepositRequestAction(formData: FormData) {
     amount: Number(formData.get('amount')),
     depositorName: String(formData.get('depositorName') ?? ''),
   });
-  if (!parsed.success) return { error: parsed.error.errors.map(e => e.message).join(' · ') };
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

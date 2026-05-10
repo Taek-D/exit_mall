@@ -1,7 +1,8 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
 import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-parser';
-import { revalidatePath } from 'next/cache';
+import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import type { Json } from '@/lib/db-types';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_EXTS = ['.xlsx'];
@@ -36,7 +37,7 @@ export async function requestShippingUploadAction(
 
   let parsed;
   try {
-    parsed = parseShippingExcel(buffer);
+    parsed = await parseShippingExcel(buffer);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
@@ -90,7 +91,7 @@ export async function requestShippingUploadAction(
 
   const fee = computeShippingFee(parsed.items.length);
 
-  const { data: row, error: insErr } = await (supabase.from('order_uploads') as any)
+  const { data: row, error: insErr } = await mutationTable(supabase, 'order_uploads')
     .insert({
       user_id: u.user.id,
       storage_path: storagePath,
@@ -98,7 +99,7 @@ export async function requestShippingUploadAction(
       contact_person: parsed.uploader_company,
       buyer_phone: parsed.uploader_phone,
       request_memo: parsed.request_memo,
-      items: itemsWithProductId,
+      items: itemsWithProductId as Json,
       total_quantity: parsed.total_quantity,
       total_amount: 0,
       shipping_fee_total: fee,
@@ -112,16 +113,15 @@ export async function requestShippingUploadAction(
     return { ok: false, error: `저장 실패: ${insErr.message}` };
   }
 
-  revalidatePath('/shipping-uploads');
-  revalidatePath('/admin/shipping-uploads');
-  return { ok: true, uploadId: (row as { id: string }).id };
+  revalidatePaths(['/shipping-uploads', '/admin/shipping-uploads']);
+  return { ok: true, uploadId: row.id };
 }
 
 export async function cancelShippingUploadAction(
   uploadId: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = createClient();
-  const { error } = await (supabase.rpc as any)('cancel_shipping_upload', { upload_id: uploadId });
+  const { error } = await callRpc(supabase, 'cancel_shipping_upload', { upload_id: uploadId });
   if (error) {
     if (error.message.startsWith('NOT_CANCELLABLE')) {
       return { ok: false, error: '취소할 수 없는 상태입니다.' };
@@ -132,6 +132,6 @@ export async function cancelShippingUploadAction(
     console.error('[shipping-upload] cancel', { uploadId, error });
     return { ok: false, error: '취소 처리에 실패했습니다.' };
   }
-  revalidatePath('/shipping-uploads');
+  revalidatePaths(['/shipping-uploads']);
   return { ok: true };
 }

@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
@@ -8,6 +7,8 @@ import {
 } from '@/lib/types';
 import { OrdersRealtime } from '@/components/OrdersRealtime';
 import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
+import { formatShortDateTimeKR } from '@/lib/dates';
+import { fetchAdminShippingUploads } from '@/lib/orders/queries';
 import { ChevronRight, Inbox, FileSpreadsheet } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -22,44 +23,13 @@ const TABS: { key: string; label: string }[] = [
   { key: 'cancelled', label: '취소' },
 ];
 
-type Row = {
-  id: string;
-  user_id: string;
-  original_name: string;
-  status: string;
-  total_quantity: number;
-  shipping_fee_total: number;
-  created_at: string;
-  profiles: { name: string } | null;
-};
-
 export default async function AdminShippingUploadsPage({
   searchParams,
 }: {
   searchParams: { status?: string };
 }) {
-  const supabase = createClient();
-  const status = searchParams.status ?? 'all';
-
-  let q = supabase
-    .from('order_uploads')
-    .select(
-      'id, user_id, original_name, status, total_quantity, shipping_fee_total, created_at, profiles!order_uploads_user_id_fkey(name)',
-    )
-    .order('created_at', { ascending: false });
-  if (status !== 'all') q = q.eq('status', status);
-  const { data } = await q;
-  const rows = (data ?? []) as unknown as Row[];
-
-  const { data: counts } = await supabase.from('order_uploads').select('status');
-  const c = ((counts ?? []) as { status: string }[]).reduce<Record<string, number>>(
-    (acc, r) => {
-      acc[r.status] = (acc[r.status] ?? 0) + 1;
-      acc.all = (acc.all ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+  const status = (searchParams.status ?? 'all') as ShippingUploadStatus | 'all';
+  const { rows, counts: c } = await fetchAdminShippingUploads(status);
 
   return (
     <div className="space-y-5">
@@ -138,7 +108,7 @@ export default async function AdminShippingUploadsPage({
                       <ShippingUploadStatusBadge status={u.status as ShippingUploadStatus} />
                     </td>
                     <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(u.created_at).toLocaleString('ko-KR')}
+                      {formatShortDateTimeKR(u.created_at)}
                     </td>
                     <td className="px-3 text-right">
                       <Link href={`/admin/shipping-uploads/${u.id}`} aria-label="상세">

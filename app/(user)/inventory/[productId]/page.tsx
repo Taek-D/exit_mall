@@ -37,13 +37,15 @@ export default async function InventoryProductTimeline({
     .single<{ id: string; name: string }>();
   if (!product) notFound();
 
-  const { data: invRow } = await (supabase.from('user_inventory' as any) as any)
+  const { data: invRow } = await supabase
+    .from('user_inventory')
     .select('quantity')
     .eq('user_id', user.id)
     .eq('product_id', params.productId)
     .maybeSingle();
 
-  const { data: movRaw } = await (supabase.from('inventory_movements' as any) as any)
+  const { data: movRaw } = await supabase
+    .from('inventory_movements')
     .select('id, delta, source_type, source_id, created_at')
     .eq('user_id', user.id)
     .eq('product_id', params.productId)

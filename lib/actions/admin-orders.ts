@@ -1,23 +1,23 @@
 'use server';
-import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { callRpc, revalidatePaths } from '@/lib/actions/_shared';
 
 export async function markPreparingAction(orderId: string) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
-  const { error } = await (guard.supabase.rpc as any)('transition_order_status', { order_id: orderId, next_status: 'preparing' });
+  const { error } = await callRpc(guard.supabase, 'transition_order_status', { order_id: orderId, next_status: 'preparing' });
   if (error) {
     console.error('[admin-orders] preparing', { orderId, error });
     return { error: '상태 변경에 실패했습니다.' };
   }
-  revalidatePath(`/admin/orders/${orderId}`); revalidatePath('/admin/orders'); revalidatePath('/admin');
+  revalidatePaths([`/admin/orders/${orderId}`, '/admin/orders', '/admin']);
   return { ok: true };
 }
 
 export async function markShippedAction(orderId: string, tracking: string, carrier: string) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
-  const { error } = await (guard.supabase.rpc as any)('transition_order_status', {
+  const { error } = await callRpc(guard.supabase, 'transition_order_status', {
     order_id: orderId, next_status: 'shipped', tracking, carrier_name: carrier,
   });
   if (error) {
@@ -25,30 +25,30 @@ export async function markShippedAction(orderId: string, tracking: string, carri
     console.error('[admin-orders] shipped', { orderId, error });
     return { error: '발송 처리에 실패했습니다.' };
   }
-  revalidatePath(`/admin/orders/${orderId}`); revalidatePath('/admin/orders');
+  revalidatePaths([`/admin/orders/${orderId}`, '/admin/orders']);
   return { ok: true };
 }
 
 export async function markDeliveredAction(orderId: string) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
-  const { error } = await (guard.supabase.rpc as any)('transition_order_status', { order_id: orderId, next_status: 'delivered' });
+  const { error } = await callRpc(guard.supabase, 'transition_order_status', { order_id: orderId, next_status: 'delivered' });
   if (error) {
     console.error('[admin-orders] delivered', { orderId, error });
     return { error: '배송 완료 처리에 실패했습니다.' };
   }
-  revalidatePath(`/admin/orders/${orderId}`); revalidatePath('/admin/orders');
+  revalidatePaths([`/admin/orders/${orderId}`, '/admin/orders']);
   return { ok: true };
 }
 
 export async function adminCancelOrderAction(orderId: string) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
-  const { error } = await (guard.supabase.rpc as any)('cancel_order', { order_id: orderId });
+  const { error } = await callRpc(guard.supabase, 'cancel_order', { order_id: orderId });
   if (error) {
     console.error('[admin-orders] cancel', { orderId, error });
     return { error: '주문을 취소하지 못했습니다.' };
   }
-  revalidatePath(`/admin/orders/${orderId}`); revalidatePath('/admin/orders');
+  revalidatePaths([`/admin/orders/${orderId}`, '/admin/orders']);
   return { ok: true };
 }

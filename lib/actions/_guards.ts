@@ -2,9 +2,9 @@
 import { createClient } from '@/lib/supabase/server';
 import type { User } from '@supabase/supabase-js';
 
-type SupabaseServerClient = ReturnType<typeof createClient>;
+export type SupabaseServerClient = ReturnType<typeof createClient>;
 
-type AdminContext = {
+export type AdminContext = {
   ok: true;
   supabase: SupabaseServerClient;
   user: User;

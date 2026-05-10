@@ -1,8 +1,8 @@
 'use server';
 import { productSchema } from '@/lib/schemas';
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { formatZodPathError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 
 function parseForm(fd: FormData) {
   const rawLimit = (fd.get('perUserLimit') as string | null)?.trim() ?? '';
@@ -21,8 +21,8 @@ export async function createProductAction(fd: FormData) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
-  if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
-  const { error } = await (guard.supabase.from('products') as any).insert({
+  if (!parsed.success) return { error: formatZodPathError(parsed.error) };
+  const { error } = await mutationTable(guard.supabase, 'products').insert({
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
@@ -32,7 +32,7 @@ export async function createProductAction(fd: FormData) {
     console.error('[admin-products] create', error);
     return { error: '상품을 등록하지 못했습니다.' };
   }
-  revalidatePath('/admin/products');
+  revalidatePaths(['/admin/products']);
   redirect('/admin/products');
 }
 
@@ -40,8 +40,8 @@ export async function updateProductAction(id: string, fd: FormData) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
-  if (!parsed.success) return { error: parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(' · ') };
-  const { error } = await (guard.supabase.from('products') as any).update({
+  if (!parsed.success) return { error: formatZodPathError(parsed.error) };
+  const { error } = await mutationTable(guard.supabase, 'products').update({
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
@@ -51,7 +51,7 @@ export async function updateProductAction(id: string, fd: FormData) {
     console.error('[admin-products] update', { id, error });
     return { error: '상품을 수정하지 못했습니다.' };
   }
-  revalidatePath('/admin/products');
+  revalidatePaths(['/admin/products']);
   redirect('/admin/products');
 }
 
@@ -63,6 +63,6 @@ export async function deleteProductAction(id: string) {
     console.error('[admin-products] delete', { id, error });
     return { error: '상품을 삭제하지 못했습니다.' };
   }
-  revalidatePath('/admin/products');
+  revalidatePaths(['/admin/products']);
   return { ok: true };
 }

@@ -1,10 +1,11 @@
-import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
 import { type StockOrderStatus, STOCK_ORDER_STATUS_LABEL } from '@/lib/types';
 import { StockOrderStatusBadge } from '@/components/StatusBadge';
 import { OrdersRealtime } from '@/components/OrdersRealtime';
 import { cn } from '@/lib/utils';
+import { formatDateTimeKR } from '@/lib/dates';
+import { fetchAdminStockOrders, summarizeStockItems } from '@/lib/orders/queries';
 import { ChevronRight, Inbox } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -17,42 +18,13 @@ const TABS: { key: StockOrderStatus | 'all'; label: string }[] = [
   { key: 'cancelled', label: '취소' },
 ];
 
-type Row = {
-  id: string;
-  user_id: string;
-  total_amount: number;
-  status: string;
-  items: Array<{ qty: number; product_name: string }>;
-  created_at: string;
-  profiles: { name: string } | null;
-};
-
 export default async function AdminStockOrdersPage({
   searchParams,
 }: {
   searchParams: { status?: string };
 }) {
-  const supabase = createClient();
   const status = (searchParams.status ?? 'all') as StockOrderStatus | 'all';
-
-  let q = (supabase.from('stock_orders' as any) as any)
-    .select(
-      'id,user_id,total_amount,status,items,created_at,profiles!stock_orders_user_id_fkey(name)',
-    )
-    .order('created_at', { ascending: false });
-  if (status !== 'all') q = q.eq('status', status);
-  const { data } = await q;
-  const rows = (data ?? []) as unknown as Row[];
-
-  const { data: allForCounts } = await (supabase.from('stock_orders' as any) as any).select('status');
-  const counts = ((allForCounts ?? []) as { status: string }[]).reduce<Record<string, number>>(
-    (acc, r) => {
-      acc[r.status] = (acc[r.status] ?? 0) + 1;
-      acc.all = (acc.all ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+  const { rows, counts } = await fetchAdminStockOrders(status);
 
   return (
     <div className="space-y-5">
@@ -126,12 +98,7 @@ export default async function AdminStockOrdersPage({
               </thead>
               <tbody>
                 {rows.map((o) => {
-                  const summary =
-                    o.items.length === 0
-                      ? '(빈 주문)'
-                      : o.items.length === 1
-                        ? `${o.items[0]!.product_name} × ${o.items[0]!.qty}`
-                        : `${o.items[0]!.product_name} 외 ${o.items.length - 1}건`;
+                  const summary = summarizeStockItems(o.items);
                   return (
                     <tr
                       key={o.id}
@@ -162,13 +129,7 @@ export default async function AdminStockOrdersPage({
                         <StockOrderStatusBadge status={o.status as StockOrderStatus} />
                       </td>
                       <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(o.created_at).toLocaleString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDateTimeKR(o.created_at)}
                       </td>
                       <td className="px-3 text-right">
                         <Link

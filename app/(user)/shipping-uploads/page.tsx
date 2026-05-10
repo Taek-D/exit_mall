@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
 import { UploadForm } from './UploadForm';
@@ -7,27 +6,13 @@ import {
   SHIPPING_UPLOAD_STATUS_LABEL,
 } from '@/lib/types';
 import { Download, FileSpreadsheet, Inbox } from 'lucide-react';
+import { formatShortDateTimeKR } from '@/lib/dates';
+import { fetchRecentShippingUploads } from '@/lib/orders/queries';
 
 export const dynamic = 'force-dynamic';
 
-type Row = {
-  id: string;
-  original_name: string;
-  status: string;
-  total_quantity: number;
-  shipping_fee_total: number;
-  admin_memo: string | null;
-  created_at: string;
-};
-
 export default async function ShippingUploadsPage() {
-  const supabase = createClient();
-  const { data } = await supabase
-    .from('order_uploads')
-    .select('id, original_name, status, total_quantity, shipping_fee_total, admin_memo, created_at')
-    .order('created_at', { ascending: false })
-    .limit(30);
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = await fetchRecentShippingUploads(30);
 
   return (
     <div className="space-y-6">
@@ -85,7 +70,7 @@ export default async function ShippingUploadsPage() {
                     {u.original_name}
                   </Link>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(u.created_at).toLocaleString('ko-KR')}
+                    {formatShortDateTimeKR(u.created_at)}
                     {' · '}
                     <span className="font-medium">
                       {SHIPPING_UPLOAD_STATUS_LABEL[u.status as ShippingUploadStatus] ?? u.status}

@@ -7,9 +7,9 @@ function load(name: string): Buffer {
   return fs.readFileSync(path.resolve(__dirname, '..', 'fixtures', name));
 }
 
-describe('재업로드 부분 송장', () => {
-  it('일부 행만 송장이 채워진 엑셀을 그대로 파싱', () => {
-    const r = parseShippingExcel(load('shipping-with-tracking-partial.xlsx'));
+describe('tracking reupload parsing', () => {
+  it('parses partial tracking reuploads as-is', async () => {
+    const r = await parseShippingExcel(load('shipping-with-tracking-partial.xlsx'));
     expect(r.items.map((it) => it.tracking_number)).toEqual([
       '632012345678',
       null,
@@ -17,9 +17,9 @@ describe('재업로드 부분 송장', () => {
     ]);
   });
 
-  it('원본/재업로드 행수 일치 검사 헬퍼', () => {
-    const a = parseShippingExcel(load('shipping-valid.xlsx'));
-    const b = parseShippingExcel(load('shipping-with-tracking-partial.xlsx'));
+  it('keeps original and reupload row counts comparable', async () => {
+    const a = await parseShippingExcel(load('shipping-valid.xlsx'));
+    const b = await parseShippingExcel(load('shipping-with-tracking-partial.xlsx'));
     expect(a.items.length).toBe(3);
     expect(b.items.length).toBe(3);
     expect(a.items.length === b.items.length).toBe(true);

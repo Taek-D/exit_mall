@@ -1,7 +1,7 @@
 'use server';
 import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/actions/_guards';
+import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 
 const adjustSchema = z.object({
   userId: z.string().uuid(),
@@ -12,15 +12,15 @@ const adjustSchema = z.object({
 
 export async function adjustUserInventoryAction(
   input: unknown,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<ActionResult> {
   const parsed = adjustSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.errors.map((e) => e.message).join(' · ') };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
 
-  const { error } = await (guard.supabase.rpc as any)('adjust_user_inventory', {
+  const { error } = await callRpc(guard.supabase, 'adjust_user_inventory', {
     target_user: parsed.data.userId,
     product_id: parsed.data.productId,
     delta: parsed.data.delta,
@@ -40,7 +40,6 @@ export async function adjustUserInventoryAction(
     console.error('[admin-inventory] adjust', error);
     return { ok: false, error: '처리 중 오류가 발생했습니다.' };
   }
-  revalidatePath(`/admin/users/${parsed.data.userId}`);
-  revalidatePath('/inventory');
+  revalidatePaths([`/admin/users/${parsed.data.userId}`, '/inventory']);
   return { ok: true };
 }

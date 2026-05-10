@@ -1,7 +1,7 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
 import { checkoutSchema } from '@/lib/schemas';
-import { revalidatePath } from 'next/cache';
+import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string }
@@ -10,12 +10,11 @@ export type PlaceOrderResult =
 export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult> {
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) {
-    const msg = parsed.error.errors.map(e => e.message).join(' · ');
-    return { ok: false, error: msg };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
 
   const supabase = createClient();
-  const { data, error } = await (supabase.rpc as any)('place_order', {
+  const { data, error } = await callRpc(supabase, 'place_order', {
     items: parsed.data.items.map(i => ({ product_id: i.productId, quantity: i.quantity })),
     shipping: {
       name: parsed.data.shipping.name,
@@ -52,19 +51,18 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
     return { ok: false, error: '주문을 처리하지 못했습니다.' };
   }
 
-  revalidatePath('/orders');
-  revalidatePath('/shop');
+  revalidatePaths(['/orders', '/shop']);
   return { ok: true, orderId: data as string };
 }
 
-export async function cancelOrderAction(orderId: string): Promise<{ ok: boolean; error?: string }> {
+export async function cancelOrderAction(orderId: string): Promise<ActionResult> {
   const supabase = createClient();
-  const { error } = await (supabase.rpc as any)('cancel_order', { order_id: orderId });
+  const { error } = await callRpc(supabase, 'cancel_order', { order_id: orderId });
   if (error) {
     if (error.message.includes('NOT_CANCELLABLE')) return { ok: false, error: '이미 처리되어 취소할 수 없습니다' };
     console.error('[order] cancel', { orderId, error });
     return { ok: false, error: '주문을 취소하지 못했습니다.' };
   }
-  revalidatePath('/orders');
+  revalidatePaths(['/orders']);
   return { ok: true };
 }

@@ -6,7 +6,8 @@
 'use server';
 import { createClient } from '@/lib/supabase/server';
 import { parseOrderExcel } from '@/lib/order-upload-parser';
-import { revalidatePath } from 'next/cache';
+import { mutationTable, revalidatePaths } from '@/lib/actions/_shared';
+import type { Json } from '@/lib/db-types';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 // .xls (legacy OLE2) is intentionally rejected — it has a much larger parser surface and
@@ -46,7 +47,7 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
   // Parse first; only persist when parsing succeeds.
   let parsed;
   try {
-    parsed = parseOrderExcel(buffer);
+    parsed = await parseOrderExcel(buffer);
   } catch (e) {
     const msg = e instanceof Error ? e.message : '엑셀을 파싱할 수 없습니다.';
     return { ok: false, error: msg };
@@ -65,7 +66,7 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
     });
   if (upErr) return { ok: false, error: `파일 업로드 실패: ${upErr.message}` };
 
-  const { data: row, error: insErr } = await (supabase.from('order_uploads') as any)
+  const { data: row, error: insErr } = await mutationTable(supabase, 'order_uploads')
     .insert({
       user_id: u.user.id,
       storage_path: storagePath,
@@ -78,7 +79,7 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
       buyer_email: parsed.buyer_email,
       shipping_address: parsed.shipping_address,
       request_memo: parsed.request_memo,
-      items: parsed.items,
+      items: parsed.items as Json,
       total_quantity: parsed.total_quantity,
       total_amount: parsed.total_amount,
       status: 'pending',
@@ -92,7 +93,6 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
     return { ok: false, error: `저장 실패: ${insErr.message}` };
   }
 
-  revalidatePath('/orders/upload');
-  revalidatePath('/admin/order-uploads');
-  return { ok: true, uploadId: (row as { id: string }).id };
+  revalidatePaths(['/orders/upload', '/admin/order-uploads']);
+  return { ok: true, uploadId: row.id };
 }
