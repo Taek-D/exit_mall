@@ -13,7 +13,7 @@ export function mapShippingUploadError(message: string): string {
     return `보유 재고가 부족합니다 (필요 ${need}개, 보유 ${have}개).`;
   }
   if (message.startsWith('INSUFFICIENT_BALANCE')) return '고객의 가용 예치금이 부족합니다.';
-  if (message.startsWith('PRODUCT_NOT_FOUND')) return '존재하지 않는 상품(관리코드)이 있습니다.';
+  if (message.startsWith('PRODUCT_NOT_FOUND')) return '존재하지 않는 상품명이 있습니다.';
   if (message.startsWith('ROW_COUNT_MISMATCH')) {
     const parts = message.split(':');
     return `원본과 행 수가 다릅니다 (원본 ${parts[1]}행, 새 파일 ${parts[2]}행).`;
@@ -32,7 +32,7 @@ export function mapShippingUploadError(message: string): string {
   }
   if (message.startsWith('PRODUCT_MISMATCH')) {
     const parts = message.split(':');
-    return `상품 ID 와 관리코드가 일치하지 않는 행이 있습니다 (코드 ${parts[2]}, 실제 상품명 ${parts[3] ?? '?'}). 반려 후 새 양식으로 다시 업로드 받아주세요.`;
+    return `상품 ID 와 상품명이 일치하지 않는 행이 있습니다 (입력 상품명 ${parts[2]}, 실제 상품명 ${parts[3] ?? '?'}). 반려 후 새 양식으로 다시 업로드 받아주세요.`;
   }
   return '처리 중 오류가 발생했습니다.';
 }

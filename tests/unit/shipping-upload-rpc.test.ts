@@ -27,7 +27,7 @@ describe('mapShippingUploadError', () => {
     expect(mapShippingUploadError('INSUFFICIENT_BALANCE')).toContain('예치금');
   });
   it('PRODUCT_NOT_FOUND', () => {
-    expect(mapShippingUploadError('PRODUCT_NOT_FOUND:CODE-123')).toContain('상품');
+    expect(mapShippingUploadError('PRODUCT_NOT_FOUND:스니커즈')).toContain('존재하지 않는 상품명');
   });
   it('ROW_COUNT_MISMATCH', () => {
     const r = mapShippingUploadError('ROW_COUNT_MISMATCH:5:3');

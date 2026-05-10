@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import ExcelJS from 'exceljs';
 import {
   parseShippingExcel,
   computeShippingFee,
@@ -9,6 +10,24 @@ import {
 
 function load(name: string): Buffer {
   return fs.readFileSync(path.resolve(__dirname, '..', 'fixtures', name));
+}
+
+async function workbookBuffer(header: string[], rows: unknown[][]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('배송대행');
+  ws.addRows([
+    ['배송대행 양식', '', '', '', '', '', '', '', ''],
+    [],
+    ['상호', '예시상사', '담당자 연락처', '010-1111-1111', '', '', '', '', ''],
+    ['요청사항', '안전 배송', '', '', '', '', '', '', ''],
+    [],
+    [],
+    [],
+    header,
+    ...rows,
+  ]);
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
 }
 
 describe('parseShippingExcel - valid', () => {
@@ -20,8 +39,8 @@ describe('parseShippingExcel - valid', () => {
       recipient: '홍길동',
       phone: '010-1234-5678',
       address: '서울시 강남구 1',
-      product_code: 'SKR-001',
-      product_name: '스니커즈/270',
+      product_code: '스니커즈',
+      product_name: '270',
       quantity: 1,
       memo: '문 앞',
       tracking_number: null,
@@ -30,6 +49,21 @@ describe('parseShippingExcel - valid', () => {
     expect(r.shipping_fee_total).toBe(3 * 3_300);
     expect(r.uploader_company).toBe('예시상사');
     expect(r.uploader_phone).toBe('010-1111-1111');
+  });
+
+  it('accepts required-marker stars in headers', async () => {
+    const r = await parseShippingExcel(
+      await workbookBuffer(
+        ['No', '받는사람*', '연락처*', '주소*', '상품명*', '옵션', '수량*', '메모', '송장번호'],
+        [[1, '홍길동', '010-1234-5678', '서울시 1', '스니커즈', '270', 1, '', '']],
+      ),
+    );
+
+    expect(r.items[0]).toMatchObject({
+      product_code: '스니커즈',
+      product_name: '270',
+      quantity: 1,
+    });
   });
 });
 
@@ -48,6 +82,17 @@ describe('parseShippingExcel - errors', () => {
 
   it('rejects invalid quantities', async () => {
     await expect(parseShippingExcel(load('shipping-bad-quantity.xlsx'))).rejects.toThrow(/수량/);
+  });
+
+  it('rejects missing product names', async () => {
+    await expect(
+      parseShippingExcel(
+        await workbookBuffer(
+          ['No', '받는사람', '연락처', '주소', '상품명', '옵션', '수량', '메모', '송장번호'],
+          [[1, '홍길동', '010-1234-5678', '서울시 1', '', '270', 1, '', '']],
+        ),
+      ),
+    ).rejects.toThrow(/상품명이 비어있습니다/);
   });
 });
 

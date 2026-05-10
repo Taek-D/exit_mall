@@ -39,7 +39,7 @@ Next.js 14 + Supabase 기반입니다.
 - Next.js 14.2.25 적용 및 기본 보안 헤더(`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`) 설정
 - `stock_orders` / `order_uploads` 직접 삽입 정책 보강: 일반 사용자는 서버 RPC가 검증한 흐름으로만 주문·배송대행 요청 생성
 - 예치금 가용액 계산 시 상품 구매 검토대기 금액과 배송대행 검토대기 배송비를 함께 예약 처리
-- 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·관리코드 불일치, 동시 승인 재고 경합을 방어
+- 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·상품명 불일치, 동시 승인 재고 경합을 방어
 - 송장 재업로드 RPC는 송장 필드만 갱신하도록 제한해 업로드 원본 데이터 무결성 유지
 - Storage 정책은 관리자가 업로드한 송장 파일을 해당 업로드 소유자와 관리자만 조회하도록 제한
 
@@ -159,7 +159,7 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 
 ### 흐름 2: 배송대행 업로드 (재고 발송)
 1. 주문자가 `/shipping-uploads`에서 양식 엑셀을 다운로드 → 받는사람 명단 작성 → 업로드.
-2. 미리보기에서 행별 검증·관리코드 매칭 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
+2. 미리보기에서 행별 검증·상품명 매칭 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
 3. 관리자가 `/admin/shipping-uploads`에서 검토 → 승인 시 보유 재고 차감(상품별 합산) + 배송비 차감 + `inventory_movements` 음수 기록.
 4. 관리자가 송장 채운 엑셀을 같은 업로드에 재업로드 → `attach_tracking` RPC가 행별 `tracking_number` 갱신 + `status=shipped`. 부분 발송도 가능, 멱등 호출 가능.
 5. 주문자 화면에 행별 송장 + CJ 조회 버튼 + 송장 포함 엑셀 다운로드 노출.

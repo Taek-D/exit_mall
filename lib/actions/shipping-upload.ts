@@ -42,13 +42,13 @@ export async function requestShippingUploadAction(
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
 
-  // 관리코드(=products.name) 매칭 — 업로드 시점에 product_id 캡처해 결정적으로 고정.
-  // products.name 에 unique 제약이 없어 같은 이름 여러 행이 있으면 RPC 매칭이 비결정적이 됨.
-  const codes = Array.from(new Set(parsed.items.map((it) => it.product_code)));
+  // 상품명(=products.name) 매칭 — 업로드 시점에 product_id 캡처해 결정적으로 고정.
+  // product_code 키는 기존 order_uploads.items JSON 호환을 위해 유지한다.
+  const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
   const { data: productRows } = await supabase
     .from('products')
     .select('id, name')
-    .in('name', codes);
+    .in('name', productNames);
   const productList = (productRows ?? []) as Array<{ id: string; name: string }>;
   const productByName = new Map<string, string>();
   const duplicates: string[] = [];
@@ -62,14 +62,14 @@ export async function requestShippingUploadAction(
   if (duplicates.length > 0) {
     return {
       ok: false,
-      error: `같은 관리코드의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ' …' : ''}`,
+      error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ' …' : ''}`,
     };
   }
-  const unknown = codes.filter((c) => !productByName.has(c));
+  const unknown = productNames.filter((name) => !productByName.has(name));
   if (unknown.length > 0) {
     return {
       ok: false,
-      error: `존재하지 않는 관리코드가 있습니다: ${unknown.slice(0, 3).join(', ')}${unknown.length > 3 ? ' …' : ''}`,
+      error: `존재하지 않는 상품명이 있습니다: ${unknown.slice(0, 3).join(', ')}${unknown.length > 3 ? ' …' : ''}`,
     };
   }
   const itemsWithProductId = parsed.items.map((it) => ({
