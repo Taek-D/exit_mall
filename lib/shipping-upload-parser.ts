@@ -7,6 +7,7 @@ export type ParsedShippingItem = {
   recipient: string;
   phone: string;
   address: string;
+  /** Internal compatibility key. In the current template this stores products.name. */
   product_code: string;
   product_name: string | null;
   quantity: number;
@@ -24,15 +25,15 @@ export type ParsedShippingUpload = {
 };
 
 const HEADER_KEYS = [
-  'no',
-  '받는사람',
-  '연락처',
-  '주소',
-  '관리코드',
-  '상품명/옵션',
-  '수량',
-  '메모',
-  '송장번호',
+  ['no'],
+  ['받는사람'],
+  ['연락처'],
+  ['주소'],
+  ['상품명', '관리코드'],
+  ['옵션', '상품명/옵션'],
+  ['수량'],
+  ['메모'],
+  ['송장번호'],
 ];
 
 export function computeShippingFee(rows: number): number {
@@ -70,6 +71,10 @@ function cellInt(value: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function normalizeHeader(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, '').replace(/\*+$/g, '');
+}
+
 function rowValues(ws: ExcelJS.Worksheet, rowNumber: number, maxCols: number): unknown[] {
   const row = ws.getRow(rowNumber);
   return Array.from({ length: maxCols }, (_, index) => row.getCell(index + 1).value);
@@ -98,14 +103,14 @@ export async function parseShippingExcel(
   }
   if (headerRow < 0) throw new Error('양식의 헤더 행을 찾을 수 없습니다 (첫 컬럼 "No").');
 
-  const headerCells = rowValues(ws, headerRow, HEADER_KEYS.length).map(
-    (value) => cellString(value)?.toLowerCase() ?? '',
+  const headerCells = rowValues(ws, headerRow, HEADER_KEYS.length).map((value) =>
+    normalizeHeader(cellString(value) ?? ''),
   );
   for (let i = 0; i < HEADER_KEYS.length; i += 1) {
     const expected = HEADER_KEYS[i]!;
     const actual = headerCells[i] ?? '';
-    if (i < 7 && actual !== expected.toLowerCase()) {
-      throw new Error(`양식 헤더가 다릅니다 (${i + 1}열: "${actual}" → "${expected}" 기대).`);
+    if (i < 7 && !expected.map(normalizeHeader).includes(actual)) {
+      throw new Error(`양식 헤더가 다릅니다 (${i + 1}열: "${actual}" → "${expected[0]}" 기대).`);
     }
   }
 
@@ -141,7 +146,7 @@ export async function parseShippingExcel(
     if (!recipient) throw new Error(`${rowNumber}행 받는사람이 비어있습니다.`);
     if (!phone) throw new Error(`${rowNumber}행 연락처가 비어있습니다.`);
     if (!address) throw new Error(`${rowNumber}행 주소가 비어있습니다.`);
-    if (!product_code) throw new Error(`${rowNumber}행 관리코드가 비어있습니다.`);
+    if (!product_code) throw new Error(`${rowNumber}행 상품명이 비어있습니다.`);
     if (quantity === null || quantity < 1) {
       throw new Error(`${rowNumber}행(${recipient}): 수량은 1 이상의 정수여야 합니다.`);
     }

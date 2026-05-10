@@ -80,7 +80,7 @@ export default async function AdminShippingUploadDetail({
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
               <th className="font-medium px-3">받는사람</th>
-              <th className="font-medium px-3">상품 (코드 / 옵션)</th>
+              <th className="font-medium px-3">상품명 / 옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
               <th className="font-medium px-3 text-right">배송비</th>
               <th className="font-medium px-3">송장번호</th>
@@ -97,7 +97,7 @@ export default async function AdminShippingUploadDetail({
                   </p>
                 </td>
                 <td className="px-3 py-2">
-                  <span className="font-mono text-xs">{item.product_code}</span>
+                  <span>{item.product_code}</span>
                   {item.product_name && (
                     <span className="text-muted-foreground"> / {item.product_name}</span>
                   )}
