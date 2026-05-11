@@ -65,12 +65,14 @@ const USER_TONE: Record<UserStatus, Tone> = {
   pending: 'warning',
   active: 'success',
   suspended: 'danger',
+  rejected: 'danger',
 };
 
 const USER_LABEL: Record<UserStatus, string> = {
   pending: '승인 대기',
   active: '활성',
   suspended: '정지',
+  rejected: '반려',
 };
 
 export function UserStatusBadge({ status }: { status: UserStatus }) {

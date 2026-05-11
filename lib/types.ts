@@ -1,5 +1,5 @@
 export type UserRole = 'user' | 'admin';
-export type UserStatus = 'pending' | 'active' | 'suspended';
+export type UserStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 export type OrderStatus = 'placed' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
 export type DepositStatus = 'pending' | 'confirmed' | 'rejected';
 export type BalanceTxType = 'deposit' | 'order' | 'refund' | 'adjust';

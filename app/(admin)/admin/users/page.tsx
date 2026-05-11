@@ -22,6 +22,7 @@ const TABS = [
   { key: undefined, label: '전체' },
   { key: 'low', label: '잔액 낮음' },
   { key: 'pending', label: '승인 대기' },
+  { key: 'rejected', label: '반려' },
 ] as const;
 
 export default async function AdminUsersPage({
@@ -40,6 +41,7 @@ export default async function AdminUsersPage({
   const filtered = list.filter((u) => {
     if (filter === 'low') return Number(u.deposit_balance) <= Number(u.low_balance_threshold);
     if (filter === 'pending') return u.status === 'pending';
+    if (filter === 'rejected') return u.status === 'rejected';
     return true;
   });
 
@@ -47,6 +49,7 @@ export default async function AdminUsersPage({
     all: list.length,
     low: list.filter((u) => Number(u.deposit_balance) <= Number(u.low_balance_threshold)).length,
     pending: list.filter((u) => u.status === 'pending').length,
+    rejected: list.filter((u) => u.status === 'rejected').length,
   };
 
   return (
@@ -65,7 +68,13 @@ export default async function AdminUsersPage({
               const active = filter === t.key;
               const href = t.key ? `/admin/users?filter=${t.key}` : '/admin/users';
               const count =
-                t.key === 'low' ? counts.low : t.key === 'pending' ? counts.pending : counts.all;
+                t.key === 'low'
+                  ? counts.low
+                  : t.key === 'pending'
+                    ? counts.pending
+                    : t.key === 'rejected'
+                      ? counts.rejected
+                      : counts.all;
               return (
                 <Link
                   key={t.label}

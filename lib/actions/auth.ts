@@ -12,7 +12,7 @@ import { PASSWORD_RECOVERY_COOKIE } from '@/lib/auth-constants';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
-import { formatSignupAuthError } from '@/lib/auth-error-messages';
+import { submitSignupApplication } from '@/lib/auth/signup-application';
 import { buildAppUrl } from '@/lib/site-url';
 
 export async function signupAction(formData: FormData) {
@@ -26,13 +26,12 @@ export async function signupAction(formData: FormData) {
     return { error: formatZodPathError(parsed.error) };
   }
 
-  const supabase = createClient();
-  const { error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: { data: { name: parsed.data.name, phone: parsed.data.phone } },
-  });
-  if (error) return { error: formatSignupAuthError(error.message) };
+  const result = await submitSignupApplication(
+    parsed.data,
+    createClient(),
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : undefined,
+  );
+  if (!result.ok) return { error: result.error };
   redirect('/pending?status=pending&from=signup');
 }
 
@@ -64,6 +63,12 @@ export async function logoutAction() {
   const supabase = createClient();
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+export async function logoutToSignupAction() {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  redirect('/signup');
 }
 
 export async function changePasswordAction(formData: FormData) {

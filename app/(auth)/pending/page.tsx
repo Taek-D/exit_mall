@@ -1,27 +1,35 @@
 import { Button } from '@/components/ui/button';
-import { logoutAction } from '@/lib/actions/auth';
-import { Ban, CheckCircle2, Clock, Mail } from 'lucide-react';
+import { logoutAction, logoutToSignupAction } from '@/lib/actions/auth';
+import { Ban, CheckCircle2, Clock, Mail, CircleX } from 'lucide-react';
 
 export default function PendingPage({ searchParams }: { searchParams: { status?: string; from?: string } }) {
   const status = searchParams.status ?? 'pending';
   const suspended = status === 'suspended';
-  const completedSignup = !suspended && searchParams.from === 'signup';
+  const rejected = status === 'rejected';
+  const completedSignup = !suspended && !rejected && searchParams.from === 'signup';
 
-  const Icon = suspended ? Ban : completedSignup ? CheckCircle2 : Clock;
+  const Icon = suspended ? Ban : rejected ? CircleX : completedSignup ? CheckCircle2 : Clock;
   const title = suspended
     ? '계정이 정지되었습니다'
+    : rejected
+      ? '가입 신청이 반려되었습니다'
     : completedSignup
       ? '가입 신청이 완료되었습니다'
       : '관리자 승인 대기 중';
   const body = suspended
     ? '접근이 제한되었습니다. 운영자에게 문의해주세요.'
+    : rejected
+      ? '입력 정보를 확인한 뒤 같은 이메일로 다시 가입 신청할 수 있습니다.'
     : '가입 신청이 접수되었습니다. 관리자 승인 후 로그인하실 수 있습니다.';
   const iconTone = suspended
     ? 'bg-destructive/10 text-destructive'
+    : rejected
+      ? 'bg-destructive/10 text-destructive'
     : completedSignup
       ? 'bg-success/10 text-success'
       : 'bg-warning/10 text-warning';
-  const buttonLabel = completedSignup ? '로그인 화면으로 이동' : '로그아웃';
+  const buttonLabel = rejected ? '다시 가입 신청하기' : completedSignup ? '로그인 화면으로 이동' : '로그아웃';
+  const buttonAction = rejected ? logoutToSignupAction : logoutAction;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-surface dotted-grid">
@@ -45,7 +53,7 @@ export default function PendingPage({ searchParams }: { searchParams: { status?:
               <p className="text-sm text-muted-foreground">{body}</p>
             </div>
 
-            {!suspended && (
+            {!suspended && !rejected && (
               <div className="w-full mt-2 rounded-md border bg-accent/5 p-3 flex items-start gap-2 text-left">
                 <Mail className="h-4 w-4 mt-0.5 text-accent shrink-0" aria-hidden />
                 <p className="text-xs text-foreground leading-relaxed">
@@ -54,7 +62,7 @@ export default function PendingPage({ searchParams }: { searchParams: { status?:
               </div>
             )}
 
-            <form action={logoutAction} className="w-full mt-2">
+            <form action={buttonAction} className="w-full mt-2">
               <Button type="submit" variant="outline" className="w-full">
                 {buttonLabel}
               </Button>

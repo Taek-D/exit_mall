@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { formatZodPathError } from '@/lib/actions/_shared';
-import { formatSignupAuthError } from '@/lib/auth-error-messages';
+import { submitSignupApplication } from '@/lib/auth/signup-application';
 import { signupSchema } from '@/lib/schemas';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 function redirectToSignup(request: Request, error: string) {
   const url = new URL('/signup', request.url);
@@ -23,15 +23,14 @@ export async function POST(request: Request) {
     return redirectToSignup(request, formatZodPathError(parsed.error));
   }
 
-  const supabase = createClient();
-  const { error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: { data: { name: parsed.data.name, phone: parsed.data.phone } },
-  });
+  const result = await submitSignupApplication(
+    parsed.data,
+    createClient(),
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : undefined,
+  );
 
-  if (error) {
-    return redirectToSignup(request, formatSignupAuthError(error.message));
+  if (!result.ok) {
+    return redirectToSignup(request, result.error);
   }
 
   return NextResponse.redirect(new URL('/pending?status=pending&from=signup', request.url), {
