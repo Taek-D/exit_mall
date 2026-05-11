@@ -9,11 +9,19 @@ const input: SignupInput = {
   phone: '010-1234-5678',
 };
 
-function authClient(error: { message: string } | null = null) {
+function authClient(error: { message: string } | null = null, userId?: string) {
   return {
     auth: {
-      signUp: vi.fn().mockResolvedValue({ error }),
+      signUp: vi.fn().mockResolvedValue({ data: { user: userId ? { id: userId } : null }, error }),
     },
+  } as any;
+}
+
+function profileEnsureClient() {
+  const upsert = vi.fn().mockResolvedValue({ error: null });
+  return {
+    from: vi.fn(() => ({ upsert })),
+    upsert,
   } as any;
 }
 
@@ -71,6 +79,27 @@ describe('submitSignupApplication', () => {
       password: input.password,
       options: { data: { name: input.name, phone: input.phone } },
     });
+  });
+
+  it('ensures a pending profile exists after successful auth signup', async () => {
+    const supabase = authClient(null, 'user-1');
+    const service = profileEnsureClient();
+
+    await expect(submitSignupApplication(input, supabase, service)).resolves.toEqual({
+      ok: true,
+      reapplied: false,
+    });
+    expect(service.upsert).toHaveBeenCalledWith(
+      {
+        id: 'user-1',
+        email: 'user@example.com',
+        name: input.name,
+        phone: input.phone,
+        role: 'user',
+        status: 'pending',
+      },
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
   });
 
   it('keeps non-rejected duplicate emails blocked', async () => {

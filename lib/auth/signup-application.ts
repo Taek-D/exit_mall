@@ -26,13 +26,35 @@ export async function submitSignupApplication(
   const email = input.email.trim().toLowerCase();
   const metadata = { name: input.name, phone: input.phone };
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password: input.password,
     options: { data: metadata },
   });
 
-  if (!error) return { ok: true, reapplied: false };
+  if (!error) {
+    if (serviceSupabase && data.user?.id) {
+      const { error: ensureProfileError } = await serviceSupabase.from('profiles').upsert(
+        {
+          id: data.user.id,
+          email,
+          name: input.name,
+          phone: input.phone,
+          role: 'user',
+          status: 'pending',
+        },
+        { onConflict: 'id', ignoreDuplicates: true },
+      );
+
+      if (ensureProfileError) {
+        console.error('[signup] ensure profile after signup', {
+          userId: data.user.id,
+          error: ensureProfileError,
+        });
+      }
+    }
+    return { ok: true, reapplied: false };
+  }
   if (!isAlreadyRegisteredError(error.message)) {
     return { ok: false, error: formatSignupAuthError(error.message) };
   }
