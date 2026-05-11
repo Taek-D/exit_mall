@@ -17,6 +17,11 @@ type Props = {
     is_active: boolean;
     image_url: string | null;
     per_user_limit: number | null;
+    brand?: string | null;
+    option_name?: string | null;
+    management_code?: string | null;
+    category?: string | null;
+    barcode?: string | null;
   };
 };
 
@@ -128,6 +133,36 @@ export function ProductForm({ action, defaults }: Props) {
             </span>
           </span>
         </label>
+      </section>
+
+      <section className="p-5 space-y-4">
+        <h2 className="font-heading font-semibold">엑셀 메타 정보</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="brand">브랜드</Label>
+            <Input id="brand" name="brand" defaultValue={defaults?.brand ?? ''} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="optionName">옵션</Label>
+            <Input id="optionName" name="optionName" defaultValue={defaults?.option_name ?? ''} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="managementCode">관리코드</Label>
+            <Input
+              id="managementCode"
+              name="managementCode"
+              defaultValue={defaults?.management_code ?? ''}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="category">카테고리</Label>
+            <Input id="category" name="category" defaultValue={defaults?.category ?? ''} />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="barcode">바코드</Label>
+            <Input id="barcode" name="barcode" defaultValue={defaults?.barcode ?? ''} />
+          </div>
+        </div>
       </section>
 
       <section className="p-5 space-y-4">

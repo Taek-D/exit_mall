@@ -13,6 +13,11 @@ type Product = {
   is_active: boolean;
   image_url: string | null;
   per_user_limit: number | null;
+  brand: string | null;
+  option_name: string | null;
+  management_code: string | null;
+  category: string | null;
+  barcode: string | null;
 };
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
@@ -48,6 +53,11 @@ export default async function EditProductPage({ params }: { params: { id: string
           is_active: p.is_active,
           image_url: p.image_url,
           per_user_limit: p.per_user_limit,
+          brand: p.brand,
+          option_name: p.option_name,
+          management_code: p.management_code,
+          category: p.category,
+          barcode: p.barcode,
         }}
       />
     </div>

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { formatKRW } from '@/lib/money';
 import { DeleteProductButton } from './DeleteProductButton';
 import { StatusPill } from '@/components/StatusBadge';
-import { Plus, ImageOff, Package } from 'lucide-react';
+import { Plus, ImageOff, Package, Upload } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,11 +33,19 @@ export default async function ProductsPage() {
           전체 <span className="font-mono tabular font-medium text-foreground">{list.length}</span>개
           상품
         </p>
+        <div className="flex items-center gap-2">
+        <Button asChild variant="outline">
+          <Link href="/admin/products/import">
+            <Upload className="h-4 w-4" aria-hidden />
+            엑셀 가져오기
+          </Link>
+        </Button>
         <Button asChild>
           <Link href="/admin/products/new">
             <Plus className="h-4 w-4" aria-hidden />새 상품
           </Link>
         </Button>
+        </div>
       </header>
 
       {list.length === 0 ? (

@@ -429,36 +429,104 @@ export type Database = {
           },
         ]
       }
+      product_imports: {
+        Row: {
+          admin_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          imported_at: string | null
+          original_name: string
+          preview: Json
+          result: Json | null
+          status: string
+          storage_path: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          imported_at?: string | null
+          original_name: string
+          preview?: Json
+          result?: Json | null
+          status?: string
+          storage_path: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          imported_at?: string | null
+          original_name?: string
+          preview?: Json
+          result?: Json | null
+          status?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_imports_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
+          barcode: string | null
+          brand: string | null
+          category: string | null
           created_at: string
           description: string
           id: string
           image_url: string | null
+          import_key: string | null
           is_active: boolean
+          last_imported_at: string | null
+          management_code: string | null
           name: string
+          option_name: string | null
           per_user_limit: number | null
           price: number
           stock: number
         }
         Insert: {
+          barcode?: string | null
+          brand?: string | null
+          category?: string | null
           created_at?: string
           description?: string
           id?: string
           image_url?: string | null
+          import_key?: string | null
           is_active?: boolean
+          last_imported_at?: string | null
+          management_code?: string | null
           name: string
+          option_name?: string | null
           per_user_limit?: number | null
           price: number
           stock?: number
         }
         Update: {
+          barcode?: string | null
+          brand?: string | null
+          category?: string | null
           created_at?: string
           description?: string
           id?: string
           image_url?: string | null
+          import_key?: string | null
           is_active?: boolean
+          last_imported_at?: string | null
+          management_code?: string | null
           name?: string
+          option_name?: string | null
           per_user_limit?: number | null
           price?: number
           stock?: number
@@ -612,6 +680,12 @@ export type Database = {
           memo?: string
         }
         Returns: undefined
+      }
+      apply_product_import: {
+        Args: {
+          rows: Json
+        }
+        Returns: Json
       }
       approve_order_upload: {
         Args: {

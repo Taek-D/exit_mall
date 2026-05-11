@@ -81,6 +81,11 @@ export const productSchema = z.object({
   stock: z.number().int('재고는 정수여야 합니다').min(-1, '재고는 -1(무제한) 또는 0 이상'),
   isActive: z.boolean(),
   imageUrl: z.string().url('이미지 URL 형식이 올바르지 않습니다').optional().nullable(),
+  brand: z.string().max(100).optional().nullable().default(null),
+  optionName: z.string().max(100).optional().nullable().default(null),
+  managementCode: z.string().max(100).optional().nullable().default(null),
+  category: z.string().max(100).optional().nullable().default(null),
+  barcode: z.string().max(100).optional().nullable().default(null),
   perUserLimit: z
     .number()
     .int('1인 구매 한도는 정수여야 합니다')

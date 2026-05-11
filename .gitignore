@@ -12,6 +12,7 @@ supabase/.temp
 .bkit
 .omc
 .claude
+SECURITY_AUDIT.md
 
 .vercel
 .env*.local
