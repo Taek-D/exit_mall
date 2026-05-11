@@ -1,6 +1,3 @@
-'use client';
-import { type FormEvent, useState, useTransition } from 'react';
-import { signupAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,19 +5,8 @@ import Link from 'next/link';
 import { AlertCircle, Mail, Lock, User, Phone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export default function SignupPage() {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const fd = new FormData(event.currentTarget);
-    setError(null);
-    start(async () => {
-      const result = await signupAction(fd);
-      if (result?.error) setError(result.error);
-    });
-  }
+export default function SignupPage({ searchParams }: { searchParams?: { error?: string } }) {
+  const error = typeof searchParams?.error === 'string' ? searchParams.error : null;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-surface dotted-grid">
@@ -40,7 +26,7 @@ export default function SignupPage() {
             </p>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form action="/api/public/signup" method="post" className="space-y-4">
             <IconField Icon={Mail} id="email" label="이메일" type="email" autoComplete="email" placeholder="name@company.com" />
             <IconField Icon={Lock} id="password" label="비밀번호" type="password" autoComplete="new-password" hint="8자 이상" />
             <IconField Icon={User} id="name" label="이름" />
@@ -57,8 +43,8 @@ export default function SignupPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full h-10" disabled={pending}>
-              {pending ? '처리 중…' : '가입 신청'}
+            <Button type="submit" className="w-full h-10">
+              가입 신청
             </Button>
           </form>
 

@@ -12,6 +12,7 @@ import { PASSWORD_RECOVERY_COOKIE } from '@/lib/auth-constants';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
+import { formatSignupAuthError } from '@/lib/auth-error-messages';
 import { buildAppUrl } from '@/lib/site-url';
 
 export async function signupAction(formData: FormData) {
@@ -31,7 +32,7 @@ export async function signupAction(formData: FormData) {
     password: parsed.data.password,
     options: { data: { name: parsed.data.name, phone: parsed.data.phone } },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: formatSignupAuthError(error.message) };
   redirect('/pending?status=pending&from=signup');
 }
 
