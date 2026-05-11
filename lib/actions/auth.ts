@@ -9,9 +9,10 @@ import {
   passwordResetSchema,
 } from '@/lib/schemas';
 import { PASSWORD_RECOVERY_COOKIE } from '@/lib/auth-constants';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
+import { buildAppUrl } from '@/lib/site-url';
 
 export async function signupAction(formData: FormData) {
   const parsed = signupSchema.safeParse({
@@ -114,18 +115,6 @@ function maskEmail(email: string) {
   return `${maskedLocal}@${maskedDomain}`;
 }
 
-function getAppOrigin() {
-  const h = headers();
-  const origin = h.get('origin');
-  if (origin) return origin;
-  const host = h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'http';
-  if (host) return `${proto}://${host}`;
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return 'http://localhost:3000';
-}
-
 export async function findAccountAction(formData: FormData) {
   const parsed = findAccountSchema.safeParse({
     name: formData.get('name'),
@@ -171,7 +160,7 @@ export async function requestPasswordResetAction(formData: FormData) {
   }
 
   const supabase = createClient();
-  const redirectTo = `${getAppOrigin()}/auth/callback?next=/reset-password`;
+  const redirectTo = buildAppUrl('/auth/callback?next=/reset-password');
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo,
   });

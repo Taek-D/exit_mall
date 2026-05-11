@@ -72,6 +72,7 @@ Windows에서 `supabase` 바이너리 심링크가 안 잡히면 `./node_modules
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<로컬 anon key>
 SUPABASE_SERVICE_ROLE_KEY=<로컬 service_role key>
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 ### 3. DB 초기화 + 타입 생성
@@ -116,8 +117,8 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 
 1. Supabase 클라우드 프로젝트 생성 → 프로젝트 URL/키 확인.
 2. `supabase link --project-ref <ref>` → `supabase db push`로 마이그레이션 적용.
-3. Vercel에 연결 → 환경 변수 3개 설정 → 배포.
-4. Supabase Auth Redirect URLs에 배포 도메인의 `/auth/callback` 추가.
+3. Vercel에 연결 → 환경 변수 4개 설정 → 배포. `NEXT_PUBLIC_SITE_URL`은 실제 서비스 주소(예: `https://example.com`)로 설정해야 비밀번호 재설정 메일이 localhost로 가지 않습니다.
+4. Supabase Auth URL Configuration에서 Site URL을 실제 서비스 주소로 설정하고, Redirect URLs에 배포 도메인의 `/auth/callback`을 추가.
 5. Supabase 대시보드에서 Point-in-Time Recovery(PITR) 활성화(유료).
 6. 프로덕션 환경에서 관리자 부트스트랩 (위 SQL).
 
