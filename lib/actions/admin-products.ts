@@ -6,6 +6,10 @@ import { formatZodPathError, mutationTable, revalidatePaths } from '@/lib/action
 
 function parseForm(fd: FormData) {
   const rawLimit = (fd.get('perUserLimit') as string | null)?.trim() ?? '';
+  const optionalText = (key: string) => {
+    const value = (fd.get(key) as string | null)?.trim() ?? '';
+    return value.length > 0 ? value : null;
+  };
   return productSchema.safeParse({
     name: fd.get('name'),
     description: fd.get('description') ?? '',
@@ -13,6 +17,11 @@ function parseForm(fd: FormData) {
     stock: Number(fd.get('stock')),
     isActive: fd.get('isActive') === 'on',
     imageUrl: (fd.get('imageUrl') as string) || null,
+    brand: optionalText('brand'),
+    optionName: optionalText('optionName'),
+    managementCode: optionalText('managementCode'),
+    category: optionalText('category'),
+    barcode: optionalText('barcode'),
     perUserLimit: rawLimit === '' ? null : Number(rawLimit),
   });
 }
@@ -26,6 +35,9 @@ export async function createProductAction(fd: FormData) {
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
+    brand: parsed.data.brand, option_name: parsed.data.optionName,
+    management_code: parsed.data.managementCode, category: parsed.data.category,
+    barcode: parsed.data.barcode,
     per_user_limit: parsed.data.perUserLimit,
   });
   if (error) {
@@ -45,6 +57,9 @@ export async function updateProductAction(id: string, fd: FormData) {
     name: parsed.data.name, description: parsed.data.description,
     price: parsed.data.price, stock: parsed.data.stock,
     is_active: parsed.data.isActive, image_url: parsed.data.imageUrl,
+    brand: parsed.data.brand, option_name: parsed.data.optionName,
+    management_code: parsed.data.managementCode, category: parsed.data.category,
+    barcode: parsed.data.barcode,
     per_user_limit: parsed.data.perUserLimit,
   }).eq('id', id);
   if (error) {
