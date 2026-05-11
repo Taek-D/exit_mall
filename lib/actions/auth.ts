@@ -32,7 +32,7 @@ export async function signupAction(formData: FormData) {
     options: { data: { name: parsed.data.name, phone: parsed.data.phone } },
   });
   if (error) return { error: error.message };
-  redirect('/pending?status=pending');
+  redirect('/pending?status=pending&from=signup');
 }
 
 export async function loginAction(formData: FormData) {

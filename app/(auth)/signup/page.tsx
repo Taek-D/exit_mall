@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { type FormEvent, useState, useTransition } from 'react';
 import { signupAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,9 @@ export default function SignupPage() {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(fd: FormData) {
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const fd = new FormData(event.currentTarget);
     setError(null);
     start(async () => {
       const result = await signupAction(fd);
@@ -38,7 +40,7 @@ export default function SignupPage() {
             </p>
           </div>
 
-          <form action={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
             <IconField Icon={Mail} id="email" label="이메일" type="email" autoComplete="email" placeholder="name@company.com" />
             <IconField Icon={Lock} id="password" label="비밀번호" type="password" autoComplete="new-password" hint="8자 이상" />
             <IconField Icon={User} id="name" label="이름" />

@@ -1,16 +1,27 @@
 import { Button } from '@/components/ui/button';
 import { logoutAction } from '@/lib/actions/auth';
-import { Clock, Ban, Mail } from 'lucide-react';
+import { Ban, CheckCircle2, Clock, Mail } from 'lucide-react';
 
-export default function PendingPage({ searchParams }: { searchParams: { status?: string } }) {
+export default function PendingPage({ searchParams }: { searchParams: { status?: string; from?: string } }) {
   const status = searchParams.status ?? 'pending';
   const suspended = status === 'suspended';
+  const completedSignup = !suspended && searchParams.from === 'signup';
 
-  const Icon = suspended ? Ban : Clock;
-  const title = suspended ? '계정이 정지되었습니다' : '관리자 승인 대기 중';
+  const Icon = suspended ? Ban : completedSignup ? CheckCircle2 : Clock;
+  const title = suspended
+    ? '계정이 정지되었습니다'
+    : completedSignup
+      ? '가입 신청이 완료되었습니다'
+      : '관리자 승인 대기 중';
   const body = suspended
     ? '접근이 제한되었습니다. 운영자에게 문의해주세요.'
     : '가입 신청이 접수되었습니다. 관리자 승인 후 로그인하실 수 있습니다.';
+  const iconTone = suspended
+    ? 'bg-destructive/10 text-destructive'
+    : completedSignup
+      ? 'bg-success/10 text-success'
+      : 'bg-warning/10 text-warning';
+  const buttonLabel = completedSignup ? '로그인 화면으로 이동' : '로그아웃';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-surface dotted-grid">
@@ -25,9 +36,7 @@ export default function PendingPage({ searchParams }: { searchParams: { status?:
         <div className="rounded-lg border bg-card p-8 shadow-card">
           <div className="flex flex-col items-center text-center gap-4">
             <div
-              className={`h-12 w-12 rounded-full grid place-items-center ${
-                suspended ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'
-              }`}
+              className={`h-12 w-12 rounded-full grid place-items-center ${iconTone}`}
             >
               <Icon className="h-5 w-5" aria-hidden />
             </div>
@@ -47,7 +56,7 @@ export default function PendingPage({ searchParams }: { searchParams: { status?:
 
             <form action={logoutAction} className="w-full mt-2">
               <Button type="submit" variant="outline" className="w-full">
-                로그아웃
+                {buttonLabel}
               </Button>
             </form>
           </div>
