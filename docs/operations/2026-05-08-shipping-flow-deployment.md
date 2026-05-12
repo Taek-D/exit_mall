@@ -30,7 +30,7 @@ order by created_at;
 -- 3) 옵션 B: 일괄 자동 반려 (고객에게 사유 노출됨)
 update public.order_uploads
 set status = 'rejected',
-    admin_memo = '구 양식 검토대기분 일괄 반려 — 새 양식(/shipping-uploads)으로 다시 업로드해주세요.',
+    admin_memo = '구 양식 검토대기분 일괄 반려 — 새 양식(/shipping-uploads/exitmall)으로 다시 업로드해주세요.',
     reviewed_at = now()
 where status = 'pending';
 ```
@@ -92,7 +92,7 @@ Vercel 배포가 자동 트리거된다. 환경 변수(`NEXT_PUBLIC_SUPABASE_URL
 배포 직후 헬스 체크:
 ```bash
 curl -I https://<배포-도메인>/login            # 200 또는 307
-curl -I https://<배포-도메인>/orders/upload    # 307 (→ /shipping-uploads)
+curl -I https://<배포-도메인>/orders/upload    # 307 (→ /shipping-uploads/exitmall)
 ```
 
 ---
@@ -104,7 +104,7 @@ curl -I https://<배포-도메인>/orders/upload    # 307 (→ /shipping-uploads
 | 옛 메뉴 / URL | 새 의미 |
 |---|---|
 | `/admin/orders` (구 일반 주문 목록) | **주문관리** = 엑시트몰 상품 구매 검토(`stock_orders`). 일반 주문은 `/admin/orders-legacy`로 이동. |
-| `/admin/order-uploads` | `/admin/shipping-uploads`로 자동 redirect. 라벨도 "배송대행 업로드"로 통일. |
+| `/admin/order-uploads` | `/admin/shipping-uploads/exitmall`로 자동 redirect (2단계 redirect 체인 가능). 라벨은 "엑시트몰 배송대행"/"사입재고 배송대행"으로 분리. |
 | (신규) `/admin/orders-legacy` | 진행 중·완료된 일반 주문 열람·전이 (책갈피 호환 자동 redirect 포함) |
 | (신규) `/admin/users/[id]` 보유 재고 섹션 | 사용자별 보유 재고 표시 + 수동 조정 UI |
 

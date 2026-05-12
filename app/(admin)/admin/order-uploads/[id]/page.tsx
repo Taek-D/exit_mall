@@ -5,5 +5,5 @@ export default function LegacyAdminOrderUploadDetailRedirect({
 }: {
   params: { id: string };
 }) {
-  redirect(`/admin/shipping-uploads/${params.id}`);
+  redirect(`/admin/shipping-uploads/exitmall/${params.id}`);
 }

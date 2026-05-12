@@ -80,7 +80,7 @@ export default function CheckoutPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 실제 발송은{' '}
-                <Link href="/shipping-uploads" className="underline">
+                <Link href="/shipping-uploads/exitmall" className="underline">
                   배송대행 업로드
                 </Link>{' '}
                 메뉴에서 받는사람 명단을 올리면 진행됩니다. 이 단계에서는 배송지를 입력하지 않습니다.

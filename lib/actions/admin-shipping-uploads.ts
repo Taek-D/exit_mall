@@ -15,7 +15,12 @@ export async function approveShippingUploadAction(
     console.error('[admin-shipping-uploads] approve', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths(['/admin/shipping-uploads', '/shipping-uploads']);
+  revalidatePaths([
+    '/admin/shipping-uploads',
+    '/admin/shipping-uploads/exitmall',
+    '/shipping-uploads',
+    '/shipping-uploads/exitmall',
+  ]);
   return { ok: true };
 }
 
@@ -34,7 +39,12 @@ export async function rejectShippingUploadAction(
     console.error('[admin-shipping-uploads] reject', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths(['/admin/shipping-uploads', '/shipping-uploads']);
+  revalidatePaths([
+    '/admin/shipping-uploads',
+    '/admin/shipping-uploads/exitmall',
+    '/shipping-uploads',
+    '/shipping-uploads/exitmall',
+  ]);
   return { ok: true };
 }
 
@@ -50,6 +60,11 @@ export async function completeShippingUploadAction(
     console.error('[admin-shipping-uploads] complete', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths(['/admin/shipping-uploads', '/shipping-uploads']);
+  revalidatePaths([
+    '/admin/shipping-uploads',
+    '/admin/shipping-uploads/exitmall',
+    '/shipping-uploads',
+    '/shipping-uploads/exitmall',
+  ]);
   return { ok: true };
 }

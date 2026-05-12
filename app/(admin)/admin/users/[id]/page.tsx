@@ -9,9 +9,18 @@ import {
   UserStatusBadge,
   OrderStatusBadge,
   DepositStatusBadge,
+  StockOrderStatusBadge,
+  ShippingUploadStatusBadge,
   StatusPill,
 } from '@/components/StatusBadge';
-import type { UserStatus, OrderStatus, DepositStatus, BalanceTxType } from '@/lib/types';
+import type {
+  UserStatus,
+  OrderStatus,
+  DepositStatus,
+  BalanceTxType,
+  StockOrderStatus,
+  ShippingUploadStatus,
+} from '@/lib/types';
 import { ArrowLeft, TrendingDown, TrendingUp, Boxes } from 'lucide-react';
 import { InventoryAdjuster } from './InventoryAdjuster';
 import { formatDateTimeKR } from '@/lib/dates';
@@ -80,9 +89,9 @@ export default async function AdminUserDetailPage({
 
         <dl className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
           <Metric label="잔액" value={formatKRW(Number(user.deposit_balance))} highlight />
-          <Metric label="총 사용액" value={formatKRW(totalSpent)} />
+          <Metric label="상품 사용액" value={formatKRW(totalSpent)} />
           <Metric label="임계치" value={formatKRW(Number(user.low_balance_threshold))} />
-          <Metric label="누적 주문" value={`${orders.length}건`} />
+          <Metric label="누적 거래" value={`${orders.length}건`} />
         </dl>
       </header>
 
@@ -119,20 +128,49 @@ export default async function AdminUserDetailPage({
 
         <TabsContent value="orders" className="rounded-lg border bg-card overflow-hidden m-0">
           <HistoryTable
-            headers={['주문번호', '금액', '상태', '시간']}
-            rightAligned={[1]}
-            rows={orders.map((order) => [
-              <span key="n" className="font-mono text-xs text-muted-foreground">
-                {order.id.slice(0, 8)}
-              </span>,
-              <span key="a" className="font-mono tabular">
-                {formatKRW(Number(order.total_amount))}
-              </span>,
-              <OrderStatusBadge key="s" status={order.status as OrderStatus} />,
-              <span key="t" className="text-xs text-muted-foreground whitespace-nowrap">
-                {formatDateTimeKR(order.created_at)}
-              </span>,
-            ])}
+            headers={['종류', '식별', '금액', '상태', '시간']}
+            rightAligned={[2]}
+            rows={orders.map((row) => {
+              const kindLabel =
+                row.kind === 'stock_order'
+                  ? '엑시트몰 구매'
+                  : row.kind === 'shipping_upload'
+                    ? '배송대행'
+                    : 'Legacy';
+              const statusBadge =
+                row.kind === 'stock_order' ? (
+                  <StockOrderStatusBadge status={row.status as StockOrderStatus} />
+                ) : row.kind === 'shipping_upload' ? (
+                  <ShippingUploadStatusBadge status={row.status as ShippingUploadStatus} />
+                ) : (
+                  <OrderStatusBadge status={row.status as OrderStatus} />
+                );
+              const idHref =
+                row.kind === 'shipping_upload'
+                  ? `/admin/shipping-uploads/exitmall/${row.id}`
+                  : row.kind === 'legacy'
+                    ? `/admin/orders-legacy/${row.id}`
+                    : `/admin/orders/${row.id}`;
+              return [
+                <span key="k" className="text-xs">
+                  {kindLabel}
+                </span>,
+                <Link
+                  key="id"
+                  href={idHref}
+                  className="text-xs text-accent hover:underline truncate inline-block max-w-[180px] align-middle"
+                >
+                  {row.summary}
+                </Link>,
+                <span key="a" className="font-mono tabular">
+                  {formatKRW(row.amount)}
+                </span>,
+                statusBadge,
+                <span key="t" className="text-xs text-muted-foreground whitespace-nowrap">
+                  {formatDateTimeKR(row.created_at)}
+                </span>,
+              ];
+            })}
           />
         </TabsContent>
 

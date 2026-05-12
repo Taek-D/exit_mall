@@ -26,13 +26,13 @@ export type ParsedShippingUpload = {
 
 const HEADER_KEYS = [
   ['no'],
-  ['받는사람'],
-  ['연락처'],
-  ['주소'],
-  ['상품명', '관리코드'],
-  ['옵션', '상품명/옵션'],
-  ['수량'],
-  ['메모'],
+  ['받는사람', '받는분성명'],
+  ['연락처', '받는분전화번호'],
+  ['주소', '받는분주소(전체,분할)', '받는분주소'],
+  ['상품명', '품목명', '관리코드'],
+  ['옵션', '내품명', '상품명/옵션'],
+  ['수량', '내품수량'],
+  ['메모', '배송메세지1'],
   ['송장번호'],
 ];
 
@@ -71,8 +71,23 @@ function cellInt(value: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function cellTrackingNumber(value: unknown): string | null {
+  const raw = rawCellValue(value as ExcelJS.CellValue);
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw)) return null;
+    return Math.trunc(raw).toString();
+  }
+  const s = String(raw).trim();
+  return s.length === 0 ? null : s;
+}
+
 function normalizeHeader(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, '').replace(/\*+$/g, '');
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[()]/g, '')
+    .replace(/\*+$/g, '');
 }
 
 function rowValues(ws: ExcelJS.Worksheet, rowNumber: number, maxCols: number): unknown[] {
@@ -139,7 +154,7 @@ export async function parseShippingExcel(
     const product_name = cellString(cells[5]);
     const quantity = cellInt(cells[6]);
     const memo = cellString(cells[7]);
-    const tracking_number = cellString(cells[8]);
+    const tracking_number = cellTrackingNumber(cells[8]);
 
     if (!recipient && !phone && !address && !product_code && quantity === null) continue;
 

@@ -84,10 +84,14 @@ export async function attachTrackingAction(
   }
 
   revalidatePaths([
+    `/admin/shipping-uploads/exitmall/${uploadId}`,
     `/admin/shipping-uploads/${uploadId}`,
+    `/shipping-uploads/exitmall/${uploadId}`,
     `/shipping-uploads/${uploadId}`,
     '/admin/shipping-uploads',
+    '/admin/shipping-uploads/exitmall',
     '/shipping-uploads',
+    '/shipping-uploads/exitmall',
   ]);
   return { ok: true };
 }

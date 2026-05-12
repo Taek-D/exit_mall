@@ -39,7 +39,7 @@ export function UploadForm() {
               title: '검토 요청 완료',
               description: '관리자가 승인하면 발송이 시작됩니다.',
             });
-            router.push(`/shipping-uploads/${r.uploadId}`);
+            router.push(`/shipping-uploads/exitmall/${r.uploadId}`);
             router.refresh();
           })
         }

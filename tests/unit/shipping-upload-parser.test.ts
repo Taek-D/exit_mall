@@ -65,6 +65,48 @@ describe('parseShippingExcel - valid', () => {
       quantity: 1,
     });
   });
+
+  it('accepts new CJ-style headers (받는분성명, 받는분주소(전체, 분할), 품목명, 내품명, 내품수량, 배송메세지1)', async () => {
+    const r = await parseShippingExcel(
+      await workbookBuffer(
+        [
+          'No',
+          '받는분성명',
+          '받는분전화번호',
+          '받는분주소(전체, 분할)',
+          '품목명',
+          '내품명',
+          '내품수량',
+          '배송메세지1',
+          '송장번호',
+        ],
+        [[1, '홍길동', '010-1234-5678', '서울시 강남구 1', '스니커즈', '270', 2, '문 앞', '']],
+      ),
+    );
+
+    expect(r.items[0]).toMatchObject({
+      no: 1,
+      recipient: '홍길동',
+      phone: '010-1234-5678',
+      address: '서울시 강남구 1',
+      product_code: '스니커즈',
+      product_name: '270',
+      quantity: 2,
+      memo: '문 앞',
+      tracking_number: null,
+    });
+  });
+
+  it('preserves numeric tracking numbers as integer strings (no scientific notation)', async () => {
+    // CJ 송장번호는 10~12자리 — 셀이 number로 들어와도 정수 문자열로 보존되어야 함
+    const r = await parseShippingExcel(
+      await workbookBuffer(
+        ['No', '받는사람', '연락처', '주소', '상품명', '옵션', '수량', '메모', '송장번호'],
+        [[1, '홍길동', '010-1234-5678', '서울시 1', '스니커즈', '270', 1, '', 521853092894]],
+      ),
+    );
+    expect(r.items[0]?.tracking_number).toBe('521853092894');
+  });
 });
 
 describe('parseShippingExcel - errors', () => {

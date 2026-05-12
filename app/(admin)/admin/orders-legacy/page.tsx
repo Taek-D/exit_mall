@@ -67,7 +67,7 @@ export default async function AdminOrdersPage({
           주문관리(흐름 1)
         </a>{' '}
         또는{' '}
-        <a href="/admin/shipping-uploads" className="underline">
+        <a href="/admin/shipping-uploads/exitmall" className="underline">
           배송대행 업로드(흐름 2)
         </a>{' '}
         에서 처리합니다.

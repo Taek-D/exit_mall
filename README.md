@@ -20,7 +20,7 @@ Next.js 14 + Supabase 기반입니다.
 - 예치금 잔액 (가용/검토대기 예약 분리), 이체 요청, 이체 요청 내역
 - 내 주문 내역(엑시트몰 상품 검토대기·승인·반려/취소, Legacy 일반 주문 분리)
 - 보유 재고 화면 (`/inventory`) — 상품별 가용/예약/총보유 + 변동 내역 timeline
-- 배송대행 업로드 (`/shipping-uploads`) — 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드
+- 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 준비중
 - 비밀번호 변경, 아이디 찾기, 비밀번호 재설정
 
 ### 관리자
@@ -28,7 +28,7 @@ Next.js 14 + Supabase 기반입니다.
 - 입금 요청 확인/반려 및 예치금 반영
 - 상품 CRUD, 1인 구매 한도 설정, 상품 이미지 Storage 업로드
 - 주문관리(`/admin/orders`) — `stock_orders` 검토 목록·상세·승인/반려
-- 배송대행 업로드(`/admin/shipping-uploads`) — 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리
+- 배송대행 업로드 — 엑시트몰 배송대행(`/admin/shipping-uploads/exitmall`)에서 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리. 사입재고 배송대행(`/admin/shipping-uploads/purchased`)은 준비중
 - 송장 채운 엑셀 재업로드 시 행별 `tracking_number` 갱신 + status=shipped (멱등)
 - 사용자 관리(잔액 조정·상태·임계치 + 보유 재고 표시·수동 조정)
 - Legacy 주문 화면(`/admin/orders-legacy`) — 구 일반 주문 열람 전용 (URL 직접 접근)
@@ -111,6 +111,12 @@ pnpm test                 # 단위 테스트 (money, Zod schemas, parser, CJ 배
 pnpm test:e2e             # Playwright (추후 추가 예정)
 ```
 
+배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 이 스크립트가 공식 생성 경로이며, `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
+
+```bash
+node scripts/build-shipping-template.cjs
+```
+
 릴리즈 전 권장 확인: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
 
 ## 배포 (프로덕션)
@@ -130,24 +136,26 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 - `/shop` 상품 목록 / `/cart` 장바구니 / `/checkout` 검토 요청 (배송정보 입력 없음)
 - `/orders` 내 주문 내역 (엑시트몰 상품 검토대기/승인/반려·취소 + Legacy 일반 주문)
 - `/inventory` 보유 재고 / `/inventory/[productId]` 상품별 변동 내역
-- `/shipping-uploads` 배송대행 업로드 / `/shipping-uploads/[id]` 행별 미리보기·송장·다운로드
+- `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행(준비중)
 - `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
 - `/find-account`, `/reset-password` 아이디 찾기·비밀번호 재설정
-- `/orders/upload` → `/shipping-uploads` 로 redirect (legacy)
+- `/orders/upload` → `/shipping-uploads/exitmall` 로 redirect (legacy)
+- `/shipping-uploads` → `/shipping-uploads/exitmall` 로 redirect (구 단일 메뉴 호환)
 
 ### 관리자 (`/admin/*`, role=admin 전용)
 - `/admin` 대시보드 (Realtime 새 검토대기 토스트)
 - `/admin/approvals` 가입 승인
 - `/admin/deposits` 입금 확인
 - `/admin/orders` 주문관리 (stock_orders 탭·상세·승인/반려)
-- `/admin/shipping-uploads` 배송대행 업로드 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리)
+- `/admin/shipping-uploads/exitmall` 엑시트몰 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리) / `/admin/shipping-uploads/purchased` 사입재고 배송대행(준비중)
 - `/admin/products` 상품 CRUD
 - `/admin/users` 사용자 관리 (잔액·상태·임계치 + 보유 재고 + 수동 조정)
 - `/admin/low-balance` 잔액 부족 고객
 - `/admin/settings` 입금 계좌 정보
 - `/admin/orders-legacy` (열람 전용) 구 일반 주문 — URL 직접 접근
-- `/admin/order-uploads` → `/admin/shipping-uploads` 로 redirect (legacy)
+- `/admin/order-uploads` → `/admin/shipping-uploads/exitmall` 로 redirect (legacy)
+- `/admin/shipping-uploads` → `/admin/shipping-uploads/exitmall` 로 redirect (구 단일 메뉴 호환)
 
 ## 주요 업무 흐름
 
@@ -159,9 +167,9 @@ pnpm test:e2e             # Playwright (추후 추가 예정)
 5. 주문자는 검토대기 상태에서 직접 취소 가능.
 
 ### 흐름 2: 배송대행 업로드 (재고 발송)
-1. 주문자가 `/shipping-uploads`에서 양식 엑셀을 다운로드 → 받는사람 명단 작성 → 업로드.
+1. 주문자가 `/shipping-uploads/exitmall`에서 양식 엑셀을 다운로드 → 받는사람 명단 작성 → 업로드.
 2. 미리보기에서 행별 검증·상품명 매칭 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
-3. 관리자가 `/admin/shipping-uploads`에서 검토 → 승인 시 보유 재고 차감(상품별 합산) + 배송비 차감 + `inventory_movements` 음수 기록.
+3. 관리자가 `/admin/shipping-uploads/exitmall`에서 검토 → 승인 시 보유 재고 차감(상품별 합산) + 배송비 차감 + `inventory_movements` 음수 기록.
 4. 관리자가 송장 채운 엑셀을 같은 업로드에 재업로드 → `attach_tracking` RPC가 행별 `tracking_number` 갱신 + `status=shipped`. 부분 발송도 가능, 멱등 호출 가능.
 5. 주문자 화면에 행별 송장 + CJ 조회 버튼 + 송장 포함 엑셀 다운로드 노출.
 6. 관리자가 완료 처리 → `status=completed`.
