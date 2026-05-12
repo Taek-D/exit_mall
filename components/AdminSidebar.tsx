@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Settings,
   Archive,
+  Inbox,
 } from 'lucide-react';
+import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
 
 const NAV: { href: string; label: string; Icon: typeof LayoutDashboard; exact?: boolean; muted?: boolean }[] = [
   { href: '/admin', label: '대시보드', Icon: LayoutDashboard, exact: true },
@@ -22,6 +24,7 @@ const NAV: { href: string; label: string; Icon: typeof LayoutDashboard; exact?: 
   { href: '/admin/orders', label: '주문관리', Icon: ShoppingCart, exact: true },
   { href: '/admin/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: FileSpreadsheet },
   { href: '/admin/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: FileSpreadsheet },
+  { href: '/admin/inbound-requests', label: '입고리스트', Icon: Inbox },
   { href: '/admin/products', label: '상품 관리', Icon: Package },
   { href: '/admin/users', label: '사용자', Icon: Users },
   { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
@@ -30,7 +33,7 @@ const NAV: { href: string; label: string; Icon: typeof LayoutDashboard; exact?: 
   { href: '/admin/settings', label: '설정', Icon: Settings },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ inboundUnread }: { inboundUnread: number }) {
   const pathname = usePathname();
   return (
     <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r bg-background">
@@ -61,7 +64,12 @@ export function AdminSidebar() {
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span>{label}</span>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    {href === '/admin/inbound-requests' && (
+                      <InboundUnreadBadge role="admin" initial={inboundUnread} />
+                    )}
+                  </span>
                 </Link>
               </li>
             );

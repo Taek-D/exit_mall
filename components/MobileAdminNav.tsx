@@ -13,6 +13,7 @@ import {
   Users,
   AlertTriangle,
   Settings,
+  Inbox,
 } from 'lucide-react';
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { href: '/admin/orders', label: '주문 관리', Icon: ShoppingCart, exact: true },
   { href: '/admin/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: FileSpreadsheet },
   { href: '/admin/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: FileSpreadsheet },
+  { href: '/admin/inbound-requests', label: '입고리스트', Icon: Inbox },
   { href: '/admin/products', label: '상품 관리', Icon: Package },
   { href: '/admin/users', label: '사용자', Icon: Users },
   { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },

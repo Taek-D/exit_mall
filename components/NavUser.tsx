@@ -5,7 +5,8 @@ import { logoutAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload, KeyRound, Boxes } from 'lucide-react';
+import { Wallet, ShoppingBag, ClipboardList, Package, LogOut, Upload, KeyRound, Boxes, Inbox } from 'lucide-react';
+import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,10 +22,19 @@ const NAV: { href: string; label: string; Icon: typeof Package; exact?: boolean 
   { href: '/inventory', label: '보유 재고', Icon: Boxes },
   { href: '/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: Upload },
   { href: '/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: Upload },
+  { href: '/inbound-requests', label: '입고리스트', Icon: Inbox },
   { href: '/deposit', label: '예치금', Icon: Wallet },
 ];
 
-export function NavUser({ balance, name }: { balance: number; name: string }) {
+export function NavUser({
+  balance,
+  name,
+  inboundUnread,
+}: {
+  balance: number;
+  name: string;
+  inboundUnread: number;
+}) {
   const pathname = usePathname();
   const initial = (name || 'U').charAt(0).toUpperCase();
 
@@ -55,7 +65,12 @@ export function NavUser({ balance, name }: { balance: number; name: string }) {
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
-                  <span>{label}</span>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    {href === '/inbound-requests' && (
+                      <InboundUnreadBadge role="user" initial={inboundUnread} />
+                    )}
+                  </span>
                 </Link>
               );
             })}
@@ -133,7 +148,12 @@ export function NavUser({ balance, name }: { balance: number; name: string }) {
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
-                  <span>{label}</span>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    {href === '/inbound-requests' && (
+                      <InboundUnreadBadge role="user" initial={inboundUnread} />
+                    )}
+                  </span>
                 </Link>
               </li>
             );
