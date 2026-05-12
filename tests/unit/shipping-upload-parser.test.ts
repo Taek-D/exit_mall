@@ -96,6 +96,17 @@ describe('parseShippingExcel - valid', () => {
       tracking_number: null,
     });
   });
+
+  it('preserves numeric tracking numbers as integer strings (no scientific notation)', async () => {
+    // CJ 송장번호는 10~12자리 — 셀이 number로 들어와도 정수 문자열로 보존되어야 함
+    const r = await parseShippingExcel(
+      await workbookBuffer(
+        ['No', '받는사람', '연락처', '주소', '상품명', '옵션', '수량', '메모', '송장번호'],
+        [[1, '홍길동', '010-1234-5678', '서울시 1', '스니커즈', '270', 1, '', 521853092894]],
+      ),
+    );
+    expect(r.items[0]?.tracking_number).toBe('521853092894');
+  });
 });
 
 describe('parseShippingExcel - errors', () => {

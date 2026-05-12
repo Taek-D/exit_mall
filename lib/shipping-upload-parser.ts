@@ -71,6 +71,17 @@ function cellInt(value: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function cellTrackingNumber(value: unknown): string | null {
+  const raw = rawCellValue(value as ExcelJS.CellValue);
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'number') {
+    if (!Number.isFinite(raw)) return null;
+    return Math.trunc(raw).toString();
+  }
+  const s = String(raw).trim();
+  return s.length === 0 ? null : s;
+}
+
 function normalizeHeader(value: string): string {
   return value
     .toLowerCase()
@@ -143,7 +154,7 @@ export async function parseShippingExcel(
     const product_name = cellString(cells[5]);
     const quantity = cellInt(cells[6]);
     const memo = cellString(cells[7]);
-    const tracking_number = cellString(cells[8]);
+    const tracking_number = cellTrackingNumber(cells[8]);
 
     if (!recipient && !phone && !address && !product_code && quantity === null) continue;
 
