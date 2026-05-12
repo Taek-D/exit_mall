@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function LegacyOrderUploadRedirect() {
-  redirect('/shipping-uploads');
+  redirect('/shipping-uploads/exitmall');
 }
