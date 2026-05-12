@@ -11,13 +11,6 @@ export type AdminUserProfile = {
   low_balance_threshold: number;
 };
 
-export type AdminUserOrder = {
-  id: string;
-  total_amount: number;
-  status: string;
-  created_at: string;
-};
-
 export type AdminUserDeposit = {
   id: string;
   amount: number;
@@ -48,19 +41,13 @@ export type AdminUserProductOption = {
 
 export type AdminUserDetail = {
   profile: AdminUserProfile;
-  orders: AdminUserOrder[];
+  orders: AdminUserUnifiedOrder[];
   deposits: AdminUserDeposit[];
   transactions: AdminUserBalanceTx[];
   inventory: AdminUserInventoryRow[];
   products: AdminUserProductOption[];
   totalSpent: number;
 };
-
-export function calculateTotalSpent(orders: AdminUserOrder[]): number {
-  return orders
-    .filter((order) => order.status !== 'cancelled')
-    .reduce((sum, order) => sum + Number(order.total_amount), 0);
-}
 
 export type AdminUserStockOrderInput = {
   id: string;
@@ -147,7 +134,9 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   const supabase = createClient();
   const [
     { data: profile },
-    { data: orders },
+    { data: stockOrders },
+    { data: shippingUploads },
+    { data: legacyOrders },
     { data: deposits },
     { data: transactions },
     { data: inventory },
@@ -155,8 +144,18 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).single<AdminUserProfile>(),
     supabase
+      .from('stock_orders')
+      .select('id, total_amount, status, items, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('order_uploads')
+      .select('id, original_name, total_quantity, shipping_fee_total, status, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
       .from('orders')
-      .select('id,total_amount,status,created_at')
+      .select('id, total_amount, status, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabase
@@ -179,14 +178,32 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
 
   if (!profile) return null;
 
-  const orderRows = (orders ?? []) as unknown as AdminUserOrder[];
+  const stockRows = (stockOrders ?? []) as unknown as AdminUserStockOrderInput[];
+  const shippingRows = (shippingUploads ?? []) as unknown as AdminUserShippingUploadInput[];
+  const legacyRows = (legacyOrders ?? []) as unknown as AdminUserLegacyOrderInput[];
+
+  const merged = mergeUserOrders({
+    stock: stockRows,
+    shipping: shippingRows,
+    legacy: legacyRows,
+  });
+
+  // totalSpent = stock_orders + legacy orders 중 cancelled 제외 (배송대행 비용은 별도)
+  const totalSpent =
+    stockRows
+      .filter((o) => o.status !== 'cancelled')
+      .reduce((sum, o) => sum + Number(o.total_amount), 0) +
+    legacyRows
+      .filter((o) => o.status !== 'cancelled')
+      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+
   return {
     profile,
-    orders: orderRows,
+    orders: merged,
     deposits: (deposits ?? []) as unknown as AdminUserDeposit[],
     transactions: (transactions ?? []) as unknown as AdminUserBalanceTx[],
     inventory: (inventory ?? []) as unknown as AdminUserInventoryRow[],
     products: (products ?? []) as unknown as AdminUserProductOption[],
-    totalSpent: calculateTotalSpent(orderRows),
+    totalSpent,
   };
 }
