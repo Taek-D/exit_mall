@@ -36,7 +36,7 @@ export default async function AdminShippingUploadsPage({
       <OrdersRealtime />
 
       <header>
-        <h1 className="font-heading font-semibold text-2xl tracking-tight">배송대행 업로드</h1>
+        <h1 className="font-heading font-semibold text-2xl tracking-tight">엑시트몰 배송대행</h1>
         <p className="text-sm text-muted-foreground mt-1">
           전체 {c.all ?? 0}건 · 검토대기 {c.pending ?? 0}건
         </p>
@@ -50,7 +50,7 @@ export default async function AdminShippingUploadsPage({
               return (
                 <Link
                   key={t.key}
-                  href={`/admin/shipping-uploads${t.key === 'all' ? '' : `?status=${t.key}`}`}
+                  href={`/admin/shipping-uploads/exitmall${t.key === 'all' ? '' : `?status=${t.key}`}`}
                   className={cn(
                     'flex items-center gap-2 px-4 h-11 text-sm border-b-2 whitespace-nowrap',
                     active
@@ -92,7 +92,7 @@ export default async function AdminShippingUploadsPage({
                   <tr key={u.id} className="border-t h-11 hover:bg-surface-muted/60">
                     <td className="px-4">
                       <Link
-                        href={`/admin/shipping-uploads/${u.id}`}
+                        href={`/admin/shipping-uploads/exitmall/${u.id}`}
                         className="inline-flex items-center gap-1.5 text-accent hover:underline"
                       >
                         <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
@@ -111,7 +111,7 @@ export default async function AdminShippingUploadsPage({
                       {formatShortDateTimeKR(u.created_at)}
                     </td>
                     <td className="px-3 text-right">
-                      <Link href={`/admin/shipping-uploads/${u.id}`} aria-label="상세">
+                      <Link href={`/admin/shipping-uploads/exitmall/${u.id}`} aria-label="상세">
                         <ChevronRight className="h-4 w-4" aria-hidden />
                       </Link>
                     </td>

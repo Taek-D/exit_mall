@@ -35,7 +35,7 @@ export default async function AdminShippingUploadDetail({
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <Link
-        href="/admin/shipping-uploads"
+        href="/admin/shipping-uploads/exitmall"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
