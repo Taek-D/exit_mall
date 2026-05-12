@@ -15,6 +15,7 @@ import {
   Settings,
   Inbox,
 } from 'lucide-react';
+import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
 
 const NAV = [
   { href: '/admin', label: '대시보드', Icon: LayoutDashboard, exact: true },
@@ -33,9 +34,11 @@ const NAV = [
 export function MobileAdminNav({
   open,
   onOpenChange,
+  inboundUnread,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  inboundUnread: number;
 }) {
   const pathname = usePathname();
   return (
@@ -66,7 +69,12 @@ export function MobileAdminNav({
                     )}
                   >
                     <Icon className="h-4 w-4" aria-hidden />
-                    <span>{label}</span>
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {href === '/admin/inbound-requests' && (
+                        <InboundUnreadBadge role="admin" initial={inboundUnread} />
+                      )}
+                    </span>
                   </Link>
                 </li>
               );

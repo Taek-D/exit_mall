@@ -1,32 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/browser';
 import { cn } from '@/lib/utils';
 
 type Role = 'user' | 'admin';
-
-type UnreadRow = {
-  last_comment_at: string | null;
-  last_comment_by_role: 'user' | 'admin' | null;
-  user_last_read_at: string | null;
-  admin_last_read_at: string | null;
-};
-
-function computeCount(rows: UnreadRow[], role: Role): number {
-  return rows.filter((r) => {
-    if (!r.last_comment_at) return false;
-    if (role === 'user') {
-      return (
-        r.last_comment_by_role === 'admin' &&
-        (!r.user_last_read_at || r.last_comment_at > r.user_last_read_at)
-      );
-    }
-    return (
-      r.last_comment_by_role === 'user' &&
-      (!r.admin_last_read_at || r.last_comment_at > r.admin_last_read_at)
-    );
-  }).length;
-}
 
 export function InboundUnreadBadge({
   role,
@@ -38,18 +15,25 @@ export function InboundUnreadBadge({
   className?: string;
 }) {
   const [count, setCount] = useState(initial);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
 
     async function refresh() {
-      // inbound_requests is not yet in generated DB types; cast to escape.
-      const { data } = await (supabase.from as any)('inbound_requests').select(
-        'id,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at',
-      );
-      if (cancelled || !data) return;
-      setCount(computeCount(data as UnreadRow[], role));
+      const { data, error } = await (supabase.rpc as any)('count_inbound_unread', {
+        p_role: role,
+      });
+      if (cancelled || error || data == null) return;
+      setCount(Number(data) || 0);
+    }
+
+    function scheduleRefresh() {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        if (!cancelled) refresh();
+      }, 1000);
     }
 
     const channel = supabase
@@ -57,17 +41,18 @@ export function InboundUnreadBadge({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inbound_requests' },
-        () => refresh(),
+        scheduleRefresh,
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inbound_request_comments' },
-        () => refresh(),
+        scheduleRefresh,
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [role]);

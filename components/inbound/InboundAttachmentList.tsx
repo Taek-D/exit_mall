@@ -31,7 +31,7 @@ export async function InboundAttachmentList({
       <a
         href={excelUrl ?? '#'}
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-background text-sm hover:bg-muted transition-colors"
       >
         <FileSpreadsheet className="h-4 w-4 text-accent" aria-hidden />
@@ -42,7 +42,7 @@ export async function InboundAttachmentList({
           {imageUrls.map((url, i) =>
             url ? (
               <li key={imagePaths[i]} className="aspect-square rounded-md overflow-hidden border bg-muted">
-                <a href={url} target="_blank" rel="noopener">
+                <a href={url} target="_blank" rel="noopener noreferrer">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`첨부 이미지 ${i + 1}`} className="w-full h-full object-cover" />
                 </a>

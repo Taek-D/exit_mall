@@ -26,7 +26,15 @@ const TITLES: Record<string, string> = {
   '/admin/account/password': '비밀번호 변경',
 };
 
-export function AdminHeader({ name, email }: { name: string; email?: string | null }) {
+export function AdminHeader({
+  name,
+  email,
+  inboundUnread,
+}: {
+  name: string;
+  email?: string | null;
+  inboundUnread: number;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const title =
@@ -97,7 +105,7 @@ export function AdminHeader({ name, email }: { name: string; email?: string | nu
         </DropdownMenu>
       </div>
 
-      <MobileAdminNav open={open} onOpenChange={setOpen} />
+      <MobileAdminNav open={open} onOpenChange={setOpen} inboundUnread={inboundUnread} />
     </header>
   );
 }

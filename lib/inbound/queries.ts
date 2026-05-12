@@ -12,7 +12,6 @@ export type InboundListRow = {
   admin_last_read_at: string | null;
   created_at: string;
   updated_at: string;
-  comment_count?: number;
   profile?: { name: string } | null;
 };
 
@@ -105,28 +104,12 @@ export async function fetchInboundRequest(id: string): Promise<{
 
 export async function fetchUnreadCount(role: 'user' | 'admin'): Promise<number> {
   const supabase = createClient();
-  const { data, error } = await (supabase.from as any)('inbound_requests').select(
-    'id,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at',
-  );
-  if (error || !data) return 0;
-  const rows = data as Array<{
-    last_comment_at: string | null;
-    last_comment_by_role: 'user' | 'admin' | null;
-    user_last_read_at: string | null;
-    admin_last_read_at: string | null;
-  }>;
-  return rows.filter((r) => {
-    if (!r.last_comment_at) return false;
-    if (role === 'user') {
-      return (
-        r.last_comment_by_role === 'admin' &&
-        (!r.user_last_read_at || r.last_comment_at > r.user_last_read_at)
-      );
-    } else {
-      return (
-        r.last_comment_by_role === 'user' &&
-        (!r.admin_last_read_at || r.last_comment_at > r.admin_last_read_at)
-      );
-    }
-  }).length;
+  const { data, error } = await (supabase.rpc as any)('count_inbound_unread', {
+    p_role: role,
+  });
+  if (error || data == null) {
+    if (error) console.error('[inbound] fetchUnreadCount', error);
+    return 0;
+  }
+  return Number(data) || 0;
 }

@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen flex bg-surface">
       <AdminSidebar inboundUnread={inboundUnread} />
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader name={profile.name} email={user.email} />
+        <AdminHeader name={profile.name} email={user.email} inboundUnread={inboundUnread} />
         <main className="flex-1 p-4 lg:p-6">
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
