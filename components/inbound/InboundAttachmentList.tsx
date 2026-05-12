@@ -42,8 +42,8 @@ export async function InboundAttachmentList({
           {imageUrls.map((url, i) =>
             url ? (
               <li key={imagePaths[i]} className="aspect-square rounded-md overflow-hidden border bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <a href={url} target="_blank" rel="noopener">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt={`첨부 이미지 ${i + 1}`} className="w-full h-full object-cover" />
                 </a>
               </li>
