@@ -89,9 +89,9 @@ export default async function AdminUserDetailPage({
 
         <dl className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
           <Metric label="잔액" value={formatKRW(Number(user.deposit_balance))} highlight />
-          <Metric label="총 사용액" value={formatKRW(totalSpent)} />
+          <Metric label="상품 사용액" value={formatKRW(totalSpent)} />
           <Metric label="임계치" value={formatKRW(Number(user.low_balance_threshold))} />
-          <Metric label="누적 주문" value={`${orders.length}건`} />
+          <Metric label="누적 거래" value={`${orders.length}건`} />
         </dl>
       </header>
 

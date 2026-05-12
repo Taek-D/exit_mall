@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mergeUserOrders,
+  sumNonCancelledAmounts,
   type AdminUserStockOrderInput,
   type AdminUserShippingUploadInput,
   type AdminUserLegacyOrderInput,
@@ -79,5 +80,30 @@ describe('mergeUserOrders', () => {
       legacy: [],
     });
     expect(merged[0]?.summary).toBe('orders.xlsx · 3개');
+  });
+});
+
+describe('sumNonCancelledAmounts', () => {
+  it('sums total_amount of rows with status !== "cancelled"', () => {
+    const rows = [
+      { status: 'pending', total_amount: 10000 },
+      { status: 'approved', total_amount: 20000 },
+      { status: 'cancelled', total_amount: 5000 },
+      { status: 'rejected', total_amount: 3000 },
+    ];
+    expect(sumNonCancelledAmounts(rows)).toBe(33000);
+  });
+
+  it('returns 0 for empty input', () => {
+    expect(sumNonCancelledAmounts([])).toBe(0);
+  });
+
+  it('returns 0 when every row is cancelled', () => {
+    expect(
+      sumNonCancelledAmounts([
+        { status: 'cancelled', total_amount: 1000 },
+        { status: 'cancelled', total_amount: 2000 },
+      ]),
+    ).toBe(0);
   });
 });

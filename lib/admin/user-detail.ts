@@ -126,6 +126,14 @@ export function isPositiveTransaction(tx: Pick<AdminUserBalanceTx, 'amount'>): b
   return Number(tx.amount) >= 0;
 }
 
+export function sumNonCancelledAmounts(
+  rows: Array<{ status: string; total_amount: number }>,
+): number {
+  return rows
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + Number(o.total_amount), 0);
+}
+
 export function getInventoryProductName(row: AdminUserInventoryRow): string {
   return row.products?.name ?? '(이름 없음)';
 }
@@ -189,13 +197,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   });
 
   // totalSpent = stock_orders + legacy orders 중 cancelled 제외 (배송대행 비용은 별도)
-  const totalSpent =
-    stockRows
-      .filter((o) => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + Number(o.total_amount), 0) +
-    legacyRows
-      .filter((o) => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + Number(o.total_amount), 0);
+  const totalSpent = sumNonCancelledAmounts(stockRows) + sumNonCancelledAmounts(legacyRows);
 
   return {
     profile,
