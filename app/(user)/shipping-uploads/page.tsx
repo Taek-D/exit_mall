@@ -30,7 +30,7 @@ export default async function ShippingUploadsPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">엑셀 양식 다운로드</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            &quot;받는사람 / 연락처 / 주소 / 상품명 / 수량&quot; 을 행마다 입력해주세요.
+            &quot;받는사람 / 연락처 / 주소 / 품목명 / 내품명(=옵션) / 수량&quot; 을 행마다 입력해주세요.
           </p>
         </div>
         <a
