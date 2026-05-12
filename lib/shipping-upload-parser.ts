@@ -26,13 +26,13 @@ export type ParsedShippingUpload = {
 
 const HEADER_KEYS = [
   ['no'],
-  ['받는사람'],
-  ['연락처'],
-  ['주소'],
-  ['상품명', '관리코드'],
-  ['옵션', '상품명/옵션'],
-  ['수량'],
-  ['메모'],
+  ['받는사람', '받는분성명'],
+  ['연락처', '받는분전화번호'],
+  ['주소', '받는분주소(전체,분할)', '받는분주소'],
+  ['상품명', '품목명', '관리코드'],
+  ['옵션', '내품명', '상품명/옵션'],
+  ['수량', '내품수량'],
+  ['메모', '배송메세지1'],
   ['송장번호'],
 ];
 
@@ -72,7 +72,11 @@ function cellInt(value: unknown): number | null {
 }
 
 function normalizeHeader(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, '').replace(/\*+$/g, '');
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[()]/g, '')
+    .replace(/\*+$/g, '');
 }
 
 function rowValues(ws: ExcelJS.Worksheet, rowNumber: number, maxCols: number): unknown[] {
