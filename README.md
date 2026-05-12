@@ -111,6 +111,12 @@ pnpm test                 # 단위 테스트 (money, Zod schemas, parser, CJ 배
 pnpm test:e2e             # Playwright (추후 추가 예정)
 ```
 
+배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 이 스크립트가 공식 생성 경로이며, `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
+
+```bash
+node scripts/build-shipping-template.cjs
+```
+
 릴리즈 전 권장 확인: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
 
 ## 배포 (프로덕션)
