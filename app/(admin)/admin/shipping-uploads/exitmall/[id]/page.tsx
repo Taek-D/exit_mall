@@ -56,11 +56,16 @@ export default async function AdminShippingUploadDetail({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DownloadButton storagePath={upload.storage_path} originalName={upload.original_name} />
+          <DownloadButton
+            storagePath={upload.storage_path}
+            originalName={upload.original_name}
+            label="고객 업로드 원본"
+          />
           {upload.admin_storage_path && (
             <DownloadButton
               storagePath={upload.admin_storage_path}
               originalName={`tracking-${upload.original_name}`}
+              label="송장 입력본"
             />
           )}
         </div>

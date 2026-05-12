@@ -7,9 +7,11 @@ import { getOrderUploadDownloadUrl } from '@/lib/actions/admin-order-uploads';
 export function DownloadButton({
   storagePath,
   originalName,
+  label = '원본 다운로드',
 }: {
   storagePath: string;
   originalName: string;
+  label?: string;
 }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -26,7 +28,7 @@ export function DownloadButton({
       }}
     >
       <Download className="h-3.5 w-3.5 mr-1" aria-hidden />
-      원본 다운로드
+      {label}
     </Button>
   );
 }
