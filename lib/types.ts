@@ -33,3 +33,12 @@ export const SHIPPING_UPLOAD_STATUS_LABEL: Record<ShippingUploadStatus, string> 
   completed: '완료',
   cancelled: '취소',
 };
+
+export type InboundStatus = 'open' | 'in_progress' | 'completed' | 'cancelled';
+
+export const INBOUND_STATUS_LABEL: Record<InboundStatus, string> = {
+  open: '접수',
+  in_progress: '진행중',
+  completed: '완료',
+  cancelled: '취소',
+};
