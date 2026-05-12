@@ -24,7 +24,7 @@ export function OrdersRealtime() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'order_uploads' },
         () => {
-          toast({ title: '새 배송대행 업로드', description: '검토대기 항목이 추가됐습니다.' });
+          toast({ title: '새 엑시트몰 배송대행 업로드', description: '검토대기 항목이 추가됐습니다.' });
           router.refresh();
         },
       )
