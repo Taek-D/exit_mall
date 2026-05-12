@@ -17,7 +17,7 @@ export default async function ShippingUploadsPage() {
   return (
     <div className="space-y-6">
       <header className="pb-4 border-b">
-        <h1 className="font-heading font-semibold text-2xl tracking-tight">배송대행 업로드</h1>
+        <h1 className="font-heading font-semibold text-2xl tracking-tight">엑시트몰 배송대행</h1>
         <p className="text-sm text-muted-foreground mt-1">
           CJ 양식 엑셀로 받는사람 명단을 업로드하면, 보유 재고에서 차감되어 발송됩니다. 행 1건당 ₩3,300 배송비가 부과됩니다.
         </p>
@@ -64,7 +64,7 @@ export default async function ShippingUploadsPage() {
                 />
                 <div className="flex-1 min-w-0">
                   <Link
-                    href={`/shipping-uploads/${u.id}`}
+                    href={`/shipping-uploads/exitmall/${u.id}`}
                     className="text-sm font-medium hover:underline"
                   >
                     {u.original_name}

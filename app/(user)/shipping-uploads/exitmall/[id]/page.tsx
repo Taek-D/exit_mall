@@ -51,7 +51,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
   return (
     <div className="space-y-5">
       <Link
-        href="/shipping-uploads"
+        href="/shipping-uploads/exitmall"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
