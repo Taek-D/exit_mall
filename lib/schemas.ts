@@ -113,3 +113,16 @@ export type AppSettingsInput = z.infer<typeof appSettingsSchema>;
 export const thresholdSchema = z.object({
   threshold: z.number().int().min(0).max(10_000_000),
 });
+
+export const inboundRequestCreateSchema = z.object({
+  title: z.string().trim().min(1, '제목을 입력해주세요').max(200, '제목은 200자 이하여야 합니다'),
+  body: z.string().max(5000, '본문은 5000자 이하여야 합니다').optional().default(''),
+});
+
+export const inboundCommentSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, '내용을 입력해주세요')
+    .max(2000, '댓글은 2000자 이하여야 합니다'),
+});
