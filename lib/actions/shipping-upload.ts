@@ -113,7 +113,12 @@ export async function requestShippingUploadAction(
     return { ok: false, error: `저장 실패: ${insErr.message}` };
   }
 
-  revalidatePaths(['/shipping-uploads', '/admin/shipping-uploads']);
+  revalidatePaths([
+    '/shipping-uploads',
+    '/shipping-uploads/exitmall',
+    '/admin/shipping-uploads',
+    '/admin/shipping-uploads/exitmall',
+  ]);
   return { ok: true, uploadId: row.id };
 }
 
@@ -132,6 +137,6 @@ export async function cancelShippingUploadAction(
     console.error('[shipping-upload] cancel', { uploadId, error });
     return { ok: false, error: '취소 처리에 실패했습니다.' };
   }
-  revalidatePaths(['/shipping-uploads']);
+  revalidatePaths(['/shipping-uploads', '/shipping-uploads/exitmall']);
   return { ok: true };
 }
