@@ -62,6 +62,79 @@ export function calculateTotalSpent(orders: AdminUserOrder[]): number {
     .reduce((sum, order) => sum + Number(order.total_amount), 0);
 }
 
+export type AdminUserStockOrderInput = {
+  id: string;
+  total_amount: number;
+  status: string;
+  items: Array<{ product_name: string; qty: number; subtotal: number }>;
+  created_at: string;
+};
+
+export type AdminUserShippingUploadInput = {
+  id: string;
+  original_name: string;
+  total_quantity: number;
+  shipping_fee_total: number;
+  status: string;
+  created_at: string;
+};
+
+export type AdminUserLegacyOrderInput = {
+  id: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+};
+
+export type AdminUserUnifiedOrder = {
+  id: string;
+  kind: 'stock_order' | 'shipping_upload' | 'legacy';
+  status: string;
+  amount: number;
+  summary: string;
+  created_at: string;
+};
+
+function summarizeStockItems(items: AdminUserStockOrderInput['items']): string {
+  if (items.length === 0) return '(빈 주문)';
+  if (items.length === 1) return `${items[0]!.product_name} × ${items[0]!.qty}`;
+  return `${items[0]!.product_name} 외 ${items.length - 1}건`;
+}
+
+export function mergeUserOrders(input: {
+  stock: AdminUserStockOrderInput[];
+  shipping: AdminUserShippingUploadInput[];
+  legacy: AdminUserLegacyOrderInput[];
+}): AdminUserUnifiedOrder[] {
+  const stock = input.stock.map<AdminUserUnifiedOrder>((o) => ({
+    id: o.id,
+    kind: 'stock_order',
+    status: o.status,
+    amount: Number(o.total_amount),
+    summary: summarizeStockItems(o.items),
+    created_at: o.created_at,
+  }));
+  const shipping = input.shipping.map<AdminUserUnifiedOrder>((u) => ({
+    id: u.id,
+    kind: 'shipping_upload',
+    status: u.status,
+    amount: Number(u.shipping_fee_total),
+    summary: `${u.original_name} · ${u.total_quantity}개`,
+    created_at: u.created_at,
+  }));
+  const legacy = input.legacy.map<AdminUserUnifiedOrder>((o) => ({
+    id: o.id,
+    kind: 'legacy',
+    status: o.status,
+    amount: Number(o.total_amount),
+    summary: `주문번호 ${o.id.slice(0, 8)}`,
+    created_at: o.created_at,
+  }));
+  return [...stock, ...shipping, ...legacy].sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+  );
+}
+
 export function isPositiveTransaction(tx: Pick<AdminUserBalanceTx, 'amount'>): boolean {
   return Number(tx.amount) >= 0;
 }
