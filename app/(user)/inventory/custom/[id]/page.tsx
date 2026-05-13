@@ -1,14 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowDown, ArrowUp, Wrench } from 'lucide-react';
+import { ArrowLeft, ArrowDown, ArrowUp, Wrench, Trash2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 const SOURCE_LABEL: Record<string, string> = {
-  stock_order_approved: '재고 적립 승인',
-  shipping_upload_approved: '배송대행 승인',
   admin_adjust: '관리자 조정',
+  admin_delete: '관리자 삭제',
+  shipping_upload_approved: '배송대행 승인',
 };
 
 type Movement = {
@@ -19,10 +19,10 @@ type Movement = {
   created_at: string;
 };
 
-export default async function InventoryProductTimeline({
+export default async function CustomInventoryTimeline({
   params,
 }: {
-  params: { productId: string };
+  params: { id: string };
 }) {
   const supabase = createClient();
   const {
@@ -30,30 +30,23 @@ export default async function InventoryProductTimeline({
   } = await supabase.auth.getUser();
   if (!user) return <p className="text-sm text-muted-foreground">로그인이 필요합니다.</p>;
 
-  const { data: product } = await supabase
-    .from('products')
-    .select('id, name')
-    .eq('id', params.productId)
-    .single<{ id: string; name: string }>();
-  if (!product) notFound();
-
-  const { data: invRow } = await supabase
-    .from('user_inventory')
-    .select('quantity')
+  const { data: row } = await supabase
+    .from('user_custom_inventory')
+    .select('id, name, quantity')
+    .eq('id', params.id)
     .eq('user_id', user.id)
-    .eq('product_id', params.productId)
-    .maybeSingle();
+    .maybeSingle<{ id: string; name: string; quantity: number }>();
+  if (!row) notFound();
 
   const { data: movRaw } = await supabase
-    .from('inventory_movements')
+    .from('custom_inventory_movements')
     .select('id, delta, source_type, source_id, created_at')
     .eq('user_id', user.id)
-    .eq('product_id', params.productId)
+    .eq('custom_inventory_id', params.id)
     .order('created_at', { ascending: false })
     .limit(200);
 
   const movements = (movRaw ?? []) as Movement[];
-  const currentQty = (invRow as { quantity: number } | null)?.quantity ?? 0;
 
   return (
     <div className="space-y-5">
@@ -66,9 +59,14 @@ export default async function InventoryProductTimeline({
       </Link>
 
       <header className="pb-4 border-b">
-        <h1 className="font-heading font-semibold text-2xl tracking-tight">{product.name}</h1>
+        <h1 className="font-heading font-semibold text-2xl tracking-tight">
+          {row.name}{' '}
+          <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
+            수기
+          </span>
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          현재 보유: <span className="font-mono tabular text-foreground">{currentQty}</span>개
+          현재 보유: <span className="font-mono tabular text-foreground">{row.quantity}</span>개
         </p>
       </header>
 
@@ -78,7 +76,13 @@ export default async function InventoryProductTimeline({
         <ul className="rounded-lg border bg-card divide-y">
           {movements.map((m) => {
             const Icon =
-              m.source_type === 'admin_adjust' ? Wrench : m.delta > 0 ? ArrowUp : ArrowDown;
+              m.source_type === 'admin_delete'
+                ? Trash2
+                : m.source_type === 'admin_adjust'
+                  ? Wrench
+                  : m.delta > 0
+                    ? ArrowUp
+                    : ArrowDown;
             const cls = m.delta > 0 ? 'text-success' : 'text-destructive';
             return (
               <li key={m.id} className="p-4 flex items-center gap-3">

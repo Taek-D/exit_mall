@@ -30,6 +30,13 @@ export function mapShippingUploadError(message: string): string {
     const parts = message.split(':');
     return `배송비가 행수×₩3,300 과 다릅니다 (예상 ${parts[1]}, 저장값 ${parts[2]}). 반려 후 다시 업로드 받아주세요.`;
   }
+  if (message.startsWith('INVALID_FEE')) {
+    const parts = message.split(':');
+    return `배송비가 행수×₩3,300 과 다릅니다 (저장값 ${parts[1]}, 예상 ${parts[2]}). 반려 후 다시 업로드 받아주세요.`;
+  }
+  if (message.startsWith('INVALID_ITEM_BOTH_IDS')) {
+    return '주문 항목에 product_id 와 custom_inventory_id 가 동시에 채워진 행이 있습니다 (조작 의심). 반려 후 다시 업로드 받아주세요.';
+  }
   if (message.startsWith('PRODUCT_MISMATCH')) {
     const parts = message.split(':');
     return `상품 ID 와 상품명이 일치하지 않는 행이 있습니다 (입력 상품명 ${parts[2]}, 실제 상품명 ${parts[3] ?? '?'}). 반려 후 새 양식으로 다시 업로드 받아주세요.`;

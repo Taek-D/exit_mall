@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-parser';
 import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { matchInventoryRefs } from '@/lib/shipping-match';
 import type { Json } from '@/lib/db-types';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -42,40 +43,47 @@ export async function requestShippingUploadAction(
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
 
-  // 상품명(=products.name) 매칭 — 업로드 시점에 product_id 캡처해 결정적으로 고정.
-  // product_code 키는 기존 order_uploads.items JSON 호환을 위해 유지한다.
+  // 2단계 매칭: products.name 우선 → user_custom_inventory.name fallback.
+  // products 우선 정책 — 같은 이름이 양쪽에 있으면 항상 products 가 이긴다.
   const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
-  const { data: productRows } = await supabase
-    .from('products')
-    .select('id, name')
-    .in('name', productNames);
-  const productList = (productRows ?? []) as Array<{ id: string; name: string }>;
-  const productByName = new Map<string, string>();
-  const duplicates: string[] = [];
-  for (const p of productList) {
-    if (productByName.has(p.name)) {
-      if (!duplicates.includes(p.name)) duplicates.push(p.name);
-    } else {
-      productByName.set(p.name, p.id);
+  const [{ data: productRows }, { data: customRows }] = await Promise.all([
+    supabase.from('products').select('id, name').in('name', productNames),
+    supabase
+      .from('user_custom_inventory')
+      .select('id, name')
+      .eq('user_id', u.user.id)
+      .in('name', productNames),
+  ]);
+
+  const match = matchInventoryRefs(
+    productNames,
+    (productRows ?? []) as Array<{ id: string; name: string }>,
+    (customRows ?? []) as Array<{ id: string; name: string }>,
+  );
+  if (!match.ok) {
+    if (match.duplicates.length > 0) {
+      const shown = match.duplicates.slice(0, 3).join(', ');
+      const more = match.duplicates.length > 3 ? ' …' : '';
+      return {
+        ok: false,
+        error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${shown}${more}`,
+      };
     }
-  }
-  if (duplicates.length > 0) {
+    const shown = match.unknown.slice(0, 3).join(', ');
+    const more = match.unknown.length > 3 ? ' …' : '';
     return {
       ok: false,
-      error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? ' …' : ''}`,
+      error: `존재하지 않는 상품명이 있습니다: ${shown}${more}`,
     };
   }
-  const unknown = productNames.filter((name) => !productByName.has(name));
-  if (unknown.length > 0) {
-    return {
-      ok: false,
-      error: `존재하지 않는 상품명이 있습니다: ${unknown.slice(0, 3).join(', ')}${unknown.length > 3 ? ' …' : ''}`,
-    };
-  }
-  const itemsWithProductId = parsed.items.map((it) => ({
-    ...it,
-    product_id: productByName.get(it.product_code)!,
-  }));
+
+  const itemsWithRef = parsed.items.map((it) => {
+    const ref = match.refs.get(it.product_code)!;
+    if (ref.kind === 'product') {
+      return { ...it, product_id: ref.id };
+    }
+    return { ...it, custom_inventory_id: ref.id };
+  });
 
   // Storage 업로드
   const safeName = file.name.replace(/[^\w가-힣\.\-]+/g, '_');
@@ -99,7 +107,7 @@ export async function requestShippingUploadAction(
       contact_person: parsed.uploader_company,
       buyer_phone: parsed.uploader_phone,
       request_memo: parsed.request_memo,
-      items: itemsWithProductId as Json,
+      items: itemsWithRef as Json,
       total_quantity: parsed.total_quantity,
       total_amount: 0,
       shipping_fee_total: fee,

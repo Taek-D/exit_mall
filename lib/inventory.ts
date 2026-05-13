@@ -1,16 +1,20 @@
+export type InventoryKey =
+  | { kind: 'product'; product_id: string }
+  | { kind: 'custom'; custom_inventory_id: string };
+
 export type InventoryRow = {
-  product_id: string;
+  key: InventoryKey;
   product_name: string;
   quantity: number;
 };
 
 export type PendingShippingRow = {
-  product_id: string;
+  key: InventoryKey;
   quantity: number;
 };
 
 export type AvailableInventoryRow = {
-  product_id: string;
+  key: InventoryKey;
   product_name: string;
   quantity: number;
   reserved: number;
@@ -34,25 +38,31 @@ export type AvailableDeposit = {
   available: number;
 };
 
+function keyToString(k: InventoryKey): string {
+  return k.kind === 'product' ? `p:${k.product_id}` : `c:${k.custom_inventory_id}`;
+}
+
 export function computeAvailableInventory(
   inventory: InventoryRow[],
   pendingShipments: PendingShippingRow[],
 ): AvailableInventoryRow[] {
-  const reservedByProduct = new Map<string, number>();
+  const reservedByKey = new Map<string, number>();
   for (const r of pendingShipments) {
-    reservedByProduct.set(
-      r.product_id,
-      (reservedByProduct.get(r.product_id) ?? 0) + r.quantity,
-    );
+    const k = keyToString(r.key);
+    reservedByKey.set(k, (reservedByKey.get(k) ?? 0) + r.quantity);
   }
 
   const seen = new Set<string>();
+  const keyByString = new Map<string, InventoryKey>();
+  for (const r of pendingShipments) keyByString.set(keyToString(r.key), r.key);
+
   const result: AvailableInventoryRow[] = [];
   for (const inv of inventory) {
-    seen.add(inv.product_id);
-    const reserved = reservedByProduct.get(inv.product_id) ?? 0;
+    const k = keyToString(inv.key);
+    seen.add(k);
+    const reserved = reservedByKey.get(k) ?? 0;
     result.push({
-      product_id: inv.product_id,
+      key: inv.key,
       product_name: inv.product_name,
       quantity: inv.quantity,
       reserved,
@@ -60,10 +70,10 @@ export function computeAvailableInventory(
     });
   }
   // pending 만 있고 보유 0인 상품도 노출 (음수 가용 → 검토대기를 다 처리할 수 없음을 시각화)
-  for (const [pid, reserved] of reservedByProduct) {
-    if (seen.has(pid)) continue;
+  for (const [k, reserved] of reservedByKey) {
+    if (seen.has(k)) continue;
     result.push({
-      product_id: pid,
+      key: keyByString.get(k)!,
       product_name: '(알 수 없는 상품)',
       quantity: 0,
       reserved,
