@@ -19,7 +19,7 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const allowRemoteSupabase = process.env.E2E_ALLOW_REMOTE_SUPABASE === '1';
 const canSeed =
   Boolean(supabaseUrl && serviceKey) &&
-  (allowRemoteSupabase || Boolean(supabaseUrl && /^https?:\/\/(127\.0\.0\.1|localhost)/.test(supabaseUrl)));
+  (allowRemoteSupabase || Boolean(supabaseUrl && isLocalSupabaseUrl(supabaseUrl)));
 
 let seed: QaSeed;
 let adminClient: SupabaseClient<Database>;
@@ -150,6 +150,15 @@ async function createQaSeed(supabase: SupabaseClient<Database>): Promise<QaSeed>
 function buildE2eCredential(runId: number) {
   const token = randomUUID().replaceAll('-', '').slice(0, 18);
   return `E2E-${runId}-${token}!Aa1`;
+}
+
+function isLocalSupabaseUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
 }
 
 async function createUserWithProfile(
