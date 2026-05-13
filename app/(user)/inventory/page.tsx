@@ -4,6 +4,7 @@ import {
   computeAvailableInventory,
   type InventoryRow,
   type PendingShippingRow,
+  type InventoryKey,
 } from '@/lib/inventory';
 import { Boxes, Inbox } from 'lucide-react';
 
@@ -15,9 +16,29 @@ type InvJoin = {
   products: { name: string } | null;
 };
 
-type ShippingPendingItem = {
-  items: Array<{ product_id?: string; product_code?: string; quantity?: number }>;
+type CustomInvRow = {
+  id: string;
+  name: string;
+  quantity: number;
 };
+
+type ShippingPendingItem = {
+  items: Array<{
+    product_id?: string;
+    custom_inventory_id?: string;
+    quantity?: number;
+  }>;
+};
+
+function keyHref(k: InventoryKey): string {
+  return k.kind === 'product'
+    ? `/inventory/product/${k.product_id}`
+    : `/inventory/custom/${k.custom_inventory_id}`;
+}
+
+function keyToReactKey(k: InventoryKey): string {
+  return k.kind === 'product' ? `p:${k.product_id}` : `c:${k.custom_inventory_id}`;
+}
 
 export default async function InventoryPage() {
   const supabase = createClient();
@@ -28,30 +49,52 @@ export default async function InventoryPage() {
     return <p className="text-sm text-muted-foreground">로그인이 필요합니다.</p>;
   }
 
-  const { data: invRaw } = await supabase
-    .from('user_inventory')
-    .select('product_id, quantity, products(name)')
-    .eq('user_id', user.id)
-    .gt('quantity', 0);
-  const inventory: InventoryRow[] = ((invRaw ?? []) as unknown as InvJoin[]).map((r) => ({
-    product_id: r.product_id,
-    product_name: r.products?.name ?? '(이름 없음)',
-    quantity: Number(r.quantity),
-  }));
+  const [{ data: invRaw }, { data: customInvRaw }, { data: pendingRaw }] = await Promise.all([
+    supabase
+      .from('user_inventory')
+      .select('product_id, quantity, products(name)')
+      .eq('user_id', user.id)
+      .gt('quantity', 0),
+    supabase
+      .from('user_custom_inventory')
+      .select('id, name, quantity')
+      .eq('user_id', user.id)
+      .gt('quantity', 0),
+    supabase
+      .from('order_uploads')
+      .select('items')
+      .eq('user_id', user.id)
+      .eq('status', 'pending'),
+  ]);
 
-  const { data: pendingRaw } = await supabase
-    .from('order_uploads')
-    .select('items')
-    .eq('user_id', user.id)
-    .eq('status', 'pending');
+  const inventory: InventoryRow[] = [
+    ...((invRaw ?? []) as unknown as InvJoin[]).map((r) => ({
+      key: { kind: 'product' as const, product_id: r.product_id },
+      product_name: r.products?.name ?? '(이름 없음)',
+      quantity: Number(r.quantity),
+    })),
+    ...((customInvRaw ?? []) as unknown as CustomInvRow[]).map((r) => ({
+      key: { kind: 'custom' as const, custom_inventory_id: r.id },
+      product_name: r.name,
+      quantity: Number(r.quantity),
+    })),
+  ];
 
-  // 신규 흐름은 server action 이 INSERT 시점에 product_id 를 캡처하므로
-  // 직접 사용. (옛 흐름의 product_code 매칭은 비결정적이라 제거)
   const pendingShipments: PendingShippingRow[] = [];
   for (const u of (pendingRaw ?? []) as unknown as ShippingPendingItem[]) {
     for (const it of u.items ?? []) {
-      if (!it.product_id) continue;
-      pendingShipments.push({ product_id: it.product_id, quantity: Number(it.quantity ?? 0) });
+      const qty = Number(it.quantity ?? 0);
+      if (it.product_id) {
+        pendingShipments.push({
+          key: { kind: 'product', product_id: it.product_id },
+          quantity: qty,
+        });
+      } else if (it.custom_inventory_id) {
+        pendingShipments.push({
+          key: { kind: 'custom', custom_inventory_id: it.custom_inventory_id },
+          quantity: qty,
+        });
+      }
     }
   }
 
@@ -95,11 +138,16 @@ export default async function InventoryPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.product_id} className="border-t">
+                <tr key={keyToReactKey(r.key)} className="border-t">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <Boxes className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      {r.product_name}
+                      <span>{r.product_name}</span>
+                      {r.key.kind === 'custom' && (
+                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          수기
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right font-mono tabular">{r.available}</td>
@@ -110,10 +158,7 @@ export default async function InventoryPage() {
                     {r.quantity}
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <Link
-                      href={`/inventory/${r.product_id}`}
-                      className="text-xs text-accent hover:underline"
-                    >
+                    <Link href={keyHref(r.key)} className="text-xs text-accent hover:underline">
                       변동 내역
                     </Link>
                   </td>
