@@ -22,6 +22,8 @@ export function InboundUnreadBadge({
     let cancelled = false;
 
     async function refresh() {
+      // browser supabase-js generic inference fails to match Functions overload;
+      // cast preserves runtime behavior. Mirrors lib/actions/_shared.ts callRpc helper.
       const { data, error } = await (supabase.rpc as any)('count_inbound_unread', {
         p_role: role,
       });

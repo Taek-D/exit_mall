@@ -30,7 +30,10 @@ function lower(s: string) {
 }
 
 function safeFilename(name: string) {
-  return name.replace(/[^\w가-힣\.\-]+/g, '_');
+  return name
+    .replace(/^\.+/, '')       // strip leading dots
+    .replace(/\.{2,}/g, '.')   // collapse runs of dots
+    .replace(/[^\w가-힣\.\-]+/g, '_');
 }
 
 export type SubmitResult =
@@ -165,7 +168,7 @@ export async function submitInboundRequestAction(fd: FormData): Promise<SubmitRe
     finalImagePaths.some((p, i) => p !== originalImagePaths[i]);
 
   if (renameHappened) {
-    const { error: upErr } = await (supabase.from as any)('inbound_requests')
+    const { error: upErr } = await mutationTable(supabase, 'inbound_requests')
       .update({ excel_storage_path: finalExcelPath, image_paths: finalImagePaths })
       .eq('id', requestId);
 
@@ -205,7 +208,7 @@ export async function submitInboundRequestAction(fd: FormData): Promise<SubmitRe
           const failed = rollbackResults.some((r) => !r.ok && r.from === p);
           return failed ? p : originalImagePaths[i];
         });
-        const { error: chaseErr } = await (supabase.from as any)('inbound_requests')
+        const { error: chaseErr } = await mutationTable(supabase, 'inbound_requests')
           .update({ excel_storage_path: chaseExcel, image_paths: chaseImages })
           .eq('id', requestId);
         if (chaseErr) console.error('[inbound] chase-update also failed; orphan possible', chaseErr);
@@ -312,7 +315,7 @@ export async function updateInboundCommentAction(
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
 
   // Fetch current comment to enforce 10-min edit window for non-admin authors.
-  const { data: row } = (await (supabase.from as any)('inbound_request_comments')
+  const { data: row } = (await supabase.from('inbound_request_comments')
     .select('author_id, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
@@ -349,7 +352,7 @@ export async function deleteInboundCommentAction(commentId: string): Promise<Act
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-  const { data: row } = (await (supabase.from as any)('inbound_request_comments')
+  const { data: row } = (await supabase.from('inbound_request_comments')
     .select('author_id, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
@@ -390,7 +393,7 @@ export async function getInboundAttachmentUrlAction(
   const supabase = createClient();
   // Authorize: verify the path is referenced by a request the caller can read (RLS handles this).
   type InboundReqRow = { id: string; excel_storage_path: string; image_paths: string[] | null };
-  const { data: req } = (await (supabase.from as any)('inbound_requests')
+  const { data: req } = (await supabase.from('inbound_requests')
     .select('id, excel_storage_path, image_paths')
     .eq('id', requestId)
     .maybeSingle()) as { data: InboundReqRow | null; error: unknown };
@@ -413,7 +416,7 @@ export async function deleteInboundRequestAction(requestId: string): Promise<Act
   const supabase = createClient();
   // Fetch storage paths before delete so we can clean up after.
   type InboundStorageRow = { excel_storage_path: string; image_paths: string[] | null };
-  const { data: row } = (await (supabase.from as any)('inbound_requests')
+  const { data: row } = (await supabase.from('inbound_requests')
     .select('excel_storage_path, image_paths')
     .eq('id', requestId)
     .maybeSingle()) as { data: InboundStorageRow | null; error: unknown };

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { callRpc } from '@/lib/actions/_shared';
 import type { InboundStatus } from '@/lib/types';
 
 export type InboundListRow = {
@@ -48,7 +49,7 @@ export type InboundCommentRow = {
 
 export async function fetchMyInboundRequests(limit = 50): Promise<InboundListRow[]> {
   const supabase = createClient();
-  const { data, error } = await (supabase.from as any)('inbound_requests')
+  const { data, error } = await supabase.from('inbound_requests')
     .select(
       'id,user_id,title,status,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
     )
@@ -66,7 +67,7 @@ export async function fetchAllInboundRequests(
   limit = 100,
 ): Promise<InboundListRow[]> {
   const supabase = createClient();
-  let q = (supabase.from as any)('inbound_requests')
+  let q = supabase.from('inbound_requests')
     .select(
       'id,user_id,title,status,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at,profiles!inbound_requests_user_id_fkey(name)',
     )
@@ -90,21 +91,30 @@ export async function fetchInboundRequest(id: string): Promise<{
 }> {
   const supabase = createClient();
   const [{ data: r }, { data: cs }] = await Promise.all([
-    (supabase.from as any)('inbound_requests').select('*').eq('id', id).maybeSingle(),
-    (supabase.from as any)('inbound_request_comments')
-      .select('*')
+    supabase
+      .from('inbound_requests')
+      .select(
+        'id,user_id,title,body,status,excel_storage_path,excel_original_name,image_paths,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
+      )
+      .eq('id', id)
+      .maybeSingle(),
+    supabase
+      .from('inbound_request_comments')
+      .select(
+        'id,request_id,author_id,author_role,body,created_at,updated_at,deleted_at',
+      )
       .eq('request_id', id)
       .order('created_at', { ascending: true }),
   ]);
   return {
-    request: (r as InboundRequestDetail) ?? null,
-    comments: (cs ?? []) as InboundCommentRow[],
+    request: (r as unknown as InboundRequestDetail) ?? null,
+    comments: (cs ?? []) as unknown as InboundCommentRow[],
   };
 }
 
 export async function fetchUnreadCount(role: 'user' | 'admin'): Promise<number> {
   const supabase = createClient();
-  const { data, error } = await (supabase.rpc as any)('count_inbound_unread', {
+  const { data, error } = await callRpc(supabase, 'count_inbound_unread', {
     p_role: role,
   });
   if (error || data == null) {
