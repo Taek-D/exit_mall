@@ -40,7 +40,10 @@ export type SubmitResult =
   | { ok: true; requestId: string }
   | { ok: false; error: string };
 
-export async function submitInboundRequestAction(fd: FormData): Promise<SubmitResult> {
+export async function submitInboundRequestAction(
+  _prevState: SubmitResult | null,
+  fd: FormData,
+): Promise<SubmitResult> {
   const supabase = createClient();
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };

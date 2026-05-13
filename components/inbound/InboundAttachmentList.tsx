@@ -41,7 +41,6 @@ export async function InboundAttachmentList({
       ) : (
         <div
           role="alert"
-          aria-disabled="true"
           className="inline-flex items-center gap-2 h-9 px-3 rounded-md border bg-muted text-sm text-muted-foreground cursor-not-allowed"
           title="다운로드 링크를 발급할 수 없습니다. 잠시 후 새로고침 하세요."
         >
