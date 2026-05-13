@@ -23,6 +23,7 @@ import type {
 } from '@/lib/types';
 import { ArrowLeft, TrendingDown, TrendingUp, Boxes } from 'lucide-react';
 import { InventoryAdjuster } from './InventoryAdjuster';
+import { CustomInventoryManager } from './CustomInventoryManager';
 import { formatDateTimeKR } from '@/lib/dates';
 import {
   fetchAdminUserDetail,
@@ -54,6 +55,7 @@ export default async function AdminUserDetailPage({
     deposits,
     transactions,
     inventory,
+    customInventory,
     products,
     totalSpent,
   } = detail;
@@ -107,17 +109,30 @@ export default async function AdminUserDetailPage({
           <h2 className="font-heading font-semibold text-sm">보유 재고</h2>
         </header>
         <ul className="p-5 space-y-2 text-sm">
-          {inventory.length === 0 && <li className="text-muted-foreground">보유 재고가 없습니다.</li>}
+          {inventory.length === 0 && customInventory.length === 0 && (
+            <li className="text-muted-foreground">보유 재고가 없습니다.</li>
+          )}
           {inventory.map((row) => (
-            <li key={row.product_id} className="flex justify-between">
+            <li key={`p-${row.product_id}`} className="flex justify-between">
               <span>{getInventoryProductName(row)}</span>
               <span className="font-mono tabular">{row.quantity}</span>
             </li>
           ))}
+          {customInventory
+            .filter((row) => row.quantity > 0)
+            .map((row) => (
+              <li key={`c-${row.id}`} className="flex justify-between">
+                <span>
+                  {row.name} <span className="text-xs text-muted-foreground">(수기)</span>
+                </span>
+                <span className="font-mono tabular">{row.quantity}</span>
+              </li>
+            ))}
         </ul>
       </section>
 
       <InventoryAdjuster userId={user.id} products={products} />
+      <CustomInventoryManager userId={user.id} rows={customInventory} />
 
       <Tabs defaultValue="orders" className="space-y-3">
         <TabsList>
