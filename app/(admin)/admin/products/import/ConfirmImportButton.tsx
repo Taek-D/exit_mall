@@ -33,7 +33,7 @@ export function ConfirmImportButton({
             }
             toast({
               title: '상품 엑셀 적용 완료',
-              description: `신규 ${result.created}개, 덮어쓰기 ${result.updated}개`,
+              description: `신규 ${result.created}개, 덮어쓰기 ${result.updated}개, 복구 ${result.restored}개`,
             });
             router.refresh();
           })

@@ -29,6 +29,7 @@ export default async function ShopPage() {
       .from('products')
       .select('id, name, description, price, stock, image_url, per_user_limit')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false }),
     user
       ? supabase

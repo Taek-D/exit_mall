@@ -20,7 +20,7 @@ export type CreateProductImportPreviewResult =
   | { ok: false; error: string };
 
 export type ConfirmProductImportResult =
-  | { ok: true; created: number; updated: number; warnings: string[] }
+  | { ok: true; created: number; updated: number; restored: number; warnings: string[] }
   | { ok: false; error: string };
 
 type ProductImportRecord = {
@@ -125,7 +125,7 @@ export async function createProductImportPreviewAction(
 
   const { data: products, error: productError } = await guard.supabase
     .from('products')
-    .select('id,name,import_key,description,image_url,is_active,stock,per_user_limit');
+    .select('id,name,import_key,description,image_url,is_active,deleted_at,stock,per_user_limit');
   if (productError) {
     console.error('[admin-product-imports] products lookup', productError);
     return { ok: false, error: '기존 상품 목록을 불러오지 못했습니다.' };
@@ -279,10 +279,11 @@ export async function confirmProductImportAction(
     return { ok: false, error: productImportError(applyError.message) };
   }
 
-  const result = (resultData ?? {}) as { created?: number; updated?: number };
+  const result = (resultData ?? {}) as { created?: number; updated?: number; restored?: number };
   const created = Number(result.created ?? 0);
   const updated = Number(result.updated ?? 0);
-  const finalResult = { created, updated, warnings };
+  const restored = Number(result.restored ?? 0);
+  const finalResult = { created, updated, restored, warnings };
 
   const { error: updateError } = await mutationTable(guard.supabase, 'product_imports')
     .update({
@@ -299,5 +300,5 @@ export async function confirmProductImportAction(
   }
 
   revalidatePaths(['/admin/products', '/admin/products/import', '/shop']);
-  return { ok: true, created, updated, warnings };
+  return { ok: true, created, updated, restored, warnings };
 }

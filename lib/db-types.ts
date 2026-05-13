@@ -579,6 +579,8 @@ export type Database = {
           brand: string | null
           category: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           description: string
           id: string
           image_url: string | null
@@ -597,6 +599,8 @@ export type Database = {
           brand?: string | null
           category?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string
           id?: string
           image_url?: string | null
@@ -615,6 +619,8 @@ export type Database = {
           brand?: string | null
           category?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string
           id?: string
           image_url?: string | null
@@ -628,7 +634,15 @@ export type Database = {
           price?: number
           stock?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

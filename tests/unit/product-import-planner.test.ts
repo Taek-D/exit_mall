@@ -65,6 +65,45 @@ describe('planProductImportRows', () => {
     expect(preview.summary).toMatchObject({ create: 0, update: 1, error: 0 });
   });
 
+  it('restores deleted products by import_key', () => {
+    const existing: ExistingImportProduct[] = [
+      {
+        id: 'p1',
+        name: '삭제된 상품 / 단일',
+        import_key: normalizeImportKey('복구 상품 / 단일'),
+        deleted_at: '2026-05-13T00:00:00.000Z',
+      },
+    ];
+
+    const preview = planProductImportRows([row(2, '복구 상품 / 단일')], existing);
+
+    expect(preview.rows[0]).toMatchObject({
+      action: 'restore',
+      existingProductId: 'p1',
+      existingProductName: '삭제된 상품 / 단일',
+    });
+    expect(preview.summary).toMatchObject({ create: 0, update: 0, restore: 1, error: 0 });
+  });
+
+  it('restores deleted products by exact name when import_key is not present', () => {
+    const existing: ExistingImportProduct[] = [
+      {
+        id: 'p1',
+        name: '복구 상품 / 단일',
+        import_key: null,
+        deleted_at: '2026-05-13T00:00:00.000Z',
+      },
+    ];
+
+    const preview = planProductImportRows([row(2, '복구 상품 / 단일')], existing);
+
+    expect(preview.rows[0]).toMatchObject({
+      action: 'restore',
+      existingProductId: 'p1',
+    });
+    expect(preview.summary.restore).toBe(1);
+  });
+
   it('falls back to exact product name when import_key is not present', () => {
     const existing: ExistingImportProduct[] = [
       { id: 'p1', name: '상품 / 옵션', import_key: null },

@@ -26,6 +26,7 @@ export default async function EditProductPage({ params }: { params: { id: string
     .from('products')
     .select('*')
     .eq('id', params.id)
+    .is('deleted_at', null)
     .single<Product>();
   if (!p) notFound();
 

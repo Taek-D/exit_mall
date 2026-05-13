@@ -26,6 +26,7 @@ type ImportRecord = {
 type ImportResult = {
   created: number;
   updated: number;
+  restored: number;
   warnings: string[];
 };
 
@@ -42,12 +43,14 @@ function readResult(value: Json | null): ImportResult | null {
   return {
     created: Number(result.created ?? 0),
     updated: Number(result.updated ?? 0),
+    restored: Number(result.restored ?? 0),
     warnings: Array.isArray(result.warnings) ? result.warnings.map(String) : [],
   };
 }
 
 function actionPill(row: PlannedProductImportRow) {
   if (row.action === 'error') return <StatusPill tone="danger">오류</StatusPill>;
+  if (row.action === 'restore') return <StatusPill tone="success">복구</StatusPill>;
   if (row.action === 'update') return <StatusPill tone="warning">덮어쓰기</StatusPill>;
   return <StatusPill tone="info">신규</StatusPill>;
 }
@@ -137,10 +140,11 @@ export default async function ProductImportPage({
               )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
               <SummaryBox label="전체" value={preview.summary.total} />
               <SummaryBox label="신규" value={preview.summary.create} />
               <SummaryBox label="덮어쓰기" value={preview.summary.update} />
+              <SummaryBox label="복구" value={preview.summary.restore ?? 0} />
               <SummaryBox label="오류" value={preview.summary.error} tone={hasErrors ? 'danger' : undefined} />
               <SummaryBox label="경고 행" value={preview.summary.warningRows} />
             </div>
@@ -156,7 +160,7 @@ export default async function ProductImportPage({
               <div className="flex items-start gap-2 rounded-md border border-success/20 bg-success/5 p-3 text-sm text-success">
                 <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
                 <p>
-                  적용 완료: 신규 {result.created}개, 덮어쓰기 {result.updated}개
+                  적용 완료: 신규 {result.created}개, 덮어쓰기 {result.updated}개, 복구 {result.restored}개
                   {importRecord.imported_at
                     ? ` (${new Date(importRecord.imported_at).toLocaleString('ko-KR')})`
                     : ''}

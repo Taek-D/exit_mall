@@ -61,7 +61,7 @@ export async function updateProductAction(id: string, fd: FormData) {
     management_code: parsed.data.managementCode, category: parsed.data.category,
     barcode: parsed.data.barcode,
     per_user_limit: parsed.data.perUserLimit,
-  }).eq('id', id);
+  }).eq('id', id).is('deleted_at', null);
   if (error) {
     console.error('[admin-products] update', { id, error });
     return { error: '상품을 수정하지 못했습니다.' };
@@ -73,11 +73,36 @@ export async function updateProductAction(id: string, fd: FormData) {
 export async function deleteProductAction(id: string) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
-  const { error } = await guard.supabase.from('products').delete().eq('id', id);
+  const { error } = await mutationTable(guard.supabase, 'products')
+    .update({
+      is_active: false,
+      deleted_at: new Date().toISOString(),
+      deleted_by: guard.user.id,
+    })
+    .eq('id', id)
+    .is('deleted_at', null);
   if (error) {
     console.error('[admin-products] delete', { id, error });
     return { error: '상품을 삭제하지 못했습니다.' };
   }
-  revalidatePaths(['/admin/products']);
+  revalidatePaths(['/admin/products', '/shop']);
+  return { ok: true };
+}
+
+export async function restoreProductAction(id: string) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  const { error } = await mutationTable(guard.supabase, 'products')
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+    })
+    .eq('id', id)
+    .not('deleted_at', 'is', null);
+  if (error) {
+    console.error('[admin-products] restore', { id, error });
+    return { error: '상품을 복구하지 못했습니다.' };
+  }
+  revalidatePaths(['/admin/products', '/shop']);
   return { ok: true };
 }

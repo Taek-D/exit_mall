@@ -190,7 +190,12 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .select('product_id, quantity, products(name)')
       .eq('user_id', userId)
       .gt('quantity', 0),
-    supabase.from('products').select('id, name').eq('is_active', true).order('name'),
+    supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .order('name'),
     supabase
       .from('user_custom_inventory')
       .select('id, name, quantity, updated_at')

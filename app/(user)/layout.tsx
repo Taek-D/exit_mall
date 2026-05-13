@@ -31,7 +31,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   if (!profile) redirect('/login');
 
   const [{ data: products }, { data: purchased }, inboundUnread] = await Promise.all([
-    supabase.from('products').select('id,per_user_limit'),
+    supabase.from('products').select('id,per_user_limit').is('deleted_at', null),
     supabase
       .from('order_items')
       .select('product_id, quantity, orders!inner(user_id, status)')

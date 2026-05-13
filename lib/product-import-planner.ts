@@ -7,11 +7,12 @@ export type ExistingImportProduct = {
   description?: string | null;
   image_url?: string | null;
   is_active?: boolean;
+  deleted_at?: string | null;
   stock?: number;
   per_user_limit?: number | null;
 };
 
-export type ProductImportAction = 'create' | 'update' | 'error';
+export type ProductImportAction = 'create' | 'update' | 'restore' | 'error';
 
 export type PlannedProductImportRow = {
   rowNumber: number;
@@ -37,6 +38,7 @@ export type ProductImportPreviewSummary = {
   total: number;
   create: number;
   update: number;
+  restore: number;
   error: number;
   warningRows: number;
 };
@@ -87,7 +89,13 @@ export function planProductImportRows(
     }
 
     const action: ProductImportAction =
-      errors.length > 0 ? 'error' : existing ? 'update' : 'create';
+      errors.length > 0
+        ? 'error'
+        : existing?.deleted_at
+          ? 'restore'
+          : existing
+            ? 'update'
+            : 'create';
 
     return {
       rowNumber: row.rowNumber,
@@ -116,6 +124,7 @@ export function planProductImportRows(
       total: rows.length,
       create: rows.filter((row) => row.action === 'create').length,
       update: rows.filter((row) => row.action === 'update').length,
+      restore: rows.filter((row) => row.action === 'restore').length,
       error: rows.filter((row) => row.action === 'error').length,
       warningRows: rows.filter((row) => row.warnings.length > 0).length,
     },
