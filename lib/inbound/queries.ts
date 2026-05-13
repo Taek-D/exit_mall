@@ -62,27 +62,50 @@ export async function fetchMyInboundRequests(limit = 50): Promise<InboundListRow
   return (data ?? []) as InboundListRow[];
 }
 
+type SearchInboundRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  status: string;
+  last_comment_at: string | null;
+  last_comment_by_role: 'user' | 'admin' | null;
+  user_last_read_at: string | null;
+  admin_last_read_at: string | null;
+  created_at: string;
+  updated_at: string;
+  profile_name: string;
+  profile_email: string;
+};
+
 export async function fetchAllInboundRequests(
   status: InboundStatus | 'all' = 'all',
   limit = 100,
+  search?: string,
 ): Promise<InboundListRow[]> {
   const supabase = createClient();
-  let q = supabase.from('inbound_requests')
-    .select(
-      'id,user_id,title,status,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at,profiles!inbound_requests_user_id_fkey(name)',
-    )
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (status !== 'all') q = q.eq('status', status);
-  const { data, error } = await q;
+  const { data, error } = await callRpc(supabase, 'search_inbound_requests', {
+    p_q: search?.trim() || null,
+    p_status: status === 'all' ? null : status,
+    p_limit: limit,
+  });
   if (error) {
     console.error('[inbound] fetchAllInboundRequests', error);
     return [];
   }
-  return (data ?? []).map((row: any) => ({
-    ...row,
-    profile: row.profiles ?? null,
-  })) as InboundListRow[];
+  const rows = (data ?? []) as SearchInboundRow[];
+  return rows.map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    title: row.title,
+    status: row.status as InboundStatus,
+    last_comment_at: row.last_comment_at,
+    last_comment_by_role: row.last_comment_by_role,
+    user_last_read_at: row.user_last_read_at,
+    admin_last_read_at: row.admin_last_read_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    profile: { name: row.profile_name },
+  }));
 }
 
 export async function fetchInboundRequest(id: string): Promise<{

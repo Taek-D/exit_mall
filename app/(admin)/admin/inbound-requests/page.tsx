@@ -19,12 +19,21 @@ const TABS: { value: InboundStatus | 'all'; label: string }[] = [
 export default async function AdminInboundRequestsPage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: { status?: string; q?: string };
 }) {
   const raw = searchParams.status;
   const status: InboundStatus | 'all' =
     raw && TABS.some((t) => t.value === raw) ? (raw as InboundStatus | 'all') : 'all';
-  const rows = await fetchAllInboundRequests(status, 200);
+  const q = searchParams.q?.trim() ?? '';
+  const rows = await fetchAllInboundRequests(status, 200, q || undefined);
+
+  function tabHref(value: InboundStatus | 'all') {
+    const params = new URLSearchParams();
+    if (value !== 'all') params.set('status', value);
+    if (q) params.set('q', q);
+    const query = params.toString();
+    return query ? `/admin/inbound-requests?${query}` : '/admin/inbound-requests';
+  }
 
   return (
     <div className="space-y-6">
@@ -35,15 +44,29 @@ export default async function AdminInboundRequestsPage({
         </p>
       </header>
 
+      <form method="GET" className="flex gap-2 max-w-md">
+        {status !== 'all' && <input type="hidden" name="status" value={status} />}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="작성자 이름·이메일로 검색"
+          className="flex-1 h-9 rounded-md border bg-background px-3 text-sm"
+          aria-label="작성자 검색"
+        />
+        <button
+          type="submit"
+          className="h-9 px-3 rounded-md border bg-background text-sm hover:bg-muted transition-colors"
+        >
+          검색
+        </button>
+      </form>
+
       <nav className="flex gap-1 border-b">
         {TABS.map((t) => (
           <Link
             key={t.value}
-            href={
-              t.value === 'all'
-                ? '/admin/inbound-requests'
-                : `/admin/inbound-requests?status=${t.value}`
-            }
+            href={tabHref(t.value)}
             className={cn(
               'px-3 h-9 inline-flex items-center text-sm border-b-2 transition-colors',
               status === t.value
