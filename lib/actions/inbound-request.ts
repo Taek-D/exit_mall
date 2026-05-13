@@ -103,28 +103,41 @@ export async function submitInboundRequestAction(fd: FormData): Promise<SubmitRe
     imagePaths.push(imgPath);
   }
 
-  const { data: row, error: insErr } = await mutationTable(supabase, 'inbound_requests')
-    .insert({
-      user_id: u.user.id,
-      title: parsed.data.title,
-      body: parsed.data.body,
-      status: 'open',
-      excel_storage_path: excelPath,
-      excel_original_name: excel.name,
-      image_paths: imagePaths,
-    })
-    .select('id')
-    .single();
-  if (insErr || !row) {
+  // Insert via RPC for atomic rate-limit + RLS chokepoint.
+  // Direct `.from(...).insert(...)` is blocked by RLS (requires app.inbound_rpc=true).
+  const { data: newId, error: rpcErr } = await callRpc(supabase, 'submit_inbound_request_rpc', {
+    p_title: parsed.data.title,
+    p_body: parsed.data.body,
+    p_excel_path: excelPath,
+    p_excel_name: excel.name,
+    p_image_paths: imagePaths,
+  });
+  if (rpcErr || !newId) {
     await supabase.storage.from('inbound-requests').remove([excelPath, ...imagePaths]);
-    return { ok: false, error: `저장 실패: ${insErr?.message ?? 'unknown'}` };
+    if (rpcErr?.message?.includes('RATE_LIMITED')) {
+      return { ok: false, error: '잠시 후 다시 시도해주세요 (분당 5건 제한).' };
+    }
+    if (rpcErr?.message?.includes('INACTIVE')) {
+      return { ok: false, error: '계정이 활성 상태가 아닙니다.' };
+    }
+    if (rpcErr?.message?.includes('INVALID_TITLE') || rpcErr?.message?.includes('INVALID_BODY')) {
+      return { ok: false, error: '입력 값을 확인해주세요.' };
+    }
+    if (rpcErr?.message?.includes('TOO_MANY_IMAGES')) {
+      return { ok: false, error: `이미지는 최대 ${MAX_IMAGES}장까지 첨부할 수 있습니다.` };
+    }
+    if (rpcErr?.message?.includes('MISSING_EXCEL')) {
+      return { ok: false, error: '엑셀 파일이 누락되었습니다.' };
+    }
+    console.error('[inbound] submit_inbound_request_rpc', rpcErr);
+    return { ok: false, error: `저장 실패: ${rpcErr?.message ?? 'unknown'}` };
   }
 
   revalidatePaths([
     '/inbound-requests',
     '/admin/inbound-requests',
   ]);
-  return { ok: true, requestId: row.id as string };
+  return { ok: true, requestId: newId as string };
 }
 
 export async function cancelInboundRequestAction(requestId: string): Promise<ActionResult> {
