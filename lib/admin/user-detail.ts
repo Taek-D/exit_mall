@@ -39,12 +39,20 @@ export type AdminUserProductOption = {
   name: string;
 };
 
+export type AdminUserCustomInventoryRow = {
+  id: string;
+  name: string;
+  quantity: number;
+  updated_at: string;
+};
+
 export type AdminUserDetail = {
   profile: AdminUserProfile;
   orders: AdminUserUnifiedOrder[];
   deposits: AdminUserDeposit[];
   transactions: AdminUserBalanceTx[];
   inventory: AdminUserInventoryRow[];
+  customInventory: AdminUserCustomInventoryRow[];
   products: AdminUserProductOption[];
   totalSpent: number;
 };
@@ -149,6 +157,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
     { data: transactions },
     { data: inventory },
     { data: products },
+    { data: customInventory },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).single<AdminUserProfile>(),
     supabase
@@ -182,6 +191,11 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .eq('user_id', userId)
       .gt('quantity', 0),
     supabase.from('products').select('id, name').eq('is_active', true).order('name'),
+    supabase
+      .from('user_custom_inventory')
+      .select('id, name, quantity, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false }),
   ]);
 
   if (!profile) return null;
@@ -205,6 +219,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
     deposits: (deposits ?? []) as unknown as AdminUserDeposit[],
     transactions: (transactions ?? []) as unknown as AdminUserBalanceTx[],
     inventory: (inventory ?? []) as unknown as AdminUserInventoryRow[],
+    customInventory: (customInventory ?? []) as unknown as AdminUserCustomInventoryRow[],
     products: (products ?? []) as unknown as AdminUserProductOption[],
     totalSpent,
   };
