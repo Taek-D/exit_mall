@@ -133,11 +133,91 @@ export async function submitInboundRequestAction(fd: FormData): Promise<SubmitRe
     return { ok: false, error: `저장 실패: ${rpcErr?.message ?? 'unknown'}` };
   }
 
+  // Best-effort rename: move files from _pending_* to canonical {request_id} path.
+  // If a move succeeds but the subsequent DB update fails, attempt rollback so the
+  // row's stored path stays valid. Cascade failure leaves the row in a mixed
+  // state — chase-update DB to point at where files actually are.
+  const requestId = newId as string;
+  const originalExcelPath = excelPath;
+  const originalImagePaths = [...imagePaths];
+
+  const renamedExcel = `${u.user.id}/${requestId}/excel/${safeFilename(excel.name)}`;
+  const { error: mvExcelErr } = await supabase.storage
+    .from('inbound-requests')
+    .move(originalExcelPath, renamedExcel);
+
+  let finalExcelPath = originalExcelPath;
+  const finalImagePaths = [...originalImagePaths];
+
+  if (!mvExcelErr) finalExcelPath = renamedExcel;
+
+  for (let i = 0; i < originalImagePaths.length; i++) {
+    const old = originalImagePaths[i];
+    const baseName = old.split('/').pop();
+    if (!baseName) continue;
+    const newName = `${u.user.id}/${requestId}/images/${baseName}`;
+    const { error } = await supabase.storage.from('inbound-requests').move(old, newName);
+    if (!error) finalImagePaths[i] = newName;
+  }
+
+  const renameHappened =
+    finalExcelPath !== originalExcelPath ||
+    finalImagePaths.some((p, i) => p !== originalImagePaths[i]);
+
+  if (renameHappened) {
+    const { error: upErr } = await (supabase.from as any)('inbound_requests')
+      .update({ excel_storage_path: finalExcelPath, image_paths: finalImagePaths })
+      .eq('id', requestId);
+
+    if (upErr) {
+      // Rollback attempt: move files back to _pending_* paths.
+      console.error('[inbound] post-rename DB update failed; rolling back rename', upErr);
+      const rollbackResults: Array<{ ok: boolean; from: string; to: string }> = [];
+      if (finalExcelPath !== originalExcelPath) {
+        const { error } = await supabase.storage
+          .from('inbound-requests')
+          .move(finalExcelPath, originalExcelPath);
+        rollbackResults.push({ ok: !error, from: finalExcelPath, to: originalExcelPath });
+        if (error) console.error('[inbound] excel rename rollback failed', error);
+      }
+      for (let i = 0; i < finalImagePaths.length; i++) {
+        if (finalImagePaths[i] !== originalImagePaths[i]) {
+          const { error } = await supabase.storage
+            .from('inbound-requests')
+            .move(finalImagePaths[i], originalImagePaths[i]);
+          rollbackResults.push({ ok: !error, from: finalImagePaths[i], to: originalImagePaths[i] });
+          if (error) console.error('[inbound] image rename rollback failed', error);
+        }
+      }
+      // Cascade failure: at least one rollback `move` also failed. We end up in a
+      // mixed state where some files are at canonical {request_id}/... paths
+      // (rollback failed) and others are back at _pending_* (rollback succeeded).
+      // For each path, point the DB at where the file actually IS now:
+      //   - rollback succeeded → use original _pending_* path
+      //   - rollback failed    → use canonical path (file is still there)
+      // The orphan cleanup function reclaims any abandoned _pending_* files.
+      if (rollbackResults.some((r) => !r.ok)) {
+        const excelRollbackFailed = rollbackResults.some(
+          (r) => !r.ok && r.from === finalExcelPath,
+        );
+        const chaseExcel = excelRollbackFailed ? finalExcelPath : originalExcelPath;
+        const chaseImages = finalImagePaths.map((p, i) => {
+          const failed = rollbackResults.some((r) => !r.ok && r.from === p);
+          return failed ? p : originalImagePaths[i];
+        });
+        const { error: chaseErr } = await (supabase.from as any)('inbound_requests')
+          .update({ excel_storage_path: chaseExcel, image_paths: chaseImages })
+          .eq('id', requestId);
+        if (chaseErr) console.error('[inbound] chase-update also failed; orphan possible', chaseErr);
+      }
+    }
+  }
+
   revalidatePaths([
     '/inbound-requests',
     '/admin/inbound-requests',
   ]);
-  return { ok: true, requestId: newId as string };
+  return { ok: true, requestId };
 }
 
 export async function cancelInboundRequestAction(requestId: string): Promise<ActionResult> {
