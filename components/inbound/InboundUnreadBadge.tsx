@@ -38,8 +38,11 @@ export function InboundUnreadBadge({
       }, 1000);
     }
 
+    // Unique channel name per mount avoids "cannot add postgres_changes after subscribe()"
+    // when React 18 strict mode double-invokes the effect.
+    const channelName = `inbound-unread-${role}-${Math.random().toString(36).slice(2, 10)}`;
     const channel = supabase
-      .channel(`inbound-unread-${role}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'inbound_requests' },
