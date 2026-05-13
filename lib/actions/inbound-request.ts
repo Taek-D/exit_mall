@@ -13,6 +13,7 @@ import {
   inboundCommentSchema,
 } from '@/lib/schemas';
 import { COMMENT_EDIT_WINDOW_MS } from '@/lib/inbound/permissions';
+import { safeFilename } from '@/lib/inbound/storage';
 
 const MAX_EXCEL_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -27,13 +28,6 @@ function nanoid(): string {
 
 function lower(s: string) {
   return s.toLowerCase();
-}
-
-function safeFilename(name: string) {
-  return name
-    .replace(/^\.+/, '')       // strip leading dots
-    .replace(/\.{2,}/g, '.')   // collapse runs of dots
-    .replace(/[^\w가-힣\.\-]+/g, '_');
 }
 
 export type SubmitResult =
