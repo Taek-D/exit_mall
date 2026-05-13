@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, CheckCircle2, KeyRound, Mail, Phone, Search, User } from 'lucide-react';
+import { FormMessage } from '@/components/FormMessage';
+import { KeyRound, Mail, Phone, Search, User } from 'lucide-react';
 import Link from 'next/link';
 
 type FoundAccount = {
@@ -216,24 +217,7 @@ function Message({
   tone: 'error' | 'success';
   children: React.ReactNode;
 }) {
-  return (
-    <div
-      role="alert"
-      aria-live="polite"
-      className={
-        tone === 'error'
-          ? 'flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3'
-          : 'flex items-start gap-2 text-sm text-success bg-success/5 border border-success/20 rounded-md p-3'
-      }
-    >
-      {tone === 'error' ? (
-        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-      ) : (
-        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-      )}
-      <p>{children}</p>
-    </div>
-  );
+  return <FormMessage tone={tone}>{children}</FormMessage>;
 }
 
 export function RecoveryFooterLinks() {

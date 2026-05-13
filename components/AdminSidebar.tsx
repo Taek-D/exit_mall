@@ -2,36 +2,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  UserCheck,
-  Wallet,
-  ShoppingCart,
-  FileSpreadsheet,
-  Package,
-  Users,
-  AlertTriangle,
-  Settings,
-  Archive,
-  Inbox,
-} from 'lucide-react';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
-
-const NAV: { href: string; label: string; Icon: typeof LayoutDashboard; exact?: boolean; muted?: boolean }[] = [
-  { href: '/admin', label: '대시보드', Icon: LayoutDashboard, exact: true },
-  { href: '/admin/approvals', label: '가입 승인', Icon: UserCheck },
-  { href: '/admin/deposits', label: '입금 확인', Icon: Wallet },
-  { href: '/admin/orders', label: '주문관리', Icon: ShoppingCart, exact: true },
-  { href: '/admin/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: FileSpreadsheet },
-  { href: '/admin/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: FileSpreadsheet },
-  { href: '/admin/inbound-requests', label: '입고리스트', Icon: Inbox },
-  { href: '/admin/products', label: '상품 관리', Icon: Package },
-  { href: '/admin/users', label: '사용자', Icon: Users },
-  { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
-  // 진행 중 일반 주문(`orders`) 처리·열람용 — 새 흐름 도입 후 신규 진입은 차단됨.
-  { href: '/admin/orders-legacy', label: 'Legacy 주문', Icon: Archive, muted: true },
-  { href: '/admin/settings', label: '설정', Icon: Settings },
-];
+import { ADMIN_NAV_ITEMS } from '@/components/admin-nav-items';
 
 export function AdminSidebar({ inboundUnread }: { inboundUnread: number }) {
   const pathname = usePathname();
@@ -48,7 +20,7 @@ export function AdminSidebar({ inboundUnread }: { inboundUnread: number }) {
       </div>
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-0.5">
-          {NAV.map(({ href, label, Icon, exact, muted }) => {
+          {ADMIN_NAV_ITEMS.map(({ href, label, Icon, exact, muted }) => {
             const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
             return (
               <li key={href}>

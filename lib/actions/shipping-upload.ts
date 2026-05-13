@@ -4,10 +4,9 @@ import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-pa
 import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 import { matchInventoryRefs } from '@/lib/shipping-match';
 import type { Json } from '@/lib/db-types';
+import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_EXTS = ['.xlsx'];
-const OOXML_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 export type RequestShippingUploadResult =
   | { ok: true; uploadId: string }
@@ -20,21 +19,12 @@ export async function requestShippingUploadAction(
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-  const file = fd.get('file');
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: '파일을 선택해주세요.' };
-  }
-  if (file.size > MAX_BYTES) {
-    return { ok: false, error: '파일 크기는 5MB 이하여야 합니다.' };
-  }
-  if (!ALLOWED_EXTS.some((ext) => file.name.toLowerCase().endsWith(ext))) {
-    return { ok: false, error: '.xlsx 파일만 업로드할 수 있습니다.' };
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  if (buffer.length < 4 || !buffer.subarray(0, 4).equals(OOXML_MAGIC)) {
-    return { ok: false, error: '엑셀(.xlsx) 파일 형식이 아닙니다.' };
-  }
+  const upload = await validateExcelUpload(fd.get('file'), {
+    maxBytes: MAX_BYTES,
+    sizeLabel: '5MB',
+  });
+  if (!upload.ok) return upload;
+  const { file, buffer } = upload;
 
   let parsed;
   try {
@@ -86,7 +76,7 @@ export async function requestShippingUploadAction(
   });
 
   // Storage 업로드
-  const safeName = file.name.replace(/[^\w가-힣\.\-]+/g, '_');
+  const safeName = safeStorageName(file.name, { allowKorean: true });
   const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
   const { error: upErr } = await supabase.storage
     .from('order-uploads')

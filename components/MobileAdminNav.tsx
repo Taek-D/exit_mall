@@ -3,33 +3,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  UserCheck,
-  Wallet,
-  ShoppingCart,
-  FileSpreadsheet,
-  Package,
-  Users,
-  AlertTriangle,
-  Settings,
-  Inbox,
-} from 'lucide-react';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
-
-const NAV = [
-  { href: '/admin', label: '대시보드', Icon: LayoutDashboard, exact: true },
-  { href: '/admin/approvals', label: '가입 승인', Icon: UserCheck },
-  { href: '/admin/deposits', label: '입금 확인', Icon: Wallet },
-  { href: '/admin/orders', label: '주문 관리', Icon: ShoppingCart, exact: true },
-  { href: '/admin/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: FileSpreadsheet },
-  { href: '/admin/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: FileSpreadsheet },
-  { href: '/admin/inbound-requests', label: '입고리스트', Icon: Inbox },
-  { href: '/admin/products', label: '상품 관리', Icon: Package },
-  { href: '/admin/users', label: '사용자', Icon: Users },
-  { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
-  { href: '/admin/settings', label: '설정', Icon: Settings },
-];
+import { ADMIN_NAV_ITEMS } from '@/components/admin-nav-items';
 
 export function MobileAdminNav({
   open,
@@ -56,7 +31,7 @@ export function MobileAdminNav({
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           <ul className="space-y-0.5">
-            {NAV.map(({ href, label, Icon, exact }) => {
+            {ADMIN_NAV_ITEMS.filter((item) => item.mobile !== false).map(({ href, label, Icon, exact }) => {
               const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
               return (
                 <li key={href}>
