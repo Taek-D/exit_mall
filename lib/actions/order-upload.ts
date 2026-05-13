@@ -8,14 +8,9 @@ import { createClient } from '@/lib/supabase/server';
 import { parseOrderExcel } from '@/lib/order-upload-parser';
 import { mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 import type { Json } from '@/lib/db-types';
+import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-// .xls (legacy OLE2) is intentionally rejected — it has a much larger parser surface and
-// known XLM macro / formula injection vectors. Only the modern OOXML zip format is allowed.
-const ALLOWED_EXTS = ['.xlsx'];
-// PK\x03\x04 is the magic number for ZIP/OOXML files. Anything else (CFB/OLE2 .xls,
-// renamed binaries, archives without proper structure) is rejected up front.
-const OOXML_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 export type UploadOrderResult =
   | { ok: true; uploadId: string }
@@ -26,23 +21,13 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-  const file = fd.get('file');
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: '파일을 선택해주세요.' };
-  }
-  if (file.size > MAX_BYTES) {
-    return { ok: false, error: '파일 크기는 5MB 이하여야 합니다.' };
-  }
-  const lowered = file.name.toLowerCase();
-  if (!ALLOWED_EXTS.some((ext) => lowered.endsWith(ext))) {
-    return { ok: false, error: '.xlsx 파일만 업로드할 수 있습니다. (.xls 구포맷은 지원하지 않아요.)' };
-  }
-
-  // Read once and check the magic number before handing the buffer to the parser.
-  const buffer = Buffer.from(await file.arrayBuffer());
-  if (buffer.length < 4 || !buffer.subarray(0, 4).equals(OOXML_MAGIC)) {
-    return { ok: false, error: '엑셀(.xlsx) 파일 형식이 아닙니다.' };
-  }
+  const upload = await validateExcelUpload(fd.get('file'), {
+    maxBytes: MAX_BYTES,
+    sizeLabel: '5MB',
+    extensionMessage: '.xlsx 파일만 업로드할 수 있습니다. (.xls 구포맷은 지원하지 않아요.)',
+  });
+  if (!upload.ok) return upload;
+  const { file, buffer } = upload;
 
   // Parse first; only persist when parsing succeeds.
   let parsed;
@@ -54,7 +39,7 @@ export async function uploadOrderExcelAction(fd: FormData): Promise<UploadOrderR
   }
 
   // Upload original file to storage at <user_id>/<timestamp>-<filename>
-  const safeName = file.name.replace(/[^\w가-힣\.\-]+/g, '_');
+  const safeName = safeStorageName(file.name, { allowKorean: true });
   const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
   const { error: upErr } = await supabase.storage
     .from('order-uploads')

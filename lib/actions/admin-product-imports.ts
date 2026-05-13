@@ -10,10 +10,9 @@ import {
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 import type { Json } from '@/lib/db-types';
+import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 
 const MAX_BYTES = 20 * 1024 * 1024;
-const ALLOWED_EXTS = ['.xlsx'];
-const OOXML_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 export type CreateProductImportPreviewResult =
   | { ok: true; importId: string }
@@ -44,30 +43,6 @@ type ApplyProductImportRow = {
   category: string | null;
   barcode: string | null;
 };
-
-function safeStorageName(name: string): string {
-  const sanitized = name.normalize('NFKC').replace(/[^\w.\-]+/g, '_');
-  return sanitized || 'products.xlsx';
-}
-
-function validateExcelFile(file: FormDataEntryValue | null): file is File {
-  return file instanceof File && file.size > 0;
-}
-
-async function fileToBuffer(file: File): Promise<Buffer> {
-  return Buffer.from(await file.arrayBuffer());
-}
-
-function validateXlsx(file: File, buffer: Buffer): string | null {
-  if (file.size > MAX_BYTES) return '파일 크기는 20MB 이하여야 합니다.';
-  if (!ALLOWED_EXTS.some((ext) => file.name.toLowerCase().endsWith(ext))) {
-    return '.xlsx 파일만 업로드할 수 있습니다.';
-  }
-  if (buffer.length < 4 || !buffer.subarray(0, 4).equals(OOXML_MAGIC)) {
-    return '엑셀(.xlsx) 파일 형식이 아닙니다.';
-  }
-  return null;
-}
 
 function previewFromJson(value: Json): ProductImportPreview | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -104,14 +79,13 @@ export async function createProductImportPreviewAction(
   const guard = await requireAdmin();
   if (!guard.ok) return { ok: false, error: guard.error };
 
-  const file = fd.get('file');
-  if (!validateExcelFile(file)) {
-    return { ok: false, error: '업로드할 엑셀 파일을 선택해주세요.' };
-  }
-
-  const buffer = await fileToBuffer(file);
-  const validationError = validateXlsx(file, buffer);
-  if (validationError) return { ok: false, error: validationError };
+  const upload = await validateExcelUpload(fd.get('file'), {
+    maxBytes: MAX_BYTES,
+    sizeLabel: '20MB',
+    emptyMessage: '업로드할 엑셀 파일을 선택해주세요.',
+  });
+  if (!upload.ok) return upload;
+  const { file, buffer } = upload;
 
   let parsed;
   try {
@@ -137,7 +111,7 @@ export async function createProductImportPreviewAction(
   );
 
   const importId = randomUUID();
-  const storagePath = `${guard.user.id}/${importId}-${safeStorageName(file.name)}`;
+  const storagePath = `${guard.user.id}/${importId}-${safeStorageName(file.name, { fallback: 'products.xlsx' })}`;
   const { error: uploadError } = await guard.supabase.storage
     .from('product-imports')
     .upload(storagePath, buffer, {

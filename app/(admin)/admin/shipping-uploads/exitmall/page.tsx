@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
-import { cn } from '@/lib/utils';
+import { StatusTabs, type StatusTab } from '@/components/StatusTabs';
 import {
   type ShippingUploadStatus,
   SHIPPING_UPLOAD_STATUS_LABEL,
@@ -13,7 +13,7 @@ import { ChevronRight, Inbox, FileSpreadsheet } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-const TABS: { key: string; label: string }[] = [
+const TABS: StatusTab<ShippingUploadStatus | 'all'>[] = [
   { key: 'all', label: '전체' },
   { key: 'pending', label: '검토대기' },
   { key: 'approved', label: '승인' },
@@ -43,30 +43,14 @@ export default async function AdminShippingUploadsPage({
       </header>
 
       <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="border-b overflow-x-auto">
-          <div className="flex min-w-max">
-            {TABS.map((t) => {
-              const active = status === t.key;
-              return (
-                <Link
-                  key={t.key}
-                  href={`/admin/shipping-uploads/exitmall${t.key === 'all' ? '' : `?status=${t.key}`}`}
-                  className={cn(
-                    'flex items-center gap-2 px-4 h-11 text-sm border-b-2 whitespace-nowrap',
-                    active
-                      ? 'border-primary text-foreground font-medium'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <span>{t.label}</span>
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] bg-muted">
-                    {c[t.key] ?? 0}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        <StatusTabs
+          tabs={TABS}
+          active={status}
+          counts={c}
+          hrefFor={(key) =>
+            `/admin/shipping-uploads/exitmall${key === 'all' ? '' : `?status=${key}`}`
+          }
+        />
 
         {rows.length === 0 ? (
           <div className="p-16 flex flex-col items-center gap-3 text-center">

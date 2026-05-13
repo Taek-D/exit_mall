@@ -12,15 +12,26 @@ import {
   inboundRequestCreateSchema,
   inboundCommentSchema,
 } from '@/lib/schemas';
-import { COMMENT_EDIT_WINDOW_MS } from '@/lib/inbound/permissions';
 import { safeFilename } from '@/lib/inbound/storage';
+import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
+import {
+  applyInboundMoveOutcomes,
+  chaseInboundPathsAfterRollback,
+  inboundCleanupPaths,
+  type InboundMoveOutcome,
+} from '@/lib/inbound/upload-paths';
+import {
+  mapInboundCancelError,
+  mapInboundCommentError,
+  mapInboundStatusError,
+  mapSubmitInboundRequestError,
+} from '@/lib/inbound/action-errors';
+import { getInboundCommentAccessError } from '@/lib/inbound/comment-access';
 
 const MAX_EXCEL_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 3;
-const ALLOWED_EXCEL_EXT = ['.xlsx'];
 const ALLOWED_IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
-const OOXML_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 function nanoid(): string {
   return randomBytes(8).toString('hex');
@@ -48,20 +59,16 @@ export async function submitInboundRequestAction(
   });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
 
-  const excel = fd.get('excel');
-  if (!(excel instanceof File) || excel.size === 0) {
-    return { ok: false, error: '엑셀 파일을 첨부해주세요.' };
-  }
-  if (excel.size > MAX_EXCEL_BYTES) {
-    return { ok: false, error: '엑셀은 5MB 이하여야 합니다.' };
-  }
-  if (!ALLOWED_EXCEL_EXT.some((ext) => lower(excel.name).endsWith(ext))) {
-    return { ok: false, error: '.xlsx 만 첨부할 수 있습니다.' };
-  }
-  const excelBuf = Buffer.from(await excel.arrayBuffer());
-  if (excelBuf.length < 4 || !excelBuf.subarray(0, 4).equals(OOXML_MAGIC)) {
-    return { ok: false, error: '엑셀(.xlsx) 형식이 아닙니다.' };
-  }
+  const excelUpload = await validateExcelUpload(fd.get('excel'), {
+    maxBytes: MAX_EXCEL_BYTES,
+    sizeLabel: '5MB',
+    emptyMessage: '엑셀 파일을 첨부해주세요.',
+    sizeMessage: '엑셀은 5MB 이하여야 합니다.',
+    extensionMessage: '.xlsx 만 첨부할 수 있습니다.',
+    invalidTypeMessage: '엑셀(.xlsx) 형식이 아닙니다.',
+  });
+  if (!excelUpload.ok) return excelUpload;
+  const { file: excel, buffer: excelBuf } = excelUpload;
 
   const images: File[] = [];
   for (let i = 0; i < MAX_IMAGES; i++) {
@@ -82,7 +89,7 @@ export async function submitInboundRequestAction(
 
   // Upload files under temporary folder, then we rename after row insert.
   const tmp = `_pending_${nanoid()}`;
-  const excelPath = `${u.user.id}/${tmp}/excel/${safeFilename(excel.name)}`;
+  const excelPath = `${u.user.id}/${tmp}/excel/${safeStorageName(excel.name, { allowKorean: true })}`;
   const { error: exUpErr } = await supabase.storage
     .from('inbound-requests')
     .upload(excelPath, excelBuf, { contentType: excel.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: false });
@@ -97,7 +104,7 @@ export async function submitInboundRequestAction(
       .upload(imgPath, buf, { contentType: img.type || 'image/jpeg', upsert: false });
     if (imgErr) {
       // partial-upload cleanup attempt (best effort)
-      await supabase.storage.from('inbound-requests').remove([excelPath, ...imagePaths]);
+      await supabase.storage.from('inbound-requests').remove(inboundCleanupPaths(excelPath, imagePaths));
       return { ok: false, error: `이미지 업로드 실패: ${imgErr.message}` };
     }
     imagePaths.push(imgPath);
@@ -113,22 +120,9 @@ export async function submitInboundRequestAction(
     p_image_paths: imagePaths,
   });
   if (rpcErr || !newId) {
-    await supabase.storage.from('inbound-requests').remove([excelPath, ...imagePaths]);
-    if (rpcErr?.message?.includes('RATE_LIMITED')) {
-      return { ok: false, error: '잠시 후 다시 시도해주세요 (분당 5건 제한).' };
-    }
-    if (rpcErr?.message?.includes('INACTIVE')) {
-      return { ok: false, error: '계정이 활성 상태가 아닙니다.' };
-    }
-    if (rpcErr?.message?.includes('INVALID_TITLE') || rpcErr?.message?.includes('INVALID_BODY')) {
-      return { ok: false, error: '입력 값을 확인해주세요.' };
-    }
-    if (rpcErr?.message?.includes('TOO_MANY_IMAGES')) {
-      return { ok: false, error: `이미지는 최대 ${MAX_IMAGES}장까지 첨부할 수 있습니다.` };
-    }
-    if (rpcErr?.message?.includes('MISSING_EXCEL')) {
-      return { ok: false, error: '엑셀 파일이 누락되었습니다.' };
-    }
+    await supabase.storage.from('inbound-requests').remove(inboundCleanupPaths(excelPath, imagePaths));
+    const mapped = mapSubmitInboundRequestError(rpcErr?.message ?? '', MAX_IMAGES);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[inbound] submit_inbound_request_rpc', rpcErr);
     return { ok: false, error: `저장 실패: ${rpcErr?.message ?? 'unknown'}` };
   }
@@ -141,15 +135,12 @@ export async function submitInboundRequestAction(
   const originalExcelPath = excelPath;
   const originalImagePaths = [...imagePaths];
 
-  const renamedExcel = `${u.user.id}/${requestId}/excel/${safeFilename(excel.name)}`;
+  const renamedExcel = `${u.user.id}/${requestId}/excel/${safeStorageName(excel.name, { allowKorean: true })}`;
   const { error: mvExcelErr } = await supabase.storage
     .from('inbound-requests')
     .move(originalExcelPath, renamedExcel);
 
-  let finalExcelPath = originalExcelPath;
-  const finalImagePaths = [...originalImagePaths];
-
-  if (!mvExcelErr) finalExcelPath = renamedExcel;
+  const imageMoves: InboundMoveOutcome[] = [];
 
   for (let i = 0; i < originalImagePaths.length; i++) {
     const old = originalImagePaths[i];
@@ -157,12 +148,15 @@ export async function submitInboundRequestAction(
     if (!baseName) continue;
     const newName = `${u.user.id}/${requestId}/images/${baseName}`;
     const { error } = await supabase.storage.from('inbound-requests').move(old, newName);
-    if (!error) finalImagePaths[i] = newName;
+    imageMoves.push({ ok: !error, from: old, to: newName });
   }
 
-  const renameHappened =
-    finalExcelPath !== originalExcelPath ||
-    finalImagePaths.some((p, i) => p !== originalImagePaths[i]);
+  const { finalExcelPath, finalImagePaths, renameHappened } = applyInboundMoveOutcomes({
+    originalExcelPath,
+    originalImagePaths,
+    excelMove: { ok: !mvExcelErr, from: originalExcelPath, to: renamedExcel },
+    imageMoves,
+  });
 
   if (renameHappened) {
     const { error: upErr } = await mutationTable(supabase, 'inbound_requests')
@@ -172,7 +166,7 @@ export async function submitInboundRequestAction(
     if (upErr) {
       // Rollback attempt: move files back to _pending_* paths.
       console.error('[inbound] post-rename DB update failed; rolling back rename', upErr);
-      const rollbackResults: Array<{ ok: boolean; from: string; to: string }> = [];
+      const rollbackResults: InboundMoveOutcome[] = [];
       if (finalExcelPath !== originalExcelPath) {
         const { error } = await supabase.storage
           .from('inbound-requests')
@@ -197,13 +191,12 @@ export async function submitInboundRequestAction(
       //   - rollback failed    → use canonical path (file is still there)
       // The orphan cleanup function reclaims any abandoned _pending_* files.
       if (rollbackResults.some((r) => !r.ok)) {
-        const excelRollbackFailed = rollbackResults.some(
-          (r) => !r.ok && r.from === finalExcelPath,
-        );
-        const chaseExcel = excelRollbackFailed ? finalExcelPath : originalExcelPath;
-        const chaseImages = finalImagePaths.map((p, i) => {
-          const failed = rollbackResults.some((r) => !r.ok && r.from === p);
-          return failed ? p : originalImagePaths[i];
+        const { excelPath: chaseExcel, imagePaths: chaseImages } = chaseInboundPathsAfterRollback({
+          originalExcelPath,
+          originalImagePaths,
+          finalExcelPath,
+          finalImagePaths,
+          rollbackResults,
         });
         const { error: chaseErr } = await mutationTable(supabase, 'inbound_requests')
           .update({ excel_storage_path: chaseExcel, image_paths: chaseImages })
@@ -224,10 +217,8 @@ export async function cancelInboundRequestAction(requestId: string): Promise<Act
   const supabase = createClient();
   const { error } = await callRpc(supabase, 'cancel_inbound_request', { request_id: requestId });
   if (error) {
-    if (error.message.includes('NOT_CANCELLABLE')) return { ok: false, error: '취소할 수 없는 상태입니다.' };
-    if (error.message.includes('ALREADY_CLOSED')) return { ok: false, error: '이미 종결된 요청입니다.' };
-    if (error.message.includes('FORBIDDEN')) return { ok: false, error: '권한이 없습니다.' };
-    if (error.message.includes('NOT_FOUND')) return { ok: false, error: '요청을 찾을 수 없습니다.' };
+    const mapped = mapInboundCancelError(error.message);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[inbound] cancel', { requestId, error });
     return { ok: false, error: '취소 처리에 실패했습니다.' };
   }
@@ -245,9 +236,8 @@ export async function setInboundStatusAction(
     new_status: newStatus,
   });
   if (error) {
-    if (error.message.includes('FORBIDDEN')) return { ok: false, error: '관리자만 변경할 수 있습니다.' };
-    if (error.message.includes('INVALID_TRANSITION')) return { ok: false, error: '허용되지 않은 상태 전이입니다.' };
-    if (error.message.includes('NOT_FOUND')) return { ok: false, error: '요청을 찾을 수 없습니다.' };
+    const mapped = mapInboundStatusError(error.message);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[inbound] setStatus', { requestId, newStatus, error });
     return { ok: false, error: '상태 변경에 실패했습니다.' };
   }
@@ -283,11 +273,8 @@ export async function addInboundCommentAction(
     body: parsed.data.body,
   });
   if (error) {
-    if (error.message.includes('LOCKED')) return { ok: false, error: '이미 종결되어 댓글을 작성할 수 없습니다.' };
-    if (error.message.includes('FORBIDDEN')) return { ok: false, error: '권한이 없습니다.' };
-    if (error.message.includes('INACTIVE')) return { ok: false, error: '계정이 활성 상태가 아닙니다.' };
-    if (error.message.includes('INVALID_BODY')) return { ok: false, error: '댓글 내용을 확인해주세요.' };
-    if (error.message.includes('NOT_FOUND')) return { ok: false, error: '요청을 찾을 수 없습니다.' };
+    const mapped = mapInboundCommentError(error.message);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[inbound] addComment', { requestId, error });
     return { ok: false, error: '댓글 작성에 실패했습니다.' };
   }
@@ -323,15 +310,14 @@ export async function updateInboundCommentAction(
     .select('role')
     .eq('id', u.user.id)
     .single<{ role: 'user' | 'admin' }>();
-  const isAdmin = prof?.role === 'admin';
-  const isAuthor = row.author_id === u.user.id;
-  if (!isAdmin && !isAuthor) return { ok: false, error: '권한이 없습니다.' };
-  if (!isAdmin) {
-    const ageMs = Date.now() - new Date(row.created_at).getTime();
-    if (ageMs >= COMMENT_EDIT_WINDOW_MS) {
-      return { ok: false, error: '댓글 수정 가능 시간이 지났습니다 (10분).' };
-    }
-  }
+  const accessError = getInboundCommentAccessError({
+    authorId: row.author_id,
+    currentUserId: u.user.id,
+    createdAt: row.created_at,
+    isAdmin: prof?.role === 'admin',
+    action: '수정',
+  });
+  if (accessError) return { ok: false, error: accessError };
 
   const { error } = await mutationTable(supabase, 'inbound_request_comments')
     .update({ body: parsed.data.body, updated_at: new Date().toISOString() })
@@ -360,15 +346,14 @@ export async function deleteInboundCommentAction(commentId: string): Promise<Act
     .select('role')
     .eq('id', u.user.id)
     .single<{ role: 'user' | 'admin' }>();
-  const isAdmin = prof?.role === 'admin';
-  const isAuthor = row.author_id === u.user.id;
-  if (!isAdmin && !isAuthor) return { ok: false, error: '권한이 없습니다.' };
-  if (!isAdmin) {
-    const ageMs = Date.now() - new Date(row.created_at).getTime();
-    if (ageMs >= COMMENT_EDIT_WINDOW_MS) {
-      return { ok: false, error: '댓글 삭제 가능 시간이 지났습니다 (10분).' };
-    }
-  }
+  const accessError = getInboundCommentAccessError({
+    authorId: row.author_id,
+    currentUserId: u.user.id,
+    createdAt: row.created_at,
+    isAdmin: prof?.role === 'admin',
+    action: '삭제',
+  });
+  if (accessError) return { ok: false, error: accessError };
 
   const { error } = await mutationTable(supabase, 'inbound_request_comments')
     .delete()

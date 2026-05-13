@@ -16,6 +16,7 @@ import {
 } from '@/lib/types';
 
 type Tone = 'info' | 'success' | 'warning' | 'danger' | 'neutral' | 'violet';
+export type StatusPillTone = Tone;
 
 const TONE_CLASS: Record<Tone, string> = {
   info: 'bg-info/10 text-info ring-info/20',

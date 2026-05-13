@@ -3,9 +3,9 @@
 import { useState, useTransition } from 'react';
 import { resetRecoveredPasswordAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Lock } from 'lucide-react';
+import { FormMessage } from '@/components/FormMessage';
+import { PasswordInput } from '@/components/PasswordInput';
+import { CheckCircle2, KeyRound, Lock } from 'lucide-react';
 import Link from 'next/link';
 
 type FieldName = 'newPassword' | 'confirmPassword';
@@ -61,14 +61,14 @@ export function ResetPasswordForm() {
           <h2 className="font-heading font-semibold">새 비밀번호 설정</h2>
         </div>
 
-        <PasswordField
+        <PasswordInput
           name="newPassword"
           label="새 비밀번호"
           visible={visible.newPassword}
           disabled={pending}
           onToggle={() => setVisible((v) => ({ ...v, newPassword: !v.newPassword }))}
         />
-        <PasswordField
+        <PasswordInput
           name="confirmPassword"
           label="새 비밀번호 확인"
           visible={visible.confirmPassword}
@@ -81,14 +81,7 @@ export function ResetPasswordForm() {
 
       {error && (
         <div className="px-5 pt-5">
-          <div
-            role="alert"
-            aria-live="polite"
-            className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3"
-          >
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-            <p>{error}</p>
-          </div>
+          <FormMessage tone="error">{error}</FormMessage>
         </div>
       )}
 
@@ -99,55 +92,5 @@ export function ResetPasswordForm() {
         </Button>
       </div>
     </form>
-  );
-}
-
-function PasswordField({
-  name,
-  label,
-  visible,
-  disabled,
-  onToggle,
-}: {
-  name: FieldName;
-  label: string;
-  visible: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={name}>{label}</Label>
-      <div className="relative">
-        <Lock
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          id={name}
-          name={name}
-          type={visible ? 'text' : 'password'}
-          required
-          minLength={8}
-          maxLength={72}
-          autoComplete="new-password"
-          disabled={disabled}
-          className="h-10 pl-9 pr-10"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={disabled}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          aria-label={visible ? `${label} 숨기기` : `${label} 보기`}
-        >
-          {visible ? (
-            <EyeOff className="h-4 w-4" aria-hidden />
-          ) : (
-            <Eye className="h-4 w-4" aria-hidden />
-          )}
-        </button>
-      </div>
-    </div>
   );
 }

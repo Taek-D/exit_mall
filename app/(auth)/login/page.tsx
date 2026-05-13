@@ -1,10 +1,13 @@
 'use client';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { useState, useTransition } from 'react';
 import { loginAction } from '@/lib/actions/auth';
+import { FormError } from '@/components/FormError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Mail, Lock, Eye, EyeOff, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -37,73 +40,41 @@ export default function LoginPage() {
           </div>
 
           <form action={onSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">이메일</Label>
-              <div className="relative">
-                <Mail
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="name@company.com"
-                  className="pl-9 h-10"
-                />
-              </div>
-            </div>
+            <AuthInput
+              id="email"
+              name="email"
+              type="email"
+              label="이메일"
+              icon={Mail}
+              required
+              autoComplete="email"
+              placeholder="name@company.com"
+            />
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="password">비밀번호</Label>
+            <AuthInput
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              label="비밀번호"
+              icon={Lock}
+              required
+              autoComplete="current-password"
+              action={
                 <Link
                   href="/find-account"
                   className="text-xs text-accent font-medium hover:underline"
                 >
                   아이디/비밀번호 찾기
                 </Link>
-              </div>
-              <div className="relative">
-                <Lock
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  autoComplete="current-password"
-                  className="pl-9 pr-10 h-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" aria-hidden />
-                  ) : (
-                    <Eye className="h-4 w-4" aria-hidden />
-                  )}
-                </button>
-              </div>
-            </div>
+              }
+            >
+              <PasswordVisibilityButton
+                visible={showPassword}
+                onToggle={() => setShowPassword((v) => !v)}
+              />
+            </AuthInput>
 
-            {error && (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3 animate-slide-up-fade"
-              >
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-                <p>{error}</p>
-              </div>
-            )}
+            <FormError message={error} className="animate-slide-up-fade" />
 
             <Button type="submit" className="w-full h-10" disabled={pending}>
               {pending ? '로그인 중…' : '로그인'}
@@ -134,5 +105,65 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+type AuthInputProps = ComponentPropsWithoutRef<typeof Input> & {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  action?: ReactNode;
+  children?: ReactNode;
+};
+
+function AuthInput({
+  id,
+  label,
+  icon: Icon,
+  action,
+  children,
+  className,
+  ...inputProps
+}: AuthInputProps) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        {action}
+      </div>
+      <div className="relative">
+        <Icon
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          id={id}
+          className={cn('h-10 pl-9', children && 'pr-10', className)}
+          {...inputProps}
+        />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PasswordVisibilityButton({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  const Icon = visible ? EyeOff : Eye;
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      aria-label={visible ? '비밀번호 숨기기' : '비밀번호 보기'}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+    </button>
   );
 }
