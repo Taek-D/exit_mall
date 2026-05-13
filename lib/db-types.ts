@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -170,6 +150,123 @@ export type Database = {
           },
           {
             foreignKeyName: "deposit_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_request_comments: {
+        Row: {
+          author_id: string
+          author_role: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          request_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          author_role: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          request_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          author_role?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          request_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_request_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_request_comments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbound_requests: {
+        Row: {
+          admin_last_read_at: string | null
+          body: string
+          created_at: string
+          excel_original_name: string
+          excel_storage_path: string
+          id: string
+          image_paths: string[]
+          last_comment_at: string | null
+          last_comment_by_role: string | null
+          reviewed_by: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+          user_last_read_at: string | null
+        }
+        Insert: {
+          admin_last_read_at?: string | null
+          body?: string
+          created_at?: string
+          excel_original_name: string
+          excel_storage_path: string
+          id?: string
+          image_paths?: string[]
+          last_comment_at?: string | null
+          last_comment_by_role?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          user_last_read_at?: string | null
+        }
+        Update: {
+          admin_last_read_at?: string | null
+          body?: string
+          created_at?: string
+          excel_original_name?: string
+          excel_storage_path?: string
+          id?: string
+          image_paths?: string[]
+          last_comment_at?: string | null
+          last_comment_by_role?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          user_last_read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbound_requests_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -664,140 +761,81 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_inbound_comment: {
+        Args: { body: string; request_id: string }
+        Returns: string
+      }
       adjust_balance: {
-        Args: {
-          target_user: string
-          delta: number
-          memo: string
-        }
+        Args: { delta: number; memo: string; target_user: string }
         Returns: undefined
       }
       adjust_user_inventory: {
         Args: {
-          target_user: string
-          product_id: string
           delta: number
           memo?: string
+          product_id: string
+          target_user: string
         }
         Returns: undefined
       }
-      apply_product_import: {
-        Args: {
-          rows: Json
-        }
-        Returns: Json
-      }
-      approve_order_upload: {
-        Args: {
-          upload_id: string
-        }
-        Returns: string
-      }
+      apply_product_import: { Args: { rows: Json }; Returns: Json }
+      approve_order_upload: { Args: { upload_id: string }; Returns: string }
       approve_shipping_upload: {
-        Args: {
-          upload_id: string
-        }
+        Args: { upload_id: string }
         Returns: undefined
       }
-      approve_stock_order: {
-        Args: {
-          order_id: string
-        }
-        Returns: undefined
-      }
+      approve_stock_order: { Args: { order_id: string }; Returns: undefined }
       attach_tracking: {
-        Args: {
-          upload_id: string
-          storage_path: string
-          parsed_items: Json
-        }
+        Args: { parsed_items: Json; storage_path: string; upload_id: string }
         Returns: undefined
       }
-      cancel_order: {
-        Args: {
-          order_id: string
-        }
+      cancel_inbound_request: {
+        Args: { request_id: string }
         Returns: undefined
       }
+      cancel_order: { Args: { order_id: string }; Returns: undefined }
       cancel_shipping_upload: {
-        Args: {
-          upload_id: string
-        }
+        Args: { upload_id: string }
         Returns: undefined
       }
-      cancel_stock_order: {
-        Args: {
-          order_id: string
-        }
-        Returns: undefined
-      }
+      cancel_stock_order: { Args: { order_id: string }; Returns: undefined }
       complete_shipping_upload: {
-        Args: {
-          upload_id: string
-        }
+        Args: { upload_id: string }
         Returns: undefined
       }
-      confirm_deposit: {
-        Args: {
-          request_id: string
-        }
-        Returns: undefined
-      }
-      is_active: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      place_order: {
-        Args: {
-          items: Json
-          shipping: Json
-        }
-        Returns: string
-      }
+      confirm_deposit: { Args: { request_id: string }; Returns: undefined }
+      count_inbound_unread: { Args: { p_role: string }; Returns: number }
+      is_active: { Args: never; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
+      mark_inbound_read: { Args: { request_id: string }; Returns: undefined }
+      place_order: { Args: { items: Json; shipping: Json }; Returns: string }
       reject_deposit: {
-        Args: {
-          request_id: string
-          memo: string
-        }
+        Args: { memo: string; request_id: string }
         Returns: undefined
       }
       reject_order_upload: {
-        Args: {
-          upload_id: string
-          memo: string
-        }
+        Args: { memo: string; upload_id: string }
         Returns: undefined
       }
       reject_shipping_upload: {
-        Args: {
-          upload_id: string
-          memo: string
-        }
+        Args: { memo: string; upload_id: string }
         Returns: undefined
       }
       reject_stock_order: {
-        Args: {
-          order_id: string
-          memo: string
-        }
+        Args: { memo: string; order_id: string }
         Returns: undefined
       }
-      request_stock_order: {
-        Args: {
-          items: Json
-        }
-        Returns: string
+      request_stock_order: { Args: { items: Json }; Returns: string }
+      set_inbound_status: {
+        Args: { new_status: string; request_id: string }
+        Returns: undefined
       }
       transition_order_status: {
         Args: {
-          order_id: string
-          next_status: string
-          tracking?: string
           carrier_name?: string
+          next_status: string
+          order_id: string
+          tracking?: string
         }
         Returns: undefined
       }
@@ -811,27 +849,33 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -839,20 +883,24 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -860,20 +908,24 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -881,30 +933,41 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

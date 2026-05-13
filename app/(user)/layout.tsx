@@ -4,6 +4,7 @@ import { NavUser } from '@/components/NavUser';
 import { LowBalanceBanner } from '@/components/LowBalanceBanner';
 import { CartProvider } from '@/components/CartProvider';
 import { Toaster } from '@/components/ui/toaster';
+import { fetchUnreadCount } from '@/lib/inbound/queries';
 
 type ProductLimitRow = {
   id: string;
@@ -29,13 +30,14 @@ export default async function UserLayout({ children }: { children: React.ReactNo
     .single<{ name: string; deposit_balance: number; low_balance_threshold: number }>();
   if (!profile) redirect('/login');
 
-  const [{ data: products }, { data: purchased }] = await Promise.all([
+  const [{ data: products }, { data: purchased }, inboundUnread] = await Promise.all([
     supabase.from('products').select('id,per_user_limit'),
     supabase
       .from('order_items')
       .select('product_id, quantity, orders!inner(user_id, status)')
       .eq('orders.user_id', user.id)
       .neq('orders.status', 'cancelled'),
+    fetchUnreadCount('user'),
   ]);
 
   const purchasedMap = new Map<string, number>();
@@ -56,7 +58,11 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   return (
     <CartProvider limits={cartLimits}>
       <div className="min-h-screen flex flex-col bg-surface">
-        <NavUser balance={Number(profile.deposit_balance)} name={profile.name} />
+        <NavUser
+          balance={Number(profile.deposit_balance)}
+          name={profile.name}
+          inboundUnread={inboundUnread}
+        />
         <LowBalanceBanner
           balance={Number(profile.deposit_balance)}
           threshold={Number(profile.low_balance_threshold)}

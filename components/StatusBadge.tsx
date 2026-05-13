@@ -5,12 +5,14 @@ import type {
   UserStatus,
   StockOrderStatus,
   ShippingUploadStatus,
+  InboundStatus,
 } from '@/lib/types';
 import {
   ORDER_STATUS_LABEL,
   DEPOSIT_STATUS_LABEL,
   STOCK_ORDER_STATUS_LABEL,
   SHIPPING_UPLOAD_STATUS_LABEL,
+  INBOUND_STATUS_LABEL,
 } from '@/lib/types';
 
 type Tone = 'info' | 'success' | 'warning' | 'danger' | 'neutral' | 'violet';
@@ -143,6 +145,27 @@ export function ShippingUploadStatusBadge({
   return (
     <Pill tone={SHIPPING_UPLOAD_TONE[status]} className={className}>
       {SHIPPING_UPLOAD_STATUS_LABEL[status]}
+    </Pill>
+  );
+}
+
+const INBOUND_TONE: Record<InboundStatus, Tone> = {
+  open: 'info',
+  in_progress: 'warning',
+  completed: 'success',
+  cancelled: 'neutral',
+};
+
+export function InboundStatusBadge({
+  status,
+  className,
+}: {
+  status: InboundStatus;
+  className?: string;
+}) {
+  return (
+    <Pill tone={INBOUND_TONE[status]} className={className}>
+      {INBOUND_STATUS_LABEL[status]}
     </Pill>
   );
 }
