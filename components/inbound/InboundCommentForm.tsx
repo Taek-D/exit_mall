@@ -9,6 +9,7 @@ import {
   deleteInboundCommentAction,
 } from '@/lib/actions/inbound-request';
 import { COMMENT_EDIT_WINDOW_MS } from '@/lib/inbound/permissions';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 export function InboundCommentForm({
   requestId,
@@ -92,6 +93,7 @@ export function CommentRowActions({
   const [pending, start] = useTransition();
   const router = useRouter();
   const { toast } = useToast();
+  const { confirm, element } = useConfirm();
 
   useEffect(() => {
     if (isAdmin) return;
@@ -103,76 +105,91 @@ export function CommentRowActions({
   const editable = isAdmin || (isAuthor && now - created < COMMENT_EDIT_WINDOW_MS);
   if (!editable) return null;
 
+  async function onDelete() {
+    const result = await confirm({
+      title: '이 댓글을 삭제할까요?',
+      description: '삭제하면 되돌릴 수 없습니다.',
+      confirmLabel: '삭제',
+      cancelLabel: '닫기',
+      tone: 'destructive',
+    });
+    if (!result.ok) return;
+    start(async () => {
+      const r = await deleteInboundCommentAction(commentId);
+      if (!r.ok) {
+        toast({ title: '삭제 실패', description: r.error, variant: 'destructive' });
+        return;
+      }
+      toast({ title: '삭제되었습니다.' });
+      router.refresh();
+    });
+  }
+
   if (editing) {
     return (
-      <div className="mt-2 space-y-2">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          className="w-full rounded-md border bg-background p-2 text-sm resize-y"
-          aria-label="댓글 수정"
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending || draft.trim().length === 0}
-            onClick={() =>
-              start(async () => {
-                const r = await updateInboundCommentAction(commentId, draft.trim());
-                if (!r.ok) {
-                  toast({ title: '수정 실패', description: r.error, variant: 'destructive' });
-                  return;
-                }
+      <>
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            className="w-full rounded-md border bg-background p-2 text-sm resize-y"
+            aria-label="댓글 수정"
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || draft.trim().length === 0}
+              onClick={() =>
+                start(async () => {
+                  const r = await updateInboundCommentAction(commentId, draft.trim());
+                  if (!r.ok) {
+                    toast({ title: '수정 실패', description: r.error, variant: 'destructive' });
+                    return;
+                  }
+                  setEditing(false);
+                  toast({ title: '수정되었습니다.' });
+                  router.refresh();
+                })
+              }
+            >
+              저장
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
                 setEditing(false);
-                toast({ title: '수정되었습니다.' });
-                router.refresh();
-              })
-            }
-          >
-            저장
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setEditing(false);
-              setDraft(body);
-            }}
-          >
-            취소
-          </Button>
+                setDraft(body);
+              }}
+            >
+              취소
+            </Button>
+          </div>
         </div>
-      </div>
+        {element}
+      </>
     );
   }
 
   return (
-    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-      <button type="button" className="hover:underline" onClick={() => setEditing(true)}>
-        수정
-      </button>
-      <button
-        type="button"
-        className="hover:underline text-destructive"
-        onClick={() =>
-          start(async () => {
-            if (!confirm('이 댓글을 삭제할까요?')) return;
-            const r = await deleteInboundCommentAction(commentId);
-            if (!r.ok) {
-              toast({ title: '삭제 실패', description: r.error, variant: 'destructive' });
-              return;
-            }
-            toast({ title: '삭제되었습니다.' });
-            router.refresh();
-          })
-        }
-      >
-        삭제
-      </button>
-    </div>
+    <>
+      <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+        <button type="button" className="hover:underline" onClick={() => setEditing(true)}>
+          수정
+        </button>
+        <button
+          type="button"
+          className="hover:underline text-destructive"
+          onClick={onDelete}
+        >
+          삭제
+        </button>
+      </div>
+      {element}
+    </>
   );
 }
