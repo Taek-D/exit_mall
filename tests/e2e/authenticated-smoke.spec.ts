@@ -44,6 +44,11 @@ test.describe('authenticated smoke', () => {
     seed = await createQaSeed(adminClient);
   });
 
+  test.afterAll(async () => {
+    if (!adminClient || !seed) return;
+    await cleanupQaSeed(adminClient, seed);
+  });
+
   test('customer can request a stock order and see it in order history', async ({ page }) => {
     await login(page, seed.customer.email, seed.credential);
 
@@ -213,6 +218,34 @@ async function latestStockOrderId(
     .single();
   if (error || !data) throw error ?? new Error('No stock order found');
   return data.id;
+}
+
+async function cleanupQaSeed(supabase: SupabaseClient<Database>, qaSeed: QaSeed) {
+  const cleanupErrors: string[] = [];
+  const recordError = (label: string, error: { message: string } | null) => {
+    if (error) cleanupErrors.push(`${label}: ${error.message}`);
+  };
+
+  const { error: orderError } = await supabase
+    .from('stock_orders')
+    .delete()
+    .eq('user_id', qaSeed.customer.id);
+  recordError('stock_orders', orderError);
+
+  const { error: productError } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', qaSeed.product.id);
+  recordError('products', productError);
+
+  for (const user of [qaSeed.customer, qaSeed.admin]) {
+    const { error } = await supabase.auth.admin.deleteUser(user.id);
+    recordError(`auth user ${user.email}`, error);
+  }
+
+  if (cleanupErrors.length > 0) {
+    throw new Error(`E2E seed cleanup failed: ${cleanupErrors.join('; ')}`);
+  }
 }
 
 function loadLocalEnv() {
