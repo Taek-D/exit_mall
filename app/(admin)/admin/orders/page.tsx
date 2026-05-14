@@ -1,16 +1,17 @@
 import Link from 'next/link';
+import { EmptyState } from '@/components/EmptyState';
+import { StatusTabs, type StatusTab } from '@/components/StatusTabs';
 import { formatKRW } from '@/lib/money';
 import { type StockOrderStatus, STOCK_ORDER_STATUS_LABEL } from '@/lib/types';
 import { StockOrderStatusBadge } from '@/components/StatusBadge';
 import { OrdersRealtime } from '@/components/OrdersRealtime';
-import { cn } from '@/lib/utils';
 import { formatDateTimeKR } from '@/lib/dates';
 import { fetchAdminStockOrders, summarizeStockItems } from '@/lib/orders/queries';
 import { ChevronRight, Inbox } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-const TABS: { key: StockOrderStatus | 'all'; label: string }[] = [
+const TABS: StatusTab<StockOrderStatus | 'all'>[] = [
   { key: 'all', label: '전체' },
   { key: 'pending', label: '검토대기' },
   { key: 'approved', label: '승인' },
@@ -40,48 +41,24 @@ export default async function AdminStockOrdersPage({
       </header>
 
       <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="border-b overflow-x-auto">
-          <div className="flex min-w-max">
-            {TABS.map((t) => {
-              const active = status === t.key;
-              const c = counts[t.key] ?? 0;
-              return (
-                <Link
-                  key={t.key}
-                  href={`/admin/orders${t.key === 'all' ? '' : `?status=${t.key}`}`}
-                  className={cn(
-                    'relative flex items-center gap-2 px-4 h-11 text-sm border-b-2 transition-colors whitespace-nowrap',
-                    active
-                      ? 'border-primary text-foreground font-medium'
-                      : 'border-transparent text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <span>{t.label}</span>
-                  <span
-                    className={cn(
-                      'inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[11px] font-mono tabular',
-                      active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    {c}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+        <StatusTabs
+          tabs={TABS}
+          active={status}
+          counts={counts}
+          hrefFor={(key) => `/admin/orders${key === 'all' ? '' : `?status=${key}`}`}
+        />
 
         {rows.length === 0 ? (
-          <div className="p-16 flex flex-col items-center gap-3 text-center">
-            <div className="h-11 w-11 rounded-full bg-muted grid place-items-center">
-              <Inbox className="h-5 w-5 text-muted-foreground" aria-hidden />
-            </div>
-            <p className="text-sm font-medium">
-              {status === 'all'
+          <EmptyState
+            icon={Inbox}
+            title={
+              status === 'all'
                 ? '주문이 없습니다'
-                : `${STOCK_ORDER_STATUS_LABEL[status as StockOrderStatus]} 상태의 주문이 없습니다`}
-            </p>
-          </div>
+                : `${STOCK_ORDER_STATUS_LABEL[status as StockOrderStatus]} 상태의 주문이 없습니다`
+            }
+            className="border-0 rounded-none p-16"
+            iconClassName="h-5 w-5"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

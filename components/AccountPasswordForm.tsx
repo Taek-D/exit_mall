@@ -3,9 +3,9 @@
 import { useState, useTransition } from 'react';
 import { changePasswordAction } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { FormMessage } from '@/components/FormMessage';
+import { PasswordInput } from '@/components/PasswordInput';
+import { Lock, ShieldCheck } from 'lucide-react';
 
 type FieldName = 'currentPassword' | 'newPassword' | 'confirmPassword';
 
@@ -62,11 +62,12 @@ export function AccountPasswordForm() {
 
         <div className="space-y-4">
           {FIELDS.map((field) => (
-            <PasswordField
+            <PasswordInput
               key={field.name}
               name={field.name}
               label={field.label}
               autoComplete={field.autoComplete}
+              minLength={field.name === 'currentPassword' ? undefined : 8}
               visible={visible[field.name]}
               disabled={pending}
               onToggle={() =>
@@ -79,22 +80,7 @@ export function AccountPasswordForm() {
 
       {(error || success) && (
         <div className="px-5 pt-5">
-          <div
-            role="alert"
-            aria-live="polite"
-            className={
-              error
-                ? 'flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3'
-                : 'flex items-start gap-2 text-sm text-success bg-success/5 border border-success/20 rounded-md p-3'
-            }
-          >
-            {error ? (
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-            )}
-            <p>{error ?? success}</p>
-          </div>
+          <FormMessage tone={error ? 'error' : 'success'}>{error ?? success}</FormMessage>
         </div>
       )}
 
@@ -105,57 +91,5 @@ export function AccountPasswordForm() {
         </Button>
       </div>
     </form>
-  );
-}
-
-function PasswordField({
-  name,
-  label,
-  autoComplete,
-  visible,
-  disabled,
-  onToggle,
-}: {
-  name: FieldName;
-  label: string;
-  autoComplete: string;
-  visible: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={name}>{label}</Label>
-      <div className="relative">
-        <Lock
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          id={name}
-          name={name}
-          type={visible ? 'text' : 'password'}
-          required
-          minLength={name === 'currentPassword' ? undefined : 8}
-          maxLength={72}
-          autoComplete={autoComplete}
-          disabled={disabled}
-          className="h-10 pl-9 pr-10"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={disabled}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 grid place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          aria-label={visible ? `${label} 숨기기` : `${label} 보기`}
-        >
-          {visible ? (
-            <EyeOff className="h-4 w-4" aria-hidden />
-          ) : (
-            <Eye className="h-4 w-4" aria-hidden />
-          )}
-        </button>
-      </div>
-    </div>
   );
 }

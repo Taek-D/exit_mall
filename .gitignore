@@ -16,6 +16,7 @@ SECURITY_AUDIT.md
 
 .vercel
 .env*.local
+.env.e2e.local
 
 # Playwright MCP artifacts
 .playwright-mcp/

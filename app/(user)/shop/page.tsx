@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
+import { EmptyState } from '@/components/EmptyState';
+import { FormError } from '@/components/FormError';
 import { ProductCard } from '@/components/ProductCard';
-import { PackageSearch, AlertCircle } from 'lucide-react';
+import { PackageSearch } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,13 +51,12 @@ export default async function ShopPage() {
 
   if (error) {
     return (
-      <div className="rounded-lg border bg-destructive/5 p-6 flex items-start gap-3">
-        <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden />
+      <FormError className="rounded-lg p-6" iconClassName="h-5 w-5">
         <div>
           <p className="font-medium text-destructive">상품을 불러오지 못했습니다</p>
           <p className="text-sm text-muted-foreground mt-1">{error.message}</p>
         </div>
-      </div>
+      </FormError>
     );
   }
 
@@ -75,15 +76,11 @@ export default async function ShopPage() {
       </header>
 
       {total === 0 ? (
-        <div className="rounded-lg border bg-card p-12 flex flex-col items-center text-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-muted grid place-items-center">
-            <PackageSearch className="h-6 w-6 text-muted-foreground" aria-hidden />
-          </div>
-          <h2 className="font-medium">판매중인 상품이 없습니다</h2>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            곧 새로운 상품이 등록될 예정입니다. 잠시 후 다시 확인해주세요.
-          </p>
-        </div>
+        <EmptyState
+          icon={PackageSearch}
+          title="판매중인 상품이 없습니다"
+          description="곧 새로운 상품이 등록될 예정입니다. 잠시 후 다시 확인해주세요."
+        />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
           {visible.map((p) => (

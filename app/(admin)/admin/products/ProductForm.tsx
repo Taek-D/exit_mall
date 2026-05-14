@@ -1,11 +1,13 @@
 'use client';
+import type { ReactNode } from 'react';
+import { useState, useTransition } from 'react';
+import { FormError } from '@/components/FormError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductImageUpload } from '@/components/ProductImageUpload';
-import { useState, useTransition } from 'react';
-import { AlertCircle, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 
 type Props = {
   action: (fd: FormData) => Promise<{ error?: string } | void>;
@@ -25,9 +27,35 @@ type Props = {
   };
 };
 
+type MetadataField = {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue: string;
+  className?: string;
+};
+
 export function ProductForm({ action, defaults }: Props) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const metadataFields: MetadataField[] = [
+    { id: 'brand', name: 'brand', label: '브랜드', defaultValue: defaults?.brand ?? '' },
+    { id: 'optionName', name: 'optionName', label: '옵션', defaultValue: defaults?.option_name ?? '' },
+    {
+      id: 'managementCode',
+      name: 'managementCode',
+      label: '관리코드',
+      defaultValue: defaults?.management_code ?? '',
+    },
+    { id: 'category', name: 'category', label: '카테고리', defaultValue: defaults?.category ?? '' },
+    {
+      id: 'barcode',
+      name: 'barcode',
+      label: '바코드',
+      defaultValue: defaults?.barcode ?? '',
+      className: 'sm:col-span-2',
+    },
+  ];
 
   function onSubmit(fd: FormData) {
     setError(null);
@@ -42,8 +70,7 @@ export function ProductForm({ action, defaults }: Props) {
       action={onSubmit as unknown as (fd: FormData) => void}
       className="rounded-lg border bg-card divide-y"
     >
-      <section className="p-5 space-y-4">
-        <h2 className="font-heading font-semibold">기본 정보</h2>
+      <ProductFormSection title="기본 정보">
         <div className="space-y-1.5">
           <Label htmlFor="name">상품명 *</Label>
           <Input id="name" name="name" required defaultValue={defaults?.name} />
@@ -57,10 +84,9 @@ export function ProductForm({ action, defaults }: Props) {
             defaultValue={defaults?.description}
           />
         </div>
-      </section>
+      </ProductFormSection>
 
-      <section className="p-5 space-y-4">
-        <h2 className="font-heading font-semibold">가격 · 재고</h2>
+      <ProductFormSection title="가격 · 재고">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="price">가격</Label>
@@ -133,53 +159,27 @@ export function ProductForm({ action, defaults }: Props) {
             </span>
           </span>
         </label>
-      </section>
+      </ProductFormSection>
 
-      <section className="p-5 space-y-4">
-        <h2 className="font-heading font-semibold">엑셀 메타 정보</h2>
+      <ProductFormSection title="엑셀 메타 정보">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="brand">브랜드</Label>
-            <Input id="brand" name="brand" defaultValue={defaults?.brand ?? ''} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="optionName">옵션</Label>
-            <Input id="optionName" name="optionName" defaultValue={defaults?.option_name ?? ''} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="managementCode">관리코드</Label>
-            <Input
-              id="managementCode"
-              name="managementCode"
-              defaultValue={defaults?.management_code ?? ''}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="category">카테고리</Label>
-            <Input id="category" name="category" defaultValue={defaults?.category ?? ''} />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="barcode">바코드</Label>
-            <Input id="barcode" name="barcode" defaultValue={defaults?.barcode ?? ''} />
-          </div>
+          {metadataFields.map((field) => (
+            <div
+              key={field.id}
+              className={field.className ? `space-y-1.5 ${field.className}` : 'space-y-1.5'}
+            >
+              <Label htmlFor={field.id}>{field.label}</Label>
+              <Input id={field.id} name={field.name} defaultValue={field.defaultValue} />
+            </div>
+          ))}
         </div>
-      </section>
+      </ProductFormSection>
 
-      <section className="p-5 space-y-4">
-        <h2 className="font-heading font-semibold">이미지</h2>
+      <ProductFormSection title="이미지">
         <ProductImageUpload defaultUrl={defaults?.image_url ?? null} />
-      </section>
+      </ProductFormSection>
 
-      {error && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="mx-5 mb-0 mt-5 flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3"
-        >
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
-          <p>{error}</p>
-        </div>
-      )}
+      <FormError message={error} className="mx-5 mb-0 mt-5" />
 
       <div className="p-5 flex items-center justify-end gap-3">
         <Button type="submit" disabled={pending}>
@@ -188,5 +188,14 @@ export function ProductForm({ action, defaults }: Props) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function ProductFormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="p-5 space-y-4">
+      <h2 className="font-heading font-semibold">{title}</h2>
+      {children}
+    </section>
   );
 }

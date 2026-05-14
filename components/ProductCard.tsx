@@ -1,10 +1,10 @@
 'use client';
-import Image from 'next/image';
+import { ProductThumbnail } from '@/components/ProductThumbnail';
 import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { useCart } from '@/components/CartProvider';
 import { useToast } from '@/hooks/use-toast';
-import { ImageOff, ShoppingBag, Check } from 'lucide-react';
+import { ShoppingBag, Check } from 'lucide-react';
 import { StatusPill } from '@/components/StatusBadge';
 import { useState } from 'react';
 
@@ -68,20 +68,13 @@ export function ProductCard({
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg border bg-card transition-colors duration-150 ease-out-expo hover:border-foreground/30">
-      <div className="aspect-square relative bg-surface-muted">
-        {product.image_url ? (
-          <Image
-            src={product.image_url}
-            alt={product.name}
-            fill
-            className="object-cover"
-            sizes="(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw"
-          />
-        ) : (
-          <div className="absolute inset-0 grid place-items-center text-muted-foreground">
-            <ImageOff className="h-8 w-8" aria-hidden />
-          </div>
-        )}
+      <ProductThumbnail
+        src={product.image_url}
+        alt={product.name}
+        sizes="(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw"
+        className="aspect-square rounded-none"
+        iconClassName="h-8 w-8"
+      >
         {soldOut && (
           <div className="absolute inset-0 grid place-items-center bg-background/75 backdrop-blur-sm">
             <StatusPill tone="neutral">품절</StatusPill>
@@ -99,7 +92,7 @@ export function ProductCard({
             </StatusPill>
           </div>
         )}
-      </div>
+      </ProductThumbnail>
       <div className="flex flex-col flex-1 p-4 gap-1.5">
         <h3 className="font-medium text-[15px] leading-tight line-clamp-1">{product.name}</h3>
         {product.description && (
