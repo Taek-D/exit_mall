@@ -1,10 +1,25 @@
 'use client';
 import { Button } from '@/components/ui/button';
-import { useTransition } from 'react';
-import { approveUserAction, rejectUserAction } from '@/lib/actions/admin-approvals';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useState, useTransition } from 'react';
+import {
+  approveUserAction,
+  rejectUserAction,
+} from '@/lib/actions/admin-approvals';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
+import {
+  USER_GROUPS,
+  USER_GROUP_LABEL,
+  type UserGroup,
+} from '@/lib/auth/user-groups';
 
 type Profile = {
   id: string;
@@ -15,19 +30,31 @@ type Profile = {
 };
 
 export function ApprovalRow({ profile }: { profile: Profile }) {
+  const [group, setGroup] = useState<UserGroup | ''>('');
   const [pending, start] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
 
-  function act(
-    fn: (id: string) => Promise<{ error?: string }>,
-    success: string,
-  ) {
+  function approve() {
+    if (!group) return;
     start(async () => {
-      const r = await fn(profile.id);
-      if (r.error) toast({ title: '실패', description: r.error, variant: 'destructive' });
-      else {
-        toast({ title: success });
+      const r = await approveUserAction(profile.id, group);
+      if (r.error) {
+        toast({ title: '실패', description: r.error, variant: 'destructive' });
+      } else {
+        toast({ title: '승인 완료' });
+        router.refresh();
+      }
+    });
+  }
+
+  function reject() {
+    start(async () => {
+      const r = await rejectUserAction(profile.id);
+      if (r.error) {
+        toast({ title: '실패', description: r.error, variant: 'destructive' });
+      } else {
+        toast({ title: '반려 완료' });
         router.refresh();
       }
     });
@@ -46,7 +73,9 @@ export function ApprovalRow({ profile }: { profile: Profile }) {
           <p className="text-xs text-muted-foreground break-all sm:truncate">
             {profile.email}
             <span className="text-muted-foreground/60"> · </span>
-            <span className="font-mono tabular whitespace-nowrap">{profile.phone}</span>
+            <span className="font-mono tabular whitespace-nowrap">
+              {profile.phone}
+            </span>
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             {new Date(profile.created_at).toLocaleString('ko-KR', {
@@ -59,11 +88,23 @@ export function ApprovalRow({ profile }: { profile: Profile }) {
           </p>
         </div>
       </div>
-      <div className="flex gap-2 shrink-0 sm:self-center">
+      <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-center">
+        <Select value={group} onValueChange={(v) => setGroup(v as UserGroup)}>
+          <SelectTrigger className="h-9 w-[180px]" aria-label="그룹 선택">
+            <SelectValue placeholder="그룹 선택" />
+          </SelectTrigger>
+          <SelectContent>
+            {USER_GROUPS.map((g) => (
+              <SelectItem key={g} value={g}>
+                {USER_GROUP_LABEL[g]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           size="sm"
-          onClick={() => act(approveUserAction, '승인 완료')}
-          disabled={pending}
+          onClick={approve}
+          disabled={pending || !group}
           className="flex-1 sm:flex-initial"
         >
           <Check className="h-3.5 w-3.5" aria-hidden />
@@ -72,7 +113,7 @@ export function ApprovalRow({ profile }: { profile: Profile }) {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => act(rejectUserAction, '반려 완료')}
+          onClick={reject}
           disabled={pending}
           className="flex-1 sm:flex-initial"
         >
