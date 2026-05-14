@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { BalanceAdjustForm } from './BalanceAdjustForm';
 import { UserStatusButtons } from './UserStatusButtons';
 import { ThresholdForm } from './ThresholdForm';
+import { GroupChangeForm } from './GroupChangeForm';
+import type { UserGroup } from '@/lib/auth/user-groups';
 import {
   UserStatusBadge,
   OrderStatusBadge,
@@ -97,10 +99,17 @@ export default async function AdminUserDetailPage({
         </dl>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <BalanceAdjustForm userId={user.id} />
         <ThresholdForm userId={user.id} defaultValue={Number(user.low_balance_threshold)} />
         <UserStatusButtons userId={user.id} status={user.status as UserStatus} />
+        {user.role !== 'admin' && (
+          <GroupChangeForm
+            userId={user.id}
+            currentGroup={(user.user_group ?? null) as UserGroup | null}
+            status={user.status}
+          />
+        )}
       </section>
 
       <section className="rounded-lg border bg-card">

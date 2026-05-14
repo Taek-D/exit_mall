@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import type { UserGroup } from '@/lib/auth/user-groups';
 
 export type AdminUserProfile = {
   id: string;
@@ -9,6 +10,7 @@ export type AdminUserProfile = {
   status: string;
   deposit_balance: number;
   low_balance_threshold: number;
+  user_group: UserGroup | null;
 };
 
 export type AdminUserDeposit = {

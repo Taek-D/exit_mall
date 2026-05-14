@@ -2,6 +2,7 @@
 import { adjustBalanceSchema, thresholdSchema } from '@/lib/schemas';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, formatZodError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
+import { isSelfUserGroupChange, isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
 
 export async function adjustBalanceAction(userId: string, fd: FormData) {
   const guard = await requireAdmin();
@@ -44,5 +45,45 @@ export async function setUserStatusAction(userId: string, status: 'active'|'susp
     return { error: '계정 상태를 변경하지 못했습니다.' };
   }
   revalidatePaths([`/admin/users/${userId}`]);
+  return { ok: true };
+}
+
+export async function setUserGroupAction(userId: string, group: UserGroup) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  if (!isUserGroup(group)) return { error: '그룹이 올바르지 않습니다.' };
+  if (isSelfUserGroupChange(guard.user.id, userId)) return { error: '본인 그룹은 변경할 수 없습니다.' };
+
+  const { data: before, error: readError } = await guard.supabase
+    .from('profiles')
+    .select('user_group, status, role')
+    .eq('id', userId)
+    .single<{ user_group: string | null; status: string; role: string }>();
+
+  if (readError || !before) {
+    console.error('[admin-users] setGroup read', { userId, error: readError });
+    return { error: '사용자를 찾을 수 없습니다.' };
+  }
+  if (before.status !== 'active' || before.role === 'admin') {
+    return { error: '그룹을 변경할 수 없는 사용자입니다.' };
+  }
+  if (before.user_group === group) {
+    return { ok: true }; // 변경 없음
+  }
+
+  const { error } = await mutationTable(guard.supabase, 'profiles')
+    .update({ user_group: group })
+    .eq('id', userId);
+  if (error) {
+    console.error('[admin-users] setGroup', { userId, error });
+    return { error: '그룹을 변경하지 못했습니다.' };
+  }
+  console.info('[admin-users] group-change', {
+    userId,
+    before: before.user_group,
+    after: group,
+    by: guard.user.id,
+  });
+  revalidatePaths(['/admin/users', `/admin/users/${userId}`]);
   return { ok: true };
 }

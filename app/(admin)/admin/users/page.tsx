@@ -4,6 +4,7 @@ import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { UserStatusBadge, StatusPill } from '@/components/StatusBadge';
 import type { UserStatus } from '@/lib/types';
+import { USER_GROUP_SHORT_LABEL, isUserGroup } from '@/lib/auth/user-groups';
 import { Users, ChevronRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ type UserRow = {
   low_balance_threshold: number;
   status: string;
   role: string;
+  user_group: string | null;
 };
 
 const TABS = [
@@ -118,6 +120,7 @@ export default async function AdminUsersPage({
                   <th className="font-medium px-3 text-right">잔액</th>
                   <th className="font-medium px-3 text-right">임계치</th>
                   <th className="font-medium px-3">상태</th>
+                  <th className="font-medium px-3">그룹</th>
                   <th className="font-medium px-3">역할</th>
                   <th className="font-medium px-3 w-8"></th>
                 </tr>
@@ -153,6 +156,17 @@ export default async function AdminUsersPage({
                       </td>
                       <td className="px-3">
                         <UserStatusBadge status={u.status as UserStatus} />
+                      </td>
+                      <td className="px-3">
+                        {u.role === 'admin' ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : isUserGroup(u.user_group) ? (
+                          <StatusPill tone={u.user_group === 'group2' ? 'warning' : 'neutral'}>
+                            {USER_GROUP_SHORT_LABEL[u.user_group]}
+                          </StatusPill>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="px-3">
                         {u.role === 'admin' ? (

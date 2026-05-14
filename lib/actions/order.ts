@@ -1,7 +1,7 @@
 'use server';
-import { createClient } from '@/lib/supabase/server';
 import { checkoutSchema } from '@/lib/schemas';
 import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { requireUserGroup1 } from '@/lib/actions/_guards';
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string }
@@ -13,7 +13,9 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
     return { ok: false, error: formatZodError(parsed.error) };
   }
 
-  const supabase = createClient();
+  const guard = await requireUserGroup1();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const supabase = guard.supabase;
   const { data, error } = await callRpc(supabase, 'place_order', {
     items: parsed.data.items.map(i => ({ product_id: i.productId, quantity: i.quantity })),
     shipping: {
@@ -56,7 +58,9 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
 }
 
 export async function cancelOrderAction(orderId: string): Promise<ActionResult> {
-  const supabase = createClient();
+  const guard = await requireUserGroup1();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const supabase = guard.supabase;
   const { error } = await callRpc(supabase, 'cancel_order', { order_id: orderId });
   if (error) {
     if (error.message.includes('NOT_CANCELLABLE')) return { ok: false, error: '이미 처리되어 취소할 수 없습니다' };

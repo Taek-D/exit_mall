@@ -25,10 +25,19 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   if (!user) redirect('/login');
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name,deposit_balance,low_balance_threshold')
+    .select('name,deposit_balance,low_balance_threshold,user_group')
     .eq('id', user.id)
-    .single<{ name: string; deposit_balance: number; low_balance_threshold: number }>();
+    .single<{
+      name: string;
+      deposit_balance: number;
+      low_balance_threshold: number;
+      user_group: string | null;
+    }>();
   if (!profile) redirect('/login');
+
+  const userGroup: 'group1' | 'group2' =
+    profile.user_group === 'group2' ? 'group2' : 'group1';
+  const isGroup2 = userGroup === 'group2';
 
   const [{ data: products }, { data: purchased }, inboundUnread] = await Promise.all([
     supabase.from('products').select('id,per_user_limit').is('deleted_at', null),
@@ -62,11 +71,14 @@ export default async function UserLayout({ children }: { children: React.ReactNo
           balance={Number(profile.deposit_balance)}
           name={profile.name}
           inboundUnread={inboundUnread}
+          userGroup={userGroup}
         />
-        <LowBalanceBanner
-          balance={Number(profile.deposit_balance)}
-          threshold={Number(profile.low_balance_threshold)}
-        />
+        {!isGroup2 && (
+          <LowBalanceBanner
+            balance={Number(profile.deposit_balance)}
+            threshold={Number(profile.low_balance_threshold)}
+          />
+        )}
         <main className="flex-1 mx-auto max-w-7xl w-full px-4 lg:px-6 py-6 lg:py-8">
           {children}
         </main>

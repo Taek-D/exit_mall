@@ -106,6 +106,51 @@ export type Database = {
           },
         ]
       }
+      custom_inventory_movements: {
+        Row: {
+          created_at: string
+          custom_inventory_id: string
+          delta: number
+          id: string
+          source_id: string | null
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_inventory_id: string
+          delta: number
+          id?: string
+          source_id?: string | null
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_inventory_id?: string
+          delta?: number
+          id?: string
+          source_id?: string | null
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_inventory_movements_custom_inventory_id_fkey"
+            columns: ["custom_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "user_custom_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_inventory_movements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deposit_requests: {
         Row: {
           admin_memo: string | null
@@ -656,6 +701,7 @@ export type Database = {
           phone: string
           role: string
           status: string
+          user_group: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -668,6 +714,7 @@ export type Database = {
           phone: string
           role?: string
           status?: string
+          user_group?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -680,8 +727,38 @@ export type Database = {
           phone?: string
           role?: string
           status?: string
+          user_group?: string | null
         }
         Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          action: string
+          id: number
+          occurred_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          id?: number
+          occurred_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          id?: number
+          occurred_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_orders: {
         Row: {
@@ -734,6 +811,51 @@ export type Database = {
           },
         ]
       }
+      user_custom_inventory: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          quantity: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          quantity?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          quantity?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_custom_inventory_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_custom_inventory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_inventory: {
         Row: {
           product_id: string
@@ -779,8 +901,26 @@ export type Database = {
         Args: { body: string; request_id: string }
         Returns: string
       }
+      add_user_custom_inventory: {
+        Args: {
+          initial_qty?: number
+          memo?: string
+          name: string
+          target_user: string
+        }
+        Returns: string
+      }
       adjust_balance: {
         Args: { delta: number; memo: string; target_user: string }
+        Returns: undefined
+      }
+      adjust_user_custom_inventory: {
+        Args: {
+          custom_id: string
+          delta: number
+          memo?: string
+          target_user: string
+        }
         Returns: undefined
       }
       adjust_user_inventory: {
@@ -813,16 +953,28 @@ export type Database = {
         Returns: undefined
       }
       cancel_stock_order: { Args: { order_id: string }; Returns: undefined }
+      cleanup_orphan_inbound_pending: {
+        Args: { p_older_than?: string }
+        Returns: number
+      }
       complete_shipping_upload: {
         Args: { upload_id: string }
         Returns: undefined
       }
       confirm_deposit: { Args: { request_id: string }; Returns: undefined }
       count_inbound_unread: { Args: { p_role: string }; Returns: number }
+      delete_user_custom_inventory: {
+        Args: { custom_id: string; target_user: string }
+        Returns: undefined
+      }
       is_active: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       mark_inbound_read: { Args: { request_id: string }; Returns: undefined }
       place_order: { Args: { items: Json; shipping: Json }; Returns: string }
+      rate_limit_check: {
+        Args: { p_action: string; p_limit: number; p_window_seconds: number }
+        Returns: undefined
+      }
       reject_deposit: {
         Args: { memo: string; request_id: string }
         Returns: undefined
@@ -840,9 +992,36 @@ export type Database = {
         Returns: undefined
       }
       request_stock_order: { Args: { items: Json }; Returns: string }
+      search_inbound_requests: {
+        Args: { p_limit?: number; p_q?: string; p_status?: string }
+        Returns: {
+          admin_last_read_at: string
+          created_at: string
+          id: string
+          last_comment_at: string
+          last_comment_by_role: string
+          profile_email: string
+          profile_name: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+          user_last_read_at: string
+        }[]
+      }
       set_inbound_status: {
         Args: { new_status: string; request_id: string }
         Returns: undefined
+      }
+      submit_inbound_request_rpc: {
+        Args: {
+          p_body: string
+          p_excel_name: string
+          p_excel_path: string
+          p_image_paths: string[]
+          p_title: string
+        }
+        Returns: string
       }
       transition_order_status: {
         Args: {

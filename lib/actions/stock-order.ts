@@ -1,8 +1,8 @@
 'use server';
-import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { mapStockOrderError } from '@/lib/errors/stock-order';
 import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { requireUserGroup1 } from '@/lib/actions/_guards';
 
 const requestStockOrderSchema = z.object({
   items: z
@@ -19,7 +19,9 @@ export async function requestStockOrderAction(input: unknown): Promise<StockOrde
   if (!parsed.success) {
     return { ok: false, error: formatZodError(parsed.error) };
   }
-  const supabase = createClient();
+  const guard = await requireUserGroup1();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const supabase = guard.supabase;
   const { data, error } = await callRpc(supabase, 'request_stock_order', {
     items: parsed.data.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
   });
@@ -39,7 +41,9 @@ export async function requestStockOrderAction(input: unknown): Promise<StockOrde
 export async function cancelStockOrderAction(
   orderId: string,
 ): Promise<ActionResult> {
-  const supabase = createClient();
+  const guard = await requireUserGroup1();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const supabase = guard.supabase;
   const { error } = await callRpc(supabase, 'cancel_stock_order', { order_id: orderId });
   if (error) {
     console.error('[stock-order] cancel', { orderId, error });
