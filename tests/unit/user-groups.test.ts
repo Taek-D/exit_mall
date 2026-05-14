@@ -28,6 +28,7 @@ describe('user-groups SSOT', () => {
       ['/inbound-requests'],
       ['/inbound-requests/new'],
       ['/inbound-requests/abc-123'],
+      ['/inbound-template.xlsx'],
       ['/account'],
       ['/account/password'],
     ])('허용된 경로: %s', (p) => {

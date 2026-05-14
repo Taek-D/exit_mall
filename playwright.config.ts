@@ -51,9 +51,10 @@ function loadLocalE2eEnv() {
 }
 
 function assertLocalSupabaseEnv() {
-  if (process.env.E2E_ALLOW_REMOTE_SUPABASE === '1') {
-    throw new Error('E2E_ALLOW_REMOTE_SUPABASE=1 is not allowed for local user-group verification.');
-  }
+  // 기존 authenticated-smoke.spec.ts는 E2E_ALLOW_REMOTE_SUPABASE=1로 원격 모드를
+  // 지원한다. 명시적으로 옵트-인된 경우에는 로컬 강제를 건너뛴다 — 그 외에는
+  // user-group 검증처럼 로컬 Supabase가 필수다.
+  if (process.env.E2E_ALLOW_REMOTE_SUPABASE === '1') return;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) {
