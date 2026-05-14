@@ -34,6 +34,10 @@ export default defineConfig({
 function loadLocalE2eEnv() {
   const envPath = path.resolve(__dirname, '.env.e2e.local');
   if (!fs.existsSync(envPath)) {
+    // 원격 모드(authenticated-smoke 등)에서는 .env.e2e.local이 없어도 된다 —
+    // 환경 변수나 CI secrets가 직접 주입된다. 로컬 강제는 어디까지나 user-group
+    // 검증처럼 명시적으로 로컬을 쓰는 경로에만 해당한다.
+    if (process.env.E2E_ALLOW_REMOTE_SUPABASE === '1') return;
     throw new Error(
       '.env.e2e.local is required for Playwright E2E so tests cannot accidentally use remote Supabase.',
     );
