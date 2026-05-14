@@ -31,3 +31,7 @@ export function isPathAllowedForGroup2(pathname: string): boolean {
 export function isUserGroup(value: unknown): value is UserGroup {
   return value === 'group1' || value === 'group2';
 }
+
+export function isSelfUserGroupChange(actorUserId: string, targetUserId: string): boolean {
+  return actorUserId === targetUserId;
+}

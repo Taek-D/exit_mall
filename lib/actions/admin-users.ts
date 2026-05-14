@@ -2,7 +2,7 @@
 import { adjustBalanceSchema, thresholdSchema } from '@/lib/schemas';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, formatZodError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
-import { isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
+import { isSelfUserGroupChange, isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
 
 export async function adjustBalanceAction(userId: string, fd: FormData) {
   const guard = await requireAdmin();
@@ -52,7 +52,7 @@ export async function setUserGroupAction(userId: string, group: UserGroup) {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
   if (!isUserGroup(group)) return { error: '그룹이 올바르지 않습니다.' };
-  if (guard.user.id === userId) return { error: '본인 그룹은 변경할 수 없습니다.' };
+  if (isSelfUserGroupChange(guard.user.id, userId)) return { error: '본인 그룹은 변경할 수 없습니다.' };
 
   const { data: before, error: readError } = await guard.supabase
     .from('profiles')

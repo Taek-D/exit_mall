@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
 import { submitSignupApplication } from '@/lib/auth/signup-application';
 import { buildAppUrl } from '@/lib/site-url';
+import { GROUP2_HOME } from '@/lib/auth/user-groups';
 
 export async function signupAction(formData: FormData) {
   const parsed = signupSchema.safeParse({
@@ -50,13 +51,19 @@ export async function loginAction(formData: FormData) {
   if (!user) return { error: '세션 오류' };
 
   const { data: profile } = await supabase
-    .from('profiles').select('role,status').eq('id', user.id)
-    .single<{ role: string; status: string }>();
+    .from('profiles').select('role,status,user_group').eq('id', user.id)
+    .single<{ role: string; status: string; user_group: string | null }>();
   if (!profile || profile.status !== 'active') {
     await supabase.auth.signOut();
     redirect(`/pending?status=${profile?.status ?? 'pending'}`);
   }
-  redirect(profile.role === 'admin' ? '/admin' : '/shop');
+  redirect(
+    profile.role === 'admin'
+      ? '/admin'
+      : profile.user_group === 'group2'
+        ? GROUP2_HOME
+        : '/shop',
+  );
 }
 
 export async function logoutAction() {
