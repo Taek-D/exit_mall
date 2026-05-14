@@ -60,7 +60,7 @@ export default async function ShopPage() {
     );
   }
 
-  const visible = ((products ?? []) as ProductRow[]).filter((p) => p.stock !== 0);
+  const visible = (products ?? []) as ProductRow[];
   const total = visible.length;
 
   return (

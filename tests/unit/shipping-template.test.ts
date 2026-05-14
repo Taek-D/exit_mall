@@ -42,12 +42,12 @@ describe('public shipping template', () => {
     }
   });
 
-  it('parses the sample numeric tracking number as an integer string', async () => {
+  it('parses blank tracking number in the customer template as null', async () => {
     const parsed = await parseShippingExcel(fs.readFileSync(TEMPLATE_PATH));
 
     expect(parsed.items[0]).toMatchObject({
       recipient: '홍길동',
-      tracking_number: '521853092894',
+      tracking_number: null,
     });
   });
 });

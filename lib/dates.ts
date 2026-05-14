@@ -1,5 +1,6 @@
 export function formatDateTimeKR(value: string | number | Date): string {
   return new Date(value).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -9,5 +10,7 @@ export function formatDateTimeKR(value: string | number | Date): string {
 }
 
 export function formatShortDateTimeKR(value: string | number | Date): string {
-  return new Date(value).toLocaleString('ko-KR');
+  return new Date(value).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+  });
 }

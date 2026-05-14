@@ -94,7 +94,7 @@ export function ProductCard({
         )}
       </ProductThumbnail>
       <div className="flex flex-col flex-1 p-4 gap-1.5">
-        <h3 className="font-medium text-[15px] leading-tight line-clamp-1">{product.name}</h3>
+        <h3 className="font-medium text-[15px] leading-tight line-clamp-2">{product.name}</h3>
         {product.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
         )}
