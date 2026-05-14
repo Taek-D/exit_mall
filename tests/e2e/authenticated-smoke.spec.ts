@@ -12,7 +12,7 @@ type QaSeed = {
   product: { id: string; name: string };
 };
 
-loadLocalEnv();
+loadE2eEnv();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -248,17 +248,19 @@ async function cleanupQaSeed(supabase: SupabaseClient<Database>, qaSeed: QaSeed)
   }
 }
 
-function loadLocalEnv() {
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  if (!fs.existsSync(envPath)) return;
+function loadE2eEnv() {
+  for (const fileName of ['.env.e2e.local', '.env.local']) {
+    const envPath = path.resolve(process.cwd(), fileName);
+    if (!fs.existsSync(envPath)) continue;
 
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const index = trimmed.indexOf('=');
-    if (index === -1) continue;
-    const key = trimmed.slice(0, index);
-    const value = trimmed.slice(index + 1).replace(/^['"]|['"]$/g, '');
-    process.env[key] ??= value;
+    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const index = trimmed.indexOf('=');
+      if (index === -1) continue;
+      const key = trimmed.slice(0, index);
+      const value = trimmed.slice(index + 1).replace(/^['"]|['"]$/g, '');
+      process.env[key] ??= value;
+    }
   }
 }
