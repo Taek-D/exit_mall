@@ -14,6 +14,12 @@ Next.js 14 + Supabase 기반입니다.
 
 ## 현재 구현 상태
 
+### 사용자 그룹
+- **1그룹 (`group1`, 엑시트몰 전체)**: 현행 모든 기능 사용. 가입 승인 시 기본 선택.
+- **2그룹 (`group2`, 배송대행 전용)**: `사입재고 배송대행`, `입고리스트`, `계정`만 사용 가능. 상점/주문/예치금/엑시트몰 배송대행/일반 보유 재고 등은 메뉴와 라우트 모두 차단.
+- 미들웨어 라우트 가드 + NavUser 메뉴 필터 + 일부 server action(주문/재고주문/예치금) 그룹 가드로 enforce. group2 사용자가 `/` 또는 차단 경로로 진입하면 `/shipping-uploads/purchased`로 redirect.
+- `user_group`은 NULL을 group1으로 폴백 처리해 백필 누락이나 `setUserStatus` 단독 호출 경로에서 정상 사용자가 차단되지 않습니다.
+
 ### 주문자
 - 승인된 회원만 상점/주문/예치금/입고 화면 접근. 거절된 회원도 재신청 가능
 - 상품 목록(재고 ≤ 9 시 "품절 임박" 배지, 수량은 비표시), 장바구니, 검토 요청 (배송정보 입력 없음)
@@ -26,7 +32,7 @@ Next.js 14 + Supabase 기반입니다.
 - 비밀번호 변경, 아이디 찾기, 비밀번호 재설정
 
 ### 관리자
-- 가입 승인/거절 — 거절된 사용자는 다시 신청할 수 있고 관리자 화면에서 재신청 사실이 노출
+- 가입 승인/거절 — 승인 시 사용자 그룹(`group1`/`group2`) 선택, 사용자 목록·상세에서 그룹 열람 및 변경 가능. 거절된 사용자는 다시 신청할 수 있고 관리자 화면에서 재신청 사실이 노출
 - 입금 요청 확인/반려 및 예치금 반영
 - 상품 CRUD, 1인 구매 한도 설정, 상품 이미지 Storage 업로드, 비활성 토글, **소프트 삭제 / 삭제됨 탭에서 복구**
 - 상품 엑셀 가져오기(`/admin/products/import`) — 업로드 → 미리보기로 검증(가격/한도/이미지 URL/중복) → 적용. 신규 상품은 비공개 상태로 생성
@@ -50,8 +56,7 @@ Next.js 14 + Supabase 기반입니다.
 - FK 인덱스 보강 및 `product_images` 목록 RLS 제한, RLS initplan 최적화
 
 ### 아직 구현 범위가 아닌 것
-- 사용자 그룹(`group1`/`group2`) 분리 — 설계·계획 완료, 구현 대기 (`docs/superpowers/specs/2026-05-14-user-groups-design.md`)
-- 사입재고 배송대행 흐름(`/shipping-uploads/purchased`, `/admin/shipping-uploads/purchased`)
+- 사입재고 배송대행 흐름(`/shipping-uploads/purchased`, `/admin/shipping-uploads/purchased`) — group2 홈 경로지만 페이지 자체는 준비중 placeholder
 - CJ 자동 폴링/캐싱
 - 비CJ 택배사의 앱 내 배송 상태 조회
 - 사진/OCR 기반 상품 자동 등록
@@ -90,7 +95,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ./node_modules/supabase/bin/supabase.exe gen types typescript --local > lib/db-types.ts
 ```
 
-현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC, 2026-05-09 기준 보안·동시성 보강분, 거절 회원 재신청, 상품 엑셀 가져오기(`product_imports`), FK 인덱스 보강, 입고 요청 게시판(`inbound_requests` + 첨부/댓글/Rate Limit), 사용자 수기 보유재고(`user_custom_inventory` + `custom_inventory_movements`), 상품 소프트 삭제(`products.deleted_at`)가 포함되어 있습니다.
+현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC, 2026-05-09 기준 보안·동시성 보강분, 거절 회원 재신청, 상품 엑셀 가져오기(`product_imports`), FK 인덱스 보강, 입고 요청 게시판(`inbound_requests` + 첨부/댓글/Rate Limit), 사용자 수기 보유재고(`user_custom_inventory` + `custom_inventory_movements`), 상품 소프트 삭제(`products.deleted_at`), 사용자 그룹(`profiles.user_group`)이 포함되어 있습니다.
 
 ### 4. 개발 서버
 
@@ -116,7 +121,7 @@ pnpm dev   # http://localhost:3000
 ```bash
 pnpm typecheck            # TypeScript 타입 검사
 pnpm test                 # 단위 테스트 (money, Zod schemas, 배송/입고/상품 import 파서, CJ 배송조회, stock-order, shipping-upload, inventory, inbound 권한·스토리지 경로)
-pnpm test:e2e             # Playwright 인증 스모크 테스트
+pnpm test:e2e             # Playwright 인증 스모크 + 사용자 그룹 로컬 시나리오
 ```
 
 배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 이 스크립트가 공식 생성 경로이며, `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
