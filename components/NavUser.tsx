@@ -45,6 +45,18 @@ const NAV: readonly NavItem[] = [
   { href: '/deposit', label: '예치금', Icon: Wallet, groups: ['group1'] },
 ];
 
+function formatNavLabel(label: string) {
+  if (label.length <= 5) return label;
+
+  return (
+    <>
+      {label.slice(0, 5).trimEnd()}
+      <br />
+      {label.slice(5).trimStart()}
+    </>
+  );
+}
+
 export function NavUser({
   balance,
   name,
@@ -82,15 +94,15 @@ export function NavUser({
                   key={href}
                   href={href}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 h-9 rounded-md text-sm transition-colors duration-150',
+                    'flex items-center gap-1.5 px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
                     active
                       ? 'bg-muted text-foreground font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                   )}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="inline-flex items-center gap-1">
-                    {label}
+                    <span className="text-center leading-tight">{formatNavLabel(label)}</span>
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
                     )}
@@ -179,9 +191,9 @@ export function NavUser({
                     active ? 'text-foreground font-medium' : 'text-muted-foreground',
                   )}
                 >
-                  <Icon className="h-4 w-4" aria-hidden />
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="inline-flex items-center gap-1">
-                    {label}
+                    <span className="text-center leading-tight">{formatNavLabel(label)}</span>
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
                     )}

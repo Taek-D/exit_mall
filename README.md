@@ -4,46 +4,54 @@
 
 Next.js 14 + Supabase 기반입니다.
 
-최종 업데이트: 2026-05-09
+최종 업데이트: 2026-05-14
 
 ## 두 흐름 개요
 
 - **흐름 1 — 엑시트몰 상품 구매(재고 적립)**: 고객이 결제하면 `stock_orders.pending` 으로 들어가고, 관리자 승인 시 보유 재고에 적립 + 예치금 차감. 이 단계에서는 발송이 일어나지 않습니다.
-- **흐름 2 — 배송대행 업로드(재고 발송)**: 고객이 CJ식 1행 1택배 양식 엑셀로 받는사람 명단을 올리면 `order_uploads.pending` 으로 들어가고, 관리자 승인 시 보유 재고에서 차감 + 행수 × ₩3,300 배송비 차감. 관리자가 송장 채운 엑셀을 재업로드하면 행별 송장이 노출됩니다.
+- **흐름 2 — 배송대행 업로드(재고 발송)**: 고객이 CJ식 1행 1택배 양식 엑셀로 받는사람 명단을 올리면 `order_uploads.pending` 으로 들어가고, 관리자 승인 시 보유 재고(엑시트몰 상품 + 사용자 수기 재고)에서 차감 + 행수 × ₩3,300 배송비 차감. 관리자가 송장 채운 엑셀을 재업로드하면 행별 송장이 노출됩니다.
+- **부속 흐름 — 입고 요청 게시판**: 고객이 사입 상품 입고를 비공개 게시글로 등록하고 관리자와 댓글로 진행 상황을 주고받습니다. 엑셀 양식 첨부 + 상태(접수/검토/입고완료/취소) 추적.
 
 ## 현재 구현 상태
 
 ### 주문자
-- 승인된 회원만 상점/주문/예치금 화면 접근
+- 승인된 회원만 상점/주문/예치금/입고 화면 접근. 거절된 회원도 재신청 가능
 - 상품 목록(재고 ≤ 9 시 "품절 임박" 배지, 수량은 비표시), 장바구니, 검토 요청 (배송정보 입력 없음)
 - 상품별 1인 누적 구매 한도 검사 — 승인 + 검토대기 합산
 - 예치금 잔액 (가용/검토대기 예약 분리), 이체 요청, 이체 요청 내역
 - 내 주문 내역(엑시트몰 상품 검토대기·승인·반려/취소, Legacy 일반 주문 분리)
-- 보유 재고 화면 (`/inventory`) — 상품별 가용/예약/총보유 + 변동 내역 timeline
+- 보유 재고 화면 (`/inventory`) — 엑시트몰 상품 + 사용자 수기 재고 통합 표시, 항목별 가용/예약/총보유 + 변동 내역 timeline (`/inventory/product/[id]`, `/inventory/custom/[id]`)
 - 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 준비중
+- 입고리스트(`/inbound-requests`) — 입고 요청 비공개 게시글 등록, 엑셀 양식 다운로드/첨부 업로드, 관리자와 댓글(편집 윈도우 적용)로 진행상황 추적, 미확인 답변 배지
 - 비밀번호 변경, 아이디 찾기, 비밀번호 재설정
 
 ### 관리자
-- 가입 승인/거절
+- 가입 승인/거절 — 거절된 사용자는 다시 신청할 수 있고 관리자 화면에서 재신청 사실이 노출
 - 입금 요청 확인/반려 및 예치금 반영
-- 상품 CRUD, 1인 구매 한도 설정, 상품 이미지 Storage 업로드
+- 상품 CRUD, 1인 구매 한도 설정, 상품 이미지 Storage 업로드, 비활성 토글, **소프트 삭제 / 삭제됨 탭에서 복구**
+- 상품 엑셀 가져오기(`/admin/products/import`) — 업로드 → 미리보기로 검증(가격/한도/이미지 URL/중복) → 적용. 신규 상품은 비공개 상태로 생성
 - 주문관리(`/admin/orders`) — `stock_orders` 검토 목록·상세·승인/반려
 - 배송대행 업로드 — 엑시트몰 배송대행(`/admin/shipping-uploads/exitmall`)에서 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리. 사입재고 배송대행(`/admin/shipping-uploads/purchased`)은 준비중
 - 송장 채운 엑셀 재업로드 시 행별 `tracking_number` 갱신 + status=shipped (멱등)
-- 사용자 관리(잔액 조정·상태·임계치 + 보유 재고 표시·수동 조정)
+- 입고리스트(`/admin/inbound-requests`) — 사용자 게시글 검토, 상태 변경(접수/검토/입고완료/취소), 첨부 다운로드, 댓글 응답, 미확인 답변 배지
+- 사용자 관리(잔액 조정·상태·임계치 + 보유 재고 표시·수동 조정 + 사용자별 수기 재고 등록/조정)
 - Legacy 주문 화면(`/admin/orders-legacy`) — 구 일반 주문 열람 전용 (URL 직접 접근)
 - Realtime: 새 `stock_orders` / `order_uploads` 검토대기 토스트 알림
 - 비밀번호 변경
 
 ### 보안/안정화
-- Next.js 14.2.25 적용 및 기본 보안 헤더(`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`) 설정
+- Next.js 14.2.35 적용 및 기본 보안 헤더(`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`) 설정
 - `stock_orders` / `order_uploads` 직접 삽입 정책 보강: 일반 사용자는 서버 RPC가 검증한 흐름으로만 주문·배송대행 요청 생성
 - 예치금 가용액 계산 시 상품 구매 검토대기 금액과 배송대행 검토대기 배송비를 함께 예약 처리
-- 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·상품명 불일치, 동시 승인 재고 경합을 방어
+- 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·상품명 불일치, 동시 승인 재고 경합을 방어. 사용자 수기 재고(`custom_inventory_id`)도 동일 RPC에서 차감
 - 송장 재업로드 RPC는 송장 필드만 갱신하도록 제한해 업로드 원본 데이터 무결성 유지
 - Storage 정책은 관리자가 업로드한 송장 파일을 해당 업로드 소유자와 관리자만 조회하도록 제한
+- 입고 요청 게시판은 본인 데이터 RLS + 첨부 Storage 경로 화이트리스트 + Rate Limit + 댓글 편집 윈도우(RLS) 적용
+- FK 인덱스 보강 및 `product_images` 목록 RLS 제한, RLS initplan 최적화
 
 ### 아직 구현 범위가 아닌 것
+- 사용자 그룹(`group1`/`group2`) 분리 — 설계·계획 완료, 구현 대기 (`docs/superpowers/specs/2026-05-14-user-groups-design.md`)
+- 사입재고 배송대행 흐름(`/shipping-uploads/purchased`, `/admin/shipping-uploads/purchased`)
 - CJ 자동 폴링/캐싱
 - 비CJ 택배사의 앱 내 배송 상태 조회
 - 사진/OCR 기반 상품 자동 등록
@@ -82,7 +90,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ./node_modules/supabase/bin/supabase.exe gen types typescript --local > lib/db-types.ts
 ```
 
-현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC, 2026-05-09 기준 보안·동시성 보강분이 포함되어 있습니다.
+현재 마이그레이션에는 기본 폐쇄몰 기능, 1인 구매 한도, 배송대행 흐름 재구성을 위한 `stock_orders` / `user_inventory` / `inventory_movements` 테이블, `order_uploads` 확장 컬럼, 흐름 1·2 RPC, 2026-05-09 기준 보안·동시성 보강분, 거절 회원 재신청, 상품 엑셀 가져오기(`product_imports`), FK 인덱스 보강, 입고 요청 게시판(`inbound_requests` + 첨부/댓글/Rate Limit), 사용자 수기 보유재고(`user_custom_inventory` + `custom_inventory_movements`), 상품 소프트 삭제(`products.deleted_at`)가 포함되어 있습니다.
 
 ### 4. 개발 서버
 
@@ -107,8 +115,8 @@ pnpm dev   # http://localhost:3000
 
 ```bash
 pnpm typecheck            # TypeScript 타입 검사
-pnpm test                 # 단위 테스트 (money, Zod schemas, parser, CJ 배송조회, stock-order, shipping-upload, inventory)
-pnpm test:e2e             # Playwright (추후 추가 예정)
+pnpm test                 # 단위 테스트 (money, Zod schemas, 배송/입고/상품 import 파서, CJ 배송조회, stock-order, shipping-upload, inventory, inbound 권한·스토리지 경로)
+pnpm test:e2e             # Playwright 인증 스모크 테스트
 ```
 
 배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 이 스크립트가 공식 생성 경로이며, `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
@@ -135,8 +143,9 @@ node scripts/build-shipping-template.cjs
 ### 주문자
 - `/shop` 상품 목록 / `/cart` 장바구니 / `/checkout` 검토 요청 (배송정보 입력 없음)
 - `/orders` 내 주문 내역 (엑시트몰 상품 검토대기/승인/반려·취소 + Legacy 일반 주문)
-- `/inventory` 보유 재고 / `/inventory/[productId]` 상품별 변동 내역
+- `/inventory` 보유 재고 (엑시트몰 + 수기 통합) / `/inventory/product/[id]` 상품별 변동 내역 / `/inventory/custom/[id]` 수기 재고 변동 내역
 - `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행(준비중)
+- `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
 - `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
 - `/find-account`, `/reset-password` 아이디 찾기·비밀번호 재설정
@@ -145,12 +154,13 @@ node scripts/build-shipping-template.cjs
 
 ### 관리자 (`/admin/*`, role=admin 전용)
 - `/admin` 대시보드 (Realtime 새 검토대기 토스트)
-- `/admin/approvals` 가입 승인
+- `/admin/approvals` 가입 승인 (재신청 표시)
 - `/admin/deposits` 입금 확인
 - `/admin/orders` 주문관리 (stock_orders 탭·상세·승인/반려)
 - `/admin/shipping-uploads/exitmall` 엑시트몰 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리) / `/admin/shipping-uploads/purchased` 사입재고 배송대행(준비중)
-- `/admin/products` 상품 CRUD
-- `/admin/users` 사용자 관리 (잔액·상태·임계치 + 보유 재고 + 수동 조정)
+- `/admin/inbound-requests` 입고리스트 (목록·상태 변경·댓글·첨부) / `/admin/inbound-requests/[id]` 상세
+- `/admin/products` 상품 CRUD + 비활성/소프트 삭제 + `?view=deleted` 복구 탭 / `/admin/products/import` 엑셀 가져오기 (업로드 → 미리보기 → 적용)
+- `/admin/users` 사용자 관리 (잔액·상태·임계치 + 보유 재고 + 수동 조정 + 사용자별 수기 재고)
 - `/admin/low-balance` 잔액 부족 고객
 - `/admin/settings` 입금 계좌 정보
 - `/admin/orders-legacy` (열람 전용) 구 일반 주문 — URL 직접 접근
@@ -168,11 +178,17 @@ node scripts/build-shipping-template.cjs
 
 ### 흐름 2: 배송대행 업로드 (재고 발송)
 1. 주문자가 `/shipping-uploads/exitmall`에서 양식 엑셀을 다운로드 → 받는사람 명단 작성 → 업로드.
-2. 미리보기에서 행별 검증·상품명 매칭 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
-3. 관리자가 `/admin/shipping-uploads/exitmall`에서 검토 → 승인 시 보유 재고 차감(상품별 합산) + 배송비 차감 + `inventory_movements` 음수 기록.
+2. 미리보기에서 행별 검증·상품명 매칭(엑시트몰 상품 + 본인 수기 재고) 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
+3. 관리자가 `/admin/shipping-uploads/exitmall`에서 검토 → 승인 시 보유 재고 차감(엑시트몰/수기 항목별 합산) + 배송비 차감 + `inventory_movements` / `custom_inventory_movements` 음수 기록.
 4. 관리자가 송장 채운 엑셀을 같은 업로드에 재업로드 → `attach_tracking` RPC가 행별 `tracking_number` 갱신 + `status=shipped`. 부분 발송도 가능, 멱등 호출 가능.
 5. 주문자 화면에 행별 송장 + CJ 조회 버튼 + 송장 포함 엑셀 다운로드 노출.
 6. 관리자가 완료 처리 → `status=completed`.
+
+### 입고 요청 게시판
+1. 주문자가 `/inbound-requests/new`에서 제목·내용·엑셀 첨부로 비공개 요청을 등록합니다(`status=pending`).
+2. 관리자가 `/admin/inbound-requests`에서 검토하며 상태(`reviewing`/`completed`)나 댓글로 응답합니다.
+3. 양측 모두 댓글 편집 윈도우 내에서 수정/삭제할 수 있고, 상대방 새 댓글은 미확인 배지로 표시됩니다.
+4. 주문자는 검토 전 상태에서 직접 취소할 수 있습니다(`status=cancelled`).
 
 ### 예치금 충전
 1. 주문자가 `/deposit/new`에서 이체 금액과 입금자명을 제출합니다.
@@ -187,14 +203,19 @@ node scripts/build-shipping-template.cjs
 - **배송조회**: CJ대한통운 공식 조회 endpoint 연동, 비CJ 외부 조회 URL
 - **엑셀 처리**: xlsx
 - **검증**: Zod
-- **테스트**: Vitest (단위), Playwright (E2E 예정)
+- **테스트**: Vitest (단위), Playwright (인증 스모크)
 
 ## 설계 문서
 
+- 사용자 그룹 설계/계획: `docs/superpowers/specs/2026-05-14-user-groups-design.md`, `docs/superpowers/plans/2026-05-14-user-groups.md`
+- 사용자 수기 보유재고: `docs/superpowers/specs/2026-05-13-user-custom-inventory-design.md`, `docs/superpowers/plans/2026-05-13-user-custom-inventory.md`
+- 입고 요청 게시판: `docs/superpowers/specs/2026-05-12-inbound-requests-design.md`, `docs/superpowers/plans/2026-05-12-inbound-requests.md`, `docs/superpowers/plans/2026-05-13-inbound-followups.md`
+- 배송대행 양식/메뉴 분리: `docs/superpowers/specs/2026-05-12-shipping-form-and-menu-split-design.md`, `docs/superpowers/plans/2026-05-12-shipping-form-and-menu-split.md`
 - 신규 흐름 설계: `docs/superpowers/specs/2026-05-08-shipping-flow-restructure-design.md`
 - 신규 흐름 구현 계획: `docs/superpowers/plans/2026-05-08-shipping-flow-phase{1..5}-*.md`
 - 초기 폐쇄몰 설계: `docs/superpowers/specs/2026-04-22-closed-mall-design.md`
 - 초기 폐쇄몰 구현 계획: `docs/superpowers/plans/2026-04-22-closed-mall.md`, `-part2.md`
+- 어드민 워크플로우 리팩터 로그: `docs/refactor/LOG.md`, `docs/refactor/REVIEW.md`
 - 운영 배포 체크리스트: `docs/operations/2026-05-08-shipping-flow-deployment.md`
 - 보안 감사 리포트: `SECURITY_AUDIT.md`
 
