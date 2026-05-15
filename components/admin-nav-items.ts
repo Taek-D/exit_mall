@@ -2,7 +2,9 @@ import type { LucideIcon } from 'lucide-react';
 import {
   AlertTriangle,
   Archive,
+  BookOpen,
   FileSpreadsheet,
+  HelpCircle,
   Inbox,
   LayoutDashboard,
   Package,
@@ -33,6 +35,8 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: '/admin/products', label: '상품 관리', Icon: Package },
   { href: '/admin/users', label: '사용자', Icon: Users },
   { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
+  { href: '/admin/guide', label: '관리자 가이드', Icon: BookOpen, exact: true },
+  { href: '/admin/guide/faq/manage', label: 'FAQ 관리', Icon: HelpCircle },
   { href: '/admin/orders-legacy', label: 'Legacy 주문', Icon: Archive, muted: true, mobile: false },
   { href: '/admin/settings', label: '설정', Icon: Settings },
 ];
