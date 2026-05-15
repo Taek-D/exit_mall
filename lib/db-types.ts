@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -201,6 +221,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      faqs: {
+        Row: {
+          answer: string
+          audience: string
+          category: string
+          created_at: string
+          created_by: string
+          id: string
+          question: string
+          sort_order: number
+          updated_at: string
+          updated_by: string
+          user_groups: string[] | null
+        }
+        Insert: {
+          answer: string
+          audience: string
+          category: string
+          created_at?: string
+          created_by: string
+          id?: string
+          question: string
+          sort_order?: number
+          updated_at?: string
+          updated_by: string
+          user_groups?: string[] | null
+        }
+        Update: {
+          answer?: string
+          audience?: string
+          category?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          question?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string
+          user_groups?: string[] | null
+        }
+        Relationships: []
       }
       inbound_request_comments: {
         Row: {
@@ -695,6 +757,7 @@ export type Database = {
           created_at: string
           deposit_balance: number
           email: string
+          guide_banner_dismissed_at: string | null
           id: string
           low_balance_threshold: number
           name: string
@@ -708,6 +771,7 @@ export type Database = {
           created_at?: string
           deposit_balance?: number
           email: string
+          guide_banner_dismissed_at?: string | null
           id: string
           low_balance_threshold?: number
           name: string
@@ -721,6 +785,7 @@ export type Database = {
           created_at?: string
           deposit_balance?: number
           email?: string
+          guide_banner_dismissed_at?: string | null
           id?: string
           low_balance_threshold?: number
           name?: string
@@ -898,137 +963,241 @@ export type Database = {
     }
     Functions: {
       add_inbound_comment: {
-        Args: { body: string; request_id: string }
+        Args: {
+          request_id: string
+          body: string
+        }
         Returns: string
       }
       add_user_custom_inventory: {
         Args: {
+          target_user: string
+          name: string
           initial_qty?: number
           memo?: string
-          name: string
-          target_user: string
         }
         Returns: string
       }
       adjust_balance: {
-        Args: { delta: number; memo: string; target_user: string }
+        Args: {
+          target_user: string
+          delta: number
+          memo: string
+        }
         Returns: undefined
       }
       adjust_user_custom_inventory: {
         Args: {
+          target_user: string
           custom_id: string
           delta: number
           memo?: string
-          target_user: string
         }
         Returns: undefined
       }
       adjust_user_inventory: {
         Args: {
+          target_user: string
+          product_id: string
           delta: number
           memo?: string
-          product_id: string
-          target_user: string
         }
         Returns: undefined
       }
-      apply_product_import: { Args: { rows: Json }; Returns: Json }
-      approve_order_upload: { Args: { upload_id: string }; Returns: string }
+      apply_product_import: {
+        Args: {
+          rows: Json
+        }
+        Returns: Json
+      }
+      approve_order_upload: {
+        Args: {
+          upload_id: string
+        }
+        Returns: string
+      }
       approve_shipping_upload: {
-        Args: { upload_id: string }
+        Args: {
+          upload_id: string
+        }
         Returns: undefined
       }
-      approve_stock_order: { Args: { order_id: string }; Returns: undefined }
+      approve_stock_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
       attach_tracking: {
-        Args: { parsed_items: Json; storage_path: string; upload_id: string }
+        Args: {
+          upload_id: string
+          storage_path: string
+          parsed_items: Json
+        }
         Returns: undefined
       }
       cancel_inbound_request: {
-        Args: { request_id: string }
+        Args: {
+          request_id: string
+        }
         Returns: undefined
       }
-      cancel_order: { Args: { order_id: string }; Returns: undefined }
+      cancel_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
       cancel_shipping_upload: {
-        Args: { upload_id: string }
+        Args: {
+          upload_id: string
+        }
         Returns: undefined
       }
-      cancel_stock_order: { Args: { order_id: string }; Returns: undefined }
+      cancel_stock_order: {
+        Args: {
+          order_id: string
+        }
+        Returns: undefined
+      }
       cleanup_orphan_inbound_pending: {
-        Args: { p_older_than?: string }
+        Args: {
+          p_older_than?: unknown
+        }
         Returns: number
       }
       complete_shipping_upload: {
-        Args: { upload_id: string }
+        Args: {
+          upload_id: string
+        }
         Returns: undefined
       }
-      confirm_deposit: { Args: { request_id: string }; Returns: undefined }
-      count_inbound_unread: { Args: { p_role: string }; Returns: number }
+      confirm_deposit: {
+        Args: {
+          request_id: string
+        }
+        Returns: undefined
+      }
+      count_inbound_unread: {
+        Args: {
+          p_role: string
+        }
+        Returns: number
+      }
       delete_user_custom_inventory: {
-        Args: { custom_id: string; target_user: string }
+        Args: {
+          target_user: string
+          custom_id: string
+        }
         Returns: undefined
       }
-      is_active: { Args: never; Returns: boolean }
-      is_admin: { Args: never; Returns: boolean }
-      mark_inbound_read: { Args: { request_id: string }; Returns: undefined }
-      place_order: { Args: { items: Json; shipping: Json }; Returns: string }
+      is_active: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      mark_inbound_read: {
+        Args: {
+          request_id: string
+        }
+        Returns: undefined
+      }
+      place_order: {
+        Args: {
+          items: Json
+          shipping: Json
+        }
+        Returns: string
+      }
       rate_limit_check: {
-        Args: { p_action: string; p_limit: number; p_window_seconds: number }
+        Args: {
+          p_action: string
+          p_limit: number
+          p_window_seconds: number
+        }
         Returns: undefined
       }
       reject_deposit: {
-        Args: { memo: string; request_id: string }
+        Args: {
+          request_id: string
+          memo: string
+        }
         Returns: undefined
       }
       reject_order_upload: {
-        Args: { memo: string; upload_id: string }
+        Args: {
+          upload_id: string
+          memo: string
+        }
         Returns: undefined
       }
       reject_shipping_upload: {
-        Args: { memo: string; upload_id: string }
+        Args: {
+          upload_id: string
+          memo: string
+        }
         Returns: undefined
       }
       reject_stock_order: {
-        Args: { memo: string; order_id: string }
+        Args: {
+          order_id: string
+          memo: string
+        }
         Returns: undefined
       }
-      request_stock_order: { Args: { items: Json }; Returns: string }
+      request_stock_order: {
+        Args: {
+          items: Json
+        }
+        Returns: string
+      }
       search_inbound_requests: {
-        Args: { p_limit?: number; p_q?: string; p_status?: string }
+        Args: {
+          p_q?: string
+          p_status?: string
+          p_limit?: number
+        }
         Returns: {
-          admin_last_read_at: string
-          created_at: string
           id: string
+          user_id: string
+          title: string
+          status: string
           last_comment_at: string
           last_comment_by_role: string
-          profile_email: string
-          profile_name: string
-          status: string
-          title: string
-          updated_at: string
-          user_id: string
           user_last_read_at: string
+          admin_last_read_at: string
+          created_at: string
+          updated_at: string
+          profile_name: string
+          profile_email: string
         }[]
       }
       set_inbound_status: {
-        Args: { new_status: string; request_id: string }
+        Args: {
+          request_id: string
+          new_status: string
+        }
         Returns: undefined
       }
       submit_inbound_request_rpc: {
         Args: {
-          p_body: string
-          p_excel_name: string
-          p_excel_path: string
-          p_image_paths: string[]
           p_title: string
+          p_body: string
+          p_excel_path: string
+          p_excel_name: string
+          p_image_paths: string[]
         }
         Returns: string
       }
       transition_order_status: {
         Args: {
-          carrier_name?: string
-          next_status: string
           order_id: string
+          next_status: string
           tracking?: string
+          carrier_name?: string
         }
         Returns: undefined
       }
@@ -1042,33 +1211,27 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type PublicSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  PublicTableNameOrOptions extends
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1076,24 +1239,20 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1101,24 +1260,20 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1126,41 +1281,30 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | keyof PublicSchema["CompositeTypes"]
+    | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const
