@@ -2,6 +2,7 @@
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -27,8 +28,8 @@ create table public.faqs (
   sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
-  created_by  uuid not null references auth.users(id),
-  updated_by  uuid not null references auth.users(id)
+  created_by  uuid not null references public.profiles(id) on delete restrict,
+  updated_by  uuid not null references public.profiles(id) on delete restrict
 );
 
 alter table public.faqs add constraint faqs_user_groups_required
@@ -40,7 +41,7 @@ alter table public.faqs add constraint faqs_user_groups_required
 create index faqs_audience_category_sort_idx
   on public.faqs (audience, category, sort_order);
 
--- 3. updated_at 트리거 (기존 set_updated_at 함수 재사용)
+-- 3. updated_at 트리거 (이 마이그레이션 상단의 set_updated_at 함수 사용)
 create trigger faqs_set_updated_at
   before update on public.faqs
   for each row execute function public.set_updated_at();
@@ -63,15 +64,5 @@ create policy faqs_user_select on public.faqs
 
 create policy faqs_admin_all on public.faqs
   for all to authenticated
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = (select auth.uid()) and p.role = 'admin'
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.profiles p
-      where p.id = (select auth.uid()) and p.role = 'admin'
-    )
-  );
+  using ((select public.is_admin()))
+  with check ((select public.is_admin()));
