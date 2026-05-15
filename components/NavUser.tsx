@@ -15,6 +15,7 @@ import {
   KeyRound,
   Boxes,
   Inbox,
+  BookOpen,
 } from 'lucide-react';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
 import type { UserGroup } from '@/lib/auth/user-groups';
@@ -41,6 +42,7 @@ const NAV: readonly NavItem[] = [
   { href: '/inventory', label: '보유 재고', Icon: Boxes, groups: ['group1'] },
   { href: '/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: Upload, groups: ['group1'] },
   { href: '/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: Upload, groups: ['group1', 'group2'] },
+  { href: '/guide', label: '가이드', Icon: BookOpen, groups: ['group1', 'group2'] },
   { href: '/inbound-requests', label: '입고리스트', Icon: Inbox, groups: ['group1', 'group2'] },
   { href: '/deposit', label: '예치금', Icon: Wallet, groups: ['group1'] },
 ];
