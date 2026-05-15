@@ -17,12 +17,16 @@ describe('GuideMarkdown', () => {
     expect(container.textContent).toContain('안녕');
   });
 
-  it('strips javascript: protocol from links', () => {
-    const { container } = render(
-      <GuideMarkdown source="[click](javascript:alert(1))" />,
-    );
-    const a = container.querySelector('a');
-    expect(a?.getAttribute('href')).not.toMatch(/^javascript:/);
+  it('renders [click](javascript:...) as plain text without anchor', () => {
+    const { container } = render(<GuideMarkdown source="[click](javascript:alert(1))" />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('click');
+  });
+
+  it('renders [link](//evil.com) as plain text without anchor (no protocol-relative)', () => {
+    const { container } = render(<GuideMarkdown source="[link](//evil.com)" />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('link');
   });
 
   it('adds rel=noopener to external links', () => {

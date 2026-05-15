@@ -10,7 +10,7 @@ const schema = {
   tagNames: allowedTags,
   attributes: {
     ...defaultSchema.attributes,
-    a: [['href', /^(https?:|mailto:|\/)/], 'title'],
+    a: [['href', /^(https?:|mailto:|\/(?!\/))/], 'title'],
   },
 };
 
@@ -22,12 +22,15 @@ export function GuideMarkdown({ source }: { source: string }) {
         rehypePlugins={[rehypeRaw, [rehypeSanitize, schema]]}
         components={{
           a: ({ href, children, ...rest }) => {
-            const safeHref = typeof href === 'string' && href.length > 0 ? href : '#';
-            const isExternal = /^https?:/.test(safeHref);
+            // Sanitized away — render text without an anchor
+            if (typeof href !== 'string' || href.length === 0) {
+              return <>{children}</>;
+            }
+            const isExternal = /^https?:/.test(href);
             return (
               <a
                 {...rest}
-                href={safeHref}
+                href={href}
                 target={isExternal ? '_blank' : undefined}
                 rel={isExternal ? 'noopener noreferrer' : undefined}
               >
