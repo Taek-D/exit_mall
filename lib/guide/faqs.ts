@@ -25,6 +25,18 @@ export type ActionResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
+// PostgREST `.or(...)` 표현식의 값을 안전하게 만든다.
+// 1) ILIKE 메타문자(\, %, _)를 \-이스케이프해 사용자 입력이 와일드카드로
+//    해석되지 않게 한다.
+// 2) 결과를 큰따옴표로 감싸 PostgREST OR 구문의 예약문자(`,` `(` `)` `:` `.`)가
+//    필터를 깨지 않게 한다. 따옴표 내부의 `\`와 `"`는 \로 이스케이프한다.
+function buildIlikeOr(columns: readonly string[], rawQuery: string): string {
+  const ilikeEscaped = rawQuery.replace(/[\\%_]/g, (m) => `\\${m}`);
+  const pattern = `%${ilikeEscaped}%`;
+  const quoted = `"${pattern.replace(/[\\"]/g, (m) => `\\${m}`)}"`;
+  return columns.map((col) => `${col}.ilike.${quoted}`).join(',');
+}
+
 export async function getUserFaqs(params: {
   userGroup: UserGroup;
   category?: string;
@@ -43,8 +55,7 @@ export async function getUserFaqs(params: {
     q = q.eq('category', params.category);
   }
   if (params.query && params.query.trim()) {
-    const pattern = `%${params.query.replace(/[%_]/g, m => '\\' + m)}%`;
-    q = q.or(`question.ilike.${pattern},answer.ilike.${pattern}`);
+    q = q.or(buildIlikeOr(['question', 'answer'], params.query));
   }
 
   const { data, error } = await q;
@@ -70,8 +81,7 @@ export async function getAdminFaqs(params: {
   if (params.audience) q = q.eq('audience', params.audience);
   if (params.category) q = q.eq('category', params.category);
   if (params.query && params.query.trim()) {
-    const pattern = `%${params.query.replace(/[%_]/g, m => '\\' + m)}%`;
-    q = q.or(`question.ilike.${pattern},answer.ilike.${pattern}`);
+    q = q.or(buildIlikeOr(['question', 'answer'], params.query));
   }
   const { data, error } = await q;
   if (error) throw new Error(error.message);
