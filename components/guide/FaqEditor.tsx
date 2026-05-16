@@ -76,8 +76,9 @@ export function FaqEditor(props: Props) {
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">대상</label>
+        <label htmlFor="faq-audience" className="block text-sm font-medium text-slate-700">대상</label>
         <select
+          id="faq-audience"
           value={audience}
           onChange={e => setAudience(e.target.value as 'user' | 'admin')}
           className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
@@ -105,8 +106,9 @@ export function FaqEditor(props: Props) {
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">카테고리</label>
+        <label htmlFor="faq-category" className="block text-sm font-medium text-slate-700">카테고리</label>
         <select
+          id="faq-category"
           value={category}
           onChange={e => setCategory(e.target.value)}
           className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
@@ -119,8 +121,9 @@ export function FaqEditor(props: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">질문 (최대 200자)</label>
+        <label htmlFor="faq-question" className="block text-sm font-medium text-slate-700">질문 (최대 200자)</label>
         <input
+          id="faq-question"
           type="text"
           value={question}
           onChange={e => setQuestion(e.target.value)}
@@ -131,8 +134,9 @@ export function FaqEditor(props: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">답변 (markdown, 최대 5000자)</label>
+        <label htmlFor="faq-answer" className="block text-sm font-medium text-slate-700">답변 (markdown, 최대 5000자)</label>
         <textarea
+          id="faq-answer"
           value={answer}
           onChange={e => setAnswer(e.target.value)}
           maxLength={5000}
@@ -143,8 +147,9 @@ export function FaqEditor(props: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700">정렬 순서 (작은 값이 위)</label>
+        <label htmlFor="faq-sort-order" className="block text-sm font-medium text-slate-700">정렬 순서 (작은 값이 위)</label>
         <input
+          id="faq-sort-order"
           type="number"
           value={sortOrder}
           onChange={e => setSortOrder(parseInt(e.target.value, 10) || 0)}
