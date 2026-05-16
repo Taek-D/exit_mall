@@ -1,4 +1,6 @@
-import 'dotenv/config';
+// Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... SEED_OWNER_EMAIL=admin@example.com pnpm tsx scripts/seed-faqs.ts
+// Required env vars must be supplied by the caller — no .env auto-loading.
+
 import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
