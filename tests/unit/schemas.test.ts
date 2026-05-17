@@ -3,7 +3,8 @@ import {
   signupSchema,
   passwordChangeSchema,
   findAccountSchema,
-  passwordResetRequestSchema,
+  directPasswordResetStartSchema,
+  directPasswordResetCompleteSchema,
   passwordResetSchema,
   depositRequestSchema,
   checkoutSchema,
@@ -48,11 +49,14 @@ describe('findAccountSchema', () => {
     expect(findAccountSchema.safeParse({ name: '홍길동', phone: '12345' }).success).toBe(false));
 });
 
-describe('passwordResetRequestSchema', () => {
-  it('passes valid email', () =>
-    expect(passwordResetRequestSchema.safeParse({ email: 'a@b.com' }).success).toBe(true));
+describe('directPasswordResetStartSchema', () => {
+  const valid = { name: '홍길동', phone: '010-1234-5678', email: 'a@b.com' };
+  it('passes valid identity details', () =>
+    expect(directPasswordResetStartSchema.safeParse(valid).success).toBe(true));
   it('rejects invalid email', () =>
-    expect(passwordResetRequestSchema.safeParse({ email: 'not-email' }).success).toBe(false));
+    expect(directPasswordResetStartSchema.safeParse({ ...valid, email: 'not-email' }).success).toBe(false));
+  it('rejects invalid phone', () =>
+    expect(directPasswordResetStartSchema.safeParse({ ...valid, phone: '12345' }).success).toBe(false));
 });
 
 describe('passwordResetSchema', () => {
@@ -62,6 +66,18 @@ describe('passwordResetSchema', () => {
     expect(passwordResetSchema.safeParse({ newPassword: 'short', confirmPassword: 'short' }).success).toBe(false));
   it('rejects mismatched confirmation', () =>
     expect(passwordResetSchema.safeParse({ ...valid, confirmPassword: 'different123' }).success).toBe(false));
+});
+
+describe('directPasswordResetCompleteSchema', () => {
+  const valid = {
+    resetToken: 'token',
+    newPassword: 'newpassword123',
+    confirmPassword: 'newpassword123',
+  };
+  it('requires a reset token', () =>
+    expect(directPasswordResetCompleteSchema.safeParse({ ...valid, resetToken: '' }).success).toBe(false));
+  it('passes valid token and password', () =>
+    expect(directPasswordResetCompleteSchema.safeParse(valid).success).toBe(true));
 });
 
 describe('depositRequestSchema', () => {

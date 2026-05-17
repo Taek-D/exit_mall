@@ -5,16 +5,19 @@ import {
   loginSchema,
   passwordChangeSchema,
   findAccountSchema,
-  passwordResetRequestSchema,
-  passwordResetSchema,
+  directPasswordResetStartSchema,
+  directPasswordResetCompleteSchema,
 } from '@/lib/schemas';
-import { PASSWORD_RECOVERY_COOKIE } from '@/lib/auth-constants';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
 import { submitSignupApplication } from '@/lib/auth/signup-application';
-import { buildAppUrl } from '@/lib/site-url';
 import { GROUP2_HOME } from '@/lib/auth/user-groups';
+import {
+  completeDirectPasswordReset,
+  getDirectPasswordResetSecret,
+  startDirectPasswordReset,
+} from '@/lib/auth/direct-password-reset';
 
 export async function signupAction(formData: FormData) {
   const parsed = signupSchema.safeParse({
@@ -164,26 +167,51 @@ export async function findAccountAction(formData: FormData) {
   };
 }
 
-export async function requestPasswordResetAction(formData: FormData) {
-  const parsed = passwordResetRequestSchema.safeParse({
+function getRequestIp() {
+  const headerStore = headers();
+  const forwardedFor = headerStore.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return (
+    forwardedFor ||
+    headerStore.get('x-real-ip') ||
+    headerStore.get('cf-connecting-ip') ||
+    'unknown'
+  );
+}
+
+export async function startDirectPasswordResetAction(formData: FormData) {
+  const parsed = directPasswordResetStartSchema.safeParse({
+    name: formData.get('name'),
+    phone: formData.get('phone'),
     email: formData.get('email'),
   });
   if (!parsed.success) {
     return { error: formatZodError(parsed.error) };
   }
 
-  const supabase = createClient();
-  const redirectTo = buildAppUrl('/auth/callback?next=/reset-password');
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo,
-  });
-  if (error) return { error: error.message };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
+  }
 
-  return { ok: true };
+  try {
+    const result = await startDirectPasswordReset(
+      parsed.data,
+      createServiceRoleClient(),
+      {
+        ip: getRequestIp(),
+        secret: getDirectPasswordResetSecret(),
+      },
+    );
+    if (!result.ok) return { error: result.error };
+    return { ok: true, resetToken: result.resetToken };
+  } catch (error) {
+    console.error('[auth] direct password reset start', error);
+    return { error: '비밀번호 재설정을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.' };
+  }
 }
 
-export async function resetRecoveredPasswordAction(formData: FormData) {
-  const parsed = passwordResetSchema.safeParse({
+export async function completeDirectPasswordResetAction(formData: FormData) {
+  const parsed = directPasswordResetCompleteSchema.safeParse({
+    resetToken: formData.get('resetToken'),
     newPassword: formData.get('newPassword'),
     confirmPassword: formData.get('confirmPassword'),
   });
@@ -191,24 +219,23 @@ export async function resetRecoveredPasswordAction(formData: FormData) {
     return { error: formatZodError(parsed.error) };
   }
 
-  const cookieStore = cookies();
-  if (!cookieStore.get(PASSWORD_RECOVERY_COOKIE)?.value) {
-    return { error: '비밀번호 재설정 링크가 만료되었거나 올바르지 않습니다' };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
   }
 
-  const supabase = createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) return { error: '비밀번호 재설정 세션이 만료되었습니다' };
-
-  const { error: updateError } = await supabase.auth.updateUser({
-    password: parsed.data.newPassword,
-  });
-  if (updateError) return { error: updateError.message };
-
-  cookieStore.delete(PASSWORD_RECOVERY_COOKIE);
-  await supabase.auth.signOut();
-  return { ok: true };
+  try {
+    const result = await completeDirectPasswordReset(
+      {
+        resetToken: parsed.data.resetToken,
+        newPassword: parsed.data.newPassword,
+      },
+      createServiceRoleClient(),
+      { secret: getDirectPasswordResetSecret() },
+    );
+    if (!result.ok) return { error: result.error };
+    return { ok: true };
+  } catch (error) {
+    console.error('[auth] direct password reset complete', error);
+    return { error: '비밀번호를 재설정하지 못했습니다. 처음부터 다시 시도해주세요.' };
+  }
 }

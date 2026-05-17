@@ -153,7 +153,7 @@ node scripts/build-shipping-template.cjs
 - `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
 - `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
-- `/find-account`, `/reset-password` 아이디 찾기·비밀번호 재설정
+- `/find-account`, `/forgot-password` 아이디 찾기·비밀번호 재설정
 - `/orders/upload` → `/shipping-uploads/exitmall` 로 redirect (legacy)
 - `/shipping-uploads` → `/shipping-uploads/exitmall` 로 redirect (구 단일 메뉴 호환)
 
