@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { NavUser } from '@/components/NavUser';
 import { LowBalanceBanner } from '@/components/LowBalanceBanner';
+import { GuideBanner } from '@/components/guide/GuideBanner';
 import { CartProvider } from '@/components/CartProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { fetchUnreadCount } from '@/lib/inbound/queries';
@@ -25,13 +26,14 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   if (!user) redirect('/login');
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name,deposit_balance,low_balance_threshold,user_group')
+    .select('name,deposit_balance,low_balance_threshold,user_group,guide_banner_dismissed_at')
     .eq('id', user.id)
     .single<{
       name: string;
       deposit_balance: number;
       low_balance_threshold: number;
       user_group: string | null;
+      guide_banner_dismissed_at: string | null;
     }>();
   if (!profile) redirect('/login');
 
@@ -73,6 +75,9 @@ export default async function UserLayout({ children }: { children: React.ReactNo
           inboundUnread={inboundUnread}
           userGroup={userGroup}
         />
+        {profile.guide_banner_dismissed_at === null && (
+          <GuideBanner guideHref="/guide" />
+        )}
         {!isGroup2 && (
           <LowBalanceBanner
             balance={Number(profile.deposit_balance)}

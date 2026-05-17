@@ -20,6 +20,7 @@ export const GROUP2_ALLOWED_PREFIXES = [
   '/inbound-requests',
   '/inbound-template.xlsx',
   '/account',
+  '/guide',
 ] as const;
 
 // group2 사용자가 차단된 경로로 진입하거나 / 로 진입할 때 보낼 홈
