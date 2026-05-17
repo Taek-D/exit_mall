@@ -37,7 +37,7 @@ export function Group2Guide() {
 
         <GuideSection id="account" title="계정">
           <p><Link href="/account/password">비밀번호 변경</Link>은 계정 메뉴에서 할 수 있습니다.</p>
-          <p>아이디를 잊었다면 <Link href="/find-account">아이디 찾기</Link>, 비밀번호를 잊었다면 <Link href="/reset-password">비밀번호 재설정</Link>을 이용해주세요.</p>
+          <p>아이디를 잊었다면 <Link href="/find-account">아이디 찾기</Link>, 비밀번호를 잊었다면 <Link href="/find-account">비밀번호 재설정</Link>을 이용해주세요.</p>
         </GuideSection>
       </main>
     </div>

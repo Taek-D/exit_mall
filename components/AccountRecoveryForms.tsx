@@ -1,22 +1,27 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
+  completeDirectPasswordResetAction,
   findAccountAction,
-  requestPasswordResetAction,
+  startDirectPasswordResetAction,
 } from '@/lib/actions/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FormMessage } from '@/components/FormMessage';
-import { KeyRound, Mail, Phone, Search, User } from 'lucide-react';
+import { PasswordInput } from '@/components/PasswordInput';
+import { KeyRound, Lock, Mail, Phone, Search, User, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 
 type FoundAccount = {
   email: string;
   status: string;
 };
+
+type FieldName = 'newPassword' | 'confirmPassword';
 
 export function AccountRecoveryForms({
   defaultTab = 'id',
@@ -33,7 +38,7 @@ export function AccountRecoveryForms({
         <FindIdForm />
       </TabsContent>
       <TabsContent value="password" className="mt-4">
-        <ForgotPasswordForm />
+        <DirectPasswordResetForm />
       </TabsContent>
     </Tabs>
   );
@@ -72,7 +77,7 @@ function FindIdForm() {
       <IconField
         Icon={Phone}
         id="phone"
-        label="휴대폰"
+        label="휴대폰 번호"
         placeholder="010-1234-5678"
         autoComplete="tel"
         disabled={pending}
@@ -112,35 +117,113 @@ function FindIdForm() {
   );
 }
 
-function ForgotPasswordForm() {
+function DirectPasswordResetForm() {
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [visible, setVisible] = useState<Record<FieldName, boolean>>({
+    newPassword: false,
+    confirmPassword: false,
+  });
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onVerify(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setError(null);
-    setSent(false);
     start(async () => {
-      const result = await requestPasswordResetAction(fd);
+      const result = await startDirectPasswordResetAction(fd);
       if (result?.error) {
         setError(result.error);
         return;
       }
-      setSent(true);
+      setResetToken(result?.resetToken ?? null);
     });
   }
 
+  function onReset(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setError(null);
+    start(async () => {
+      const result = await completeDirectPasswordResetAction(fd);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      router.push('/reset-password/success');
+    });
+  }
+
+  if (resetToken) {
+    return (
+      <form onSubmit={onReset} className="rounded-lg border bg-card p-6 space-y-5">
+        <input type="hidden" name="resetToken" value={resetToken} />
+        <div className="space-y-1.5">
+          <h2 className="font-heading font-semibold text-lg">새 비밀번호 설정</h2>
+          <p className="text-sm text-muted-foreground">
+            본인 정보가 확인되었습니다. 새 비밀번호를 입력해주세요.
+          </p>
+        </div>
+
+        <PasswordInput
+          name="newPassword"
+          label="새 비밀번호"
+          visible={visible.newPassword}
+          disabled={pending}
+          onToggle={() => setVisible((v) => ({ ...v, newPassword: !v.newPassword }))}
+        />
+        <PasswordInput
+          name="confirmPassword"
+          label="새 비밀번호 확인"
+          visible={visible.confirmPassword}
+          disabled={pending}
+          onToggle={() =>
+            setVisible((v) => ({ ...v, confirmPassword: !v.confirmPassword }))
+          }
+        />
+
+        {error && <Message tone="error">{error}</Message>}
+
+        <div className="grid grid-cols-[auto_1fr] gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              setResetToken(null);
+              setError(null);
+            }}
+          >
+            이전
+          </Button>
+          <Button type="submit" className="w-full" disabled={pending}>
+            <Lock className="h-4 w-4" aria-hidden />
+            {pending ? '재설정 중...' : '비밀번호 재설정'}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
   return (
-    <form onSubmit={onSubmit} className="rounded-lg border bg-card p-6 space-y-5">
+    <form onSubmit={onVerify} className="rounded-lg border bg-card p-6 space-y-5">
       <div className="space-y-1.5">
         <h2 className="font-heading font-semibold text-lg">비밀번호 찾기</h2>
         <p className="text-sm text-muted-foreground">
-          가입 이메일로 비밀번호 재설정 링크를 보내드립니다.
+          가입한 이름, 휴대폰 번호, 이메일이 모두 일치하면 바로 새 비밀번호를 설정합니다.
         </p>
       </div>
 
+      <IconField Icon={User} id="name" label="이름" autoComplete="name" disabled={pending} />
+      <IconField
+        Icon={Phone}
+        id="phone"
+        label="휴대폰 번호"
+        placeholder="010-1234-5678"
+        autoComplete="tel"
+        disabled={pending}
+      />
       <IconField
         Icon={Mail}
         id="email"
@@ -152,20 +235,11 @@ function ForgotPasswordForm() {
       />
 
       {error && <Message tone="error">{error}</Message>}
-      {sent && (
-        <Message tone="success">
-          재설정 메일을 보냈습니다. 메일의 링크는 짧은 시간 동안만 사용할 수 있습니다.
-        </Message>
-      )}
 
       <Button type="submit" className="w-full" disabled={pending}>
         <KeyRound className="h-4 w-4" aria-hidden />
-        {pending ? '발송 중...' : '재설정 메일 보내기'}
+        {pending ? '확인 중...' : '본인 정보 확인'}
       </Button>
-
-      <p className="text-xs text-muted-foreground text-center">
-        메일을 받지 못했다면 스팸함을 확인하거나 운영자에게 문의해주세요.
-      </p>
     </form>
   );
 }
@@ -179,7 +253,7 @@ function IconField({
   placeholder,
   disabled,
 }: {
-  Icon: typeof Mail;
+  Icon: LucideIcon;
   id: string;
   label: string;
   type?: string;
