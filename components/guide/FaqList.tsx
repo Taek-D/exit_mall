@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { FaqItem } from './FaqItem';
 import type { Faq } from '@/lib/guide/faqs';
 
@@ -19,6 +19,15 @@ export function FaqList({
   const [pending, start] = useTransition();
   const q = params.get('q') ?? '';
   const category = params.get('category') ?? '';
+
+  // 검색 input은 URL의 q를 진실의 원천으로 두되, 매 키스트로크마다 router.replace를
+  // useTransition으로 호출하면 pending 동안 controlled value가 깜빡일 수 있다.
+  // 그래서 local state로 즉시 표시값을 들고, URL의 q가 외부 변화(뒤로/앞으로
+  // 이동, 직접 URL 입력 등)로 바뀌면 effect로 동기화한다.
+  const [text, setText] = useState(q);
+  useEffect(() => {
+    setText(q);
+  }, [q]);
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
@@ -40,8 +49,11 @@ export function FaqList({
         <input
           type="search"
           placeholder="질문/답변 검색"
-          defaultValue={q}
-          onChange={e => setParam('q', e.target.value)}
+          value={text}
+          onChange={e => {
+            setText(e.target.value);
+            setParam('q', e.target.value);
+          }}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm sm:max-w-sm"
         />
         <select
