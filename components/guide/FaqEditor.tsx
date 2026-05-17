@@ -36,6 +36,13 @@ export function FaqEditor(props: Props) {
   const labelMap =
     audience === 'user' ? USER_FAQ_CATEGORY_LABEL : ADMIN_FAQ_CATEGORY_LABEL;
 
+  // audience 변경으로 현재 카테고리가 옵션 셋에 없으면 첫 항목으로 폴백.
+  // render-phase setState를 피하기 위해 표시값을 파생한다 (실제 state는 보존
+  // 되어 audience를 되돌리면 사용자의 원래 선택이 그대로 노출됨).
+  const effectiveCategory = (categoryOptions as readonly string[]).includes(category)
+    ? category
+    : categoryOptions[0];
+
   const toggleGroup = (g: 'group1' | 'group2') => {
     setGroups(prev =>
       prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g],
@@ -48,8 +55,8 @@ export function FaqEditor(props: Props) {
     start(async () => {
       const input =
         audience === 'user'
-          ? { audience: 'user' as const, user_groups: groups, category, question, answer, sort_order: sortOrder }
-          : { audience: 'admin' as const, user_groups: null, category, question, answer, sort_order: sortOrder };
+          ? { audience: 'user' as const, user_groups: groups, category: effectiveCategory, question, answer, sort_order: sortOrder }
+          : { audience: 'admin' as const, user_groups: null, category: effectiveCategory, question, answer, sort_order: sortOrder };
       const result =
         props.mode === 'create'
           ? await createFaq(input as any)
@@ -63,11 +70,6 @@ export function FaqEditor(props: Props) {
       router.refresh();
     });
   };
-
-  // 카테고리가 audience에 안 맞으면 첫 항목으로 리셋
-  if (!(categoryOptions as readonly string[]).includes(category)) {
-    setCategory(categoryOptions[0]);
-  }
 
   return (
     <div className="space-y-4">
@@ -109,7 +111,7 @@ export function FaqEditor(props: Props) {
         <label htmlFor="faq-category" className="block text-sm font-medium text-slate-700">카테고리</label>
         <select
           id="faq-category"
-          value={category}
+          value={effectiveCategory}
           onChange={e => setCategory(e.target.value)}
           className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
         >
