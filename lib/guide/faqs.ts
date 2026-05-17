@@ -37,12 +37,24 @@ function buildIlikeOr(columns: readonly string[], rawQuery: string): string {
   return columns.map((col) => `${col}.ilike.${quoted}`).join(',');
 }
 
+// Next.js App Router의 searchParams는 같은 키가 반복되면 `string[]`로 도착한다
+// (예: `/guide/faq?q=a&q=b`). 헬퍼는 첫 값만 받아 단일 문자열로 정규화하고,
+// 비문자열·빈 문자열은 undefined로 떨어뜨려 호출부의 defensive trim/eq 호출이
+// TypeError를 던지지 않도록 한다.
+function firstString(v: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(v) ? v[0] : v;
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 export async function getUserFaqs(params: {
   userGroup: UserGroup;
-  category?: string;
-  query?: string;
+  category?: string | string[];
+  query?: string | string[];
 }): Promise<Faq[]> {
   const supabase = createClient();
+  const category = firstString(params.category);
+  const query = firstString(params.query);
+
   let q = supabase
     .from('faqs')
     .select('*')
@@ -51,11 +63,11 @@ export async function getUserFaqs(params: {
     .order('category', { ascending: true })
     .order('sort_order', { ascending: true });
 
-  if (params.category && isUserFaqCategory(params.category)) {
-    q = q.eq('category', params.category);
+  if (category && isUserFaqCategory(category)) {
+    q = q.eq('category', category);
   }
-  if (params.query && params.query.trim()) {
-    q = q.or(buildIlikeOr(['question', 'answer'], params.query));
+  if (query && query.trim()) {
+    q = q.or(buildIlikeOr(['question', 'answer'], query));
   }
 
   const { data, error } = await q;
@@ -64,12 +76,18 @@ export async function getUserFaqs(params: {
 }
 
 export async function getAdminFaqs(params: {
-  audience?: 'user' | 'admin';
-  category?: string;
-  query?: string;
+  audience?: string | string[];
+  category?: string | string[];
+  query?: string | string[];
 }): Promise<Faq[]> {
   const guard = await requireAdmin();
   if (!guard.ok) throw new Error(guard.error);
+
+  const audienceRaw = firstString(params.audience);
+  const audience: 'user' | 'admin' | undefined =
+    audienceRaw === 'user' || audienceRaw === 'admin' ? audienceRaw : undefined;
+  const category = firstString(params.category);
+  const query = firstString(params.query);
 
   let q = guard.supabase
     .from('faqs')
@@ -78,10 +96,10 @@ export async function getAdminFaqs(params: {
     .order('category', { ascending: true })
     .order('sort_order', { ascending: true });
 
-  if (params.audience) q = q.eq('audience', params.audience);
-  if (params.category) q = q.eq('category', params.category);
-  if (params.query && params.query.trim()) {
-    q = q.or(buildIlikeOr(['question', 'answer'], params.query));
+  if (audience) q = q.eq('audience', audience);
+  if (category) q = q.eq('category', category);
+  if (query && query.trim()) {
+    q = q.or(buildIlikeOr(['question', 'answer'], query));
   }
   const { data, error } = await q;
   if (error) throw new Error(error.message);

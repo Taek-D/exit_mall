@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function FaqPage({
   searchParams,
 }: {
-  searchParams: { q?: string; category?: string };
+  searchParams: { q?: string | string[]; category?: string | string[] };
 }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();

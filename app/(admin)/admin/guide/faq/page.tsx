@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminFaqPage({
   searchParams,
 }: {
-  searchParams: { q?: string; category?: string };
+  searchParams: { q?: string | string[]; category?: string | string[] };
 }) {
   const faqs = await getAdminFaqs({
     audience: 'admin',
