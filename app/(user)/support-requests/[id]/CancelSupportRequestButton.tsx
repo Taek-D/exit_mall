@@ -8,21 +8,28 @@ import { useToast } from '@/hooks/use-toast';
 import { cancelSupportRequestAction } from '@/lib/actions/support-request';
 
 export function CancelSupportRequestButton({ requestId }: { requestId: string }) {
+  const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { confirm, element } = useConfirm();
 
   async function onCancel() {
-    if (pending) return;
+    if (confirming || pending) return;
 
-    const result = await confirm({
+    setConfirming(true);
+    let result: Awaited<ReturnType<typeof confirm>>;
+    try {
+      result = await confirm({
       title: '문의를 취소할까요?',
       description: '취소하면 되돌릴 수 없습니다.',
       confirmLabel: '취소',
       cancelLabel: '닫기',
       tone: 'destructive',
-    });
+      });
+    } finally {
+      setConfirming(false);
+    }
     if (!result.ok) return;
 
     setPending(true);
@@ -41,7 +48,7 @@ export function CancelSupportRequestButton({ requestId }: { requestId: string })
 
   return (
     <>
-      <Button variant="ghost" size="sm" disabled={pending} onClick={onCancel}>
+      <Button variant="ghost" size="sm" disabled={confirming || pending} onClick={onCancel}>
         {pending ? '처리 중...' : '취소'}
       </Button>
       {element}

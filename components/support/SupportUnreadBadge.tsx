@@ -39,7 +39,7 @@ export function SupportUnreadBadge({
     function scheduleRefresh() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        if (!cancelled) refresh();
+        if (!cancelled) void refresh();
       }, 1000);
     }
 
@@ -59,6 +59,8 @@ export function SupportUnreadBadge({
         scheduleRefresh,
       )
       .subscribe();
+
+    void refresh();
 
     return () => {
       cancelled = true;
