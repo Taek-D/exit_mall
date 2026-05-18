@@ -133,20 +133,6 @@ alter table public.support_request_attachments enable row level security;
 create policy support_requests_owner_admin_select on public.support_requests
   for select using (user_id = auth.uid() or public.is_admin());
 
-create policy support_requests_self_delete on public.support_requests
-  for delete using (
-    user_id = (select auth.uid())
-    and status = 'open'
-    and not exists (
-      select 1 from public.support_request_comments c
-      where c.request_id = support_requests.id
-    )
-    and not exists (
-      select 1 from public.support_request_attachments a
-      where a.request_id = support_requests.id
-    )
-  );
-
 create policy support_requests_admin_all on public.support_requests
   for all using (public.is_admin()) with check (public.is_admin());
 
@@ -163,20 +149,63 @@ create policy support_comments_self_update on public.support_request_comments
   for update using (
     author_id = auth.uid()
     and now() < created_at + interval '10 minutes'
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
   )
   with check (
     author_id = auth.uid()
     and now() < created_at + interval '10 minutes'
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
   );
 
 create policy support_comments_self_delete on public.support_request_comments
   for delete using (
     author_id = auth.uid()
     and now() < created_at + interval '10 minutes'
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
   );
 
-create policy support_comments_admin_all on public.support_request_comments
-  for all using (public.is_admin()) with check (public.is_admin());
+create policy support_comments_admin_select on public.support_request_comments
+  for select using (public.is_admin());
+
+create policy support_comments_admin_update on public.support_request_comments
+  for update using (
+    public.is_admin()
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
+  )
+  with check (
+    public.is_admin()
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
+  );
+
+create policy support_comments_admin_delete on public.support_request_comments
+  for delete using (
+    public.is_admin()
+    and exists (
+      select 1 from public.support_requests r
+      where r.id = request_id
+        and r.status not in ('completed','cancelled')
+    )
+  );
 
 create policy support_attachments_select on public.support_request_attachments
   for select using (
@@ -196,15 +225,6 @@ create policy support_attachments_owner_insert on public.support_request_attachm
       where r.id = request_id
         and r.user_id = auth.uid()
         and r.status = 'open'
-    )
-  );
-
-create policy support_attachments_owner_delete on public.support_request_attachments
-  for delete using (
-    user_id = auth.uid()
-    and exists (
-      select 1 from public.support_requests r
-      where r.id = request_id and r.status = 'open'
     )
   );
 

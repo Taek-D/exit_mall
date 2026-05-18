@@ -69,7 +69,12 @@ export default async function SupportRequestDetailPage({
 
       <section className="space-y-3">
         <h2 className="font-heading font-semibold text-lg">댓글</h2>
-        <SupportCommentList comments={comments} currentUserId={u.user.id} isAdmin={false} />
+        <SupportCommentList
+          comments={comments}
+          currentUserId={u.user.id}
+          isAdmin={false}
+          locked={locked}
+        />
         <SupportCommentForm
           requestId={request.id}
           disabled={locked}

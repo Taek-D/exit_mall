@@ -8,9 +8,10 @@ type Props = {
   comments: SupportCommentRow[];
   currentUserId: string;
   isAdmin: boolean;
+  locked?: boolean;
 };
 
-export function SupportCommentList({ comments, currentUserId, isAdmin }: Props) {
+export function SupportCommentList({ comments, currentUserId, isAdmin, locked = false }: Props) {
   if (comments.length === 0) {
     return <p className="py-4 text-sm text-muted-foreground">아직 댓글이 없습니다.</p>;
   }
@@ -45,13 +46,15 @@ export function SupportCommentList({ comments, currentUserId, isAdmin }: Props) 
                 {comment.updated_at !== comment.created_at && <span>(수정됨)</span>}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm">{comment.body}</p>
-              <CommentRowActions
-                commentId={comment.id}
-                createdAt={comment.created_at}
-                isAuthor={isAuthor}
-                isAdmin={isAdmin}
-                body={comment.body}
-              />
+              {!locked && (
+                <CommentRowActions
+                  commentId={comment.id}
+                  createdAt={comment.created_at}
+                  isAuthor={isAuthor}
+                  isAdmin={isAdmin}
+                  body={comment.body}
+                />
+              )}
             </div>
           </li>
         );

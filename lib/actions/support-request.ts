@@ -10,15 +10,16 @@ import {
 } from '@/lib/actions/_shared';
 import { fileToBuffer } from '@/lib/files/excel';
 import { supportCommentSchema, supportRequestCreateSchema } from '@/lib/schemas';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import {
   mapSubmitSupportRequestError,
   mapSupportCancelError,
   mapSupportCommentError,
   mapSupportStatusError,
 } from '@/lib/support/action-errors';
-import { getSupportCommentAccessError } from '@/lib/support/permissions';
+import { getSupportCommentAccessError, isSupportLocked } from '@/lib/support/permissions';
 import { supportAttachmentPath, supportCleanupPaths } from '@/lib/support/upload-paths';
+import type { SupportStatus } from '@/lib/types';
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -209,8 +210,12 @@ export async function submitSupportRequestAction(
       insertedAttachmentIds.push(attachmentId);
     }
   } catch (error) {
+    const cleanupSupabase = (
+      process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : supabase
+    ) as ReturnType<typeof createClient>;
+
     if (insertedAttachmentIds.length > 0) {
-      const { error: metadataCleanupError } = await mutationTable(supabase, 'support_request_attachments')
+      const { error: metadataCleanupError } = await mutationTable(cleanupSupabase, 'support_request_attachments')
         .delete()
         .in('id', insertedAttachmentIds);
       if (metadataCleanupError) {
@@ -220,7 +225,7 @@ export async function submitSupportRequestAction(
 
     const cleanupPaths = supportCleanupPaths(uploadedPaths);
     if (cleanupPaths.length > 0) {
-      const { error: storageCleanupError } = await supabase.storage
+      const { error: storageCleanupError } = await cleanupSupabase.storage
         .from('support-requests')
         .remove(cleanupPaths);
       if (storageCleanupError) {
@@ -228,7 +233,7 @@ export async function submitSupportRequestAction(
       }
     }
 
-    const { error: requestCleanupError } = await mutationTable(supabase, 'support_requests')
+    const { error: requestCleanupError } = await mutationTable(cleanupSupabase, 'support_requests')
       .delete()
       .eq('id', requestId);
     if (requestCleanupError) {
@@ -317,6 +322,32 @@ export async function addSupportCommentAction(
 }
 
 type CommentRow = { author_id: string; created_at: string; request_id: string };
+type SupportRequestStatusRow = { status: SupportStatus };
+
+async function assertSupportRequestEditable(
+  supabase: ReturnType<typeof createClient>,
+  requestId: string,
+): Promise<ActionResult> {
+  const { data: request, error } = (await supabase
+    .from('support_requests')
+    .select('status')
+    .eq('id', requestId)
+    .maybeSingle()) as { data: SupportRequestStatusRow | null; error: unknown };
+
+  if (error || !request) {
+    if (error) console.error('[support] fetch request for comment mutation', { requestId, error });
+    return { ok: false, error: 'Support request not found.' };
+  }
+
+  if (isSupportLocked(request.status)) {
+    return {
+      ok: false,
+      error: mapSupportCommentError('LOCKED') ?? 'Support request is locked.',
+    };
+  }
+
+  return { ok: true };
+}
 
 export async function updateSupportCommentAction(
   commentId: string,
@@ -349,6 +380,9 @@ export async function updateSupportCommentAction(
     action: '수정',
   });
   if (accessError) return { ok: false, error: accessError };
+
+  const editable = await assertSupportRequestEditable(supabase, row.request_id);
+  if (!editable.ok) return editable;
 
   const { error } = await mutationTable(supabase, 'support_request_comments')
     .update({ body: parsed.data.body, updated_at: new Date().toISOString() })
@@ -386,6 +420,9 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
     action: '삭제',
   });
   if (accessError) return { ok: false, error: accessError };
+
+  const editable = await assertSupportRequestEditable(supabase, row.request_id);
+  if (!editable.ok) return editable;
 
   const { error } = await mutationTable(supabase, 'support_request_comments')
     .delete()

@@ -8,6 +8,11 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '60mb',
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
