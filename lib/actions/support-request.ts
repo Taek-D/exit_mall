@@ -173,7 +173,13 @@ export async function submitSupportRequestAction(
     const mapped = mapSubmitSupportRequestError(rpcErr?.message ?? '');
     if (mapped) return { ok: false, error: mapped };
     console.error('[support] submit_support_request_rpc', rpcErr);
-    return { ok: false, error: '문의 등록에 실패했습니다.' };
+    const detail = rpcErr?.message?.trim();
+    return {
+      ok: false,
+      error: detail
+        ? `문의 등록에 실패했습니다: ${detail}`
+        : '문의 등록에 실패했습니다.',
+    };
   }
 
   const requestId = String(requestIdData);

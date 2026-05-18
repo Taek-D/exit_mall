@@ -5,9 +5,12 @@ function supportErrorCode(message: string): string {
 export function mapSubmitSupportRequestError(message: string): string | null {
   const code = supportErrorCode(message);
   if (code === 'RATE_LIMITED') return '잠시 후 다시 시도해주세요 (분당 5건 제한).';
+  if (code === 'FORBIDDEN') return '비활성 계정은 문의를 등록할 수 없습니다. 관리자에게 문의해주세요.';
   if (code === 'INVALID_CATEGORY') return '문의 유형을 확인해주세요.';
   if (code === 'INVALID_REFERENCE_TYPE') return '참고번호 유형을 확인해주세요.';
+  if (code === 'INVALID_TITLE') return '제목을 확인해주세요 (1~200자).';
   if (code === 'INVALID_BODY') return '문의 내용을 확인해주세요.';
+  if (code === 'INVALID_REFERENCE') return '참고 번호는 100자 이하여야 합니다.';
   return null;
 }
 
