@@ -27,6 +27,18 @@ const TITLES: Record<string, string> = {
   '/admin/account/password': '비밀번호 변경',
 };
 
+function getAdminTitle(pathname: string) {
+  const exactTitle = TITLES[pathname];
+  if (exactTitle) return exactTitle;
+
+  return (
+    Object.entries(TITLES)
+      .filter(([path]) => path !== '/admin')
+      .sort(([a], [b]) => b.length - a.length)
+      .find(([path]) => pathname.startsWith(path + '/'))?.[1] ?? '관리자'
+  );
+}
+
 export function AdminHeader({
   name,
   email,
@@ -40,10 +52,7 @@ export function AdminHeader({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const title =
-    TITLES[pathname] ??
-    Object.entries(TITLES).find(([p]) => pathname.startsWith(p + '/'))?.[1] ??
-    '관리자';
+  const title = getAdminTitle(pathname);
   const initial = (name || email || 'A').charAt(0).toUpperCase();
 
   return (
