@@ -80,6 +80,52 @@ create table public.support_request_attachments (
 
 create index support_attachments_request_idx on public.support_request_attachments (request_id, created_at);
 
+create or replace function public.support_attachments_before_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_req public.support_requests%rowtype;
+  v_count integer;
+begin
+  select * into v_req
+  from public.support_requests
+  where id = NEW.request_id
+  for update;
+
+  if not found then
+    raise exception 'REQUEST_NOT_FOUND';
+  end if;
+
+  if NEW.user_id <> v_req.user_id then
+    raise exception 'INVALID_ATTACHMENT_OWNER';
+  end if;
+
+  if NEW.storage_path not like (NEW.user_id::text || '/' || NEW.request_id::text || '/attachments/%') then
+    raise exception 'INVALID_ATTACHMENT_PATH';
+  end if;
+
+  select count(*) into v_count
+  from public.support_request_attachments
+  where request_id = NEW.request_id;
+
+  if v_count >= 5 then
+    raise exception 'TOO_MANY_ATTACHMENTS';
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists support_attachments_before_insert_trg on public.support_request_attachments;
+create trigger support_attachments_before_insert_trg
+  before insert on public.support_request_attachments
+  for each row execute function public.support_attachments_before_insert();
+
+revoke execute on function public.support_attachments_before_insert() from public, anon, authenticated;
+
 alter table public.support_requests enable row level security;
 alter table public.support_request_comments enable row level security;
 alter table public.support_request_attachments enable row level security;
@@ -88,7 +134,18 @@ create policy support_requests_owner_admin_select on public.support_requests
   for select using (user_id = auth.uid() or public.is_admin());
 
 create policy support_requests_self_delete on public.support_requests
-  for delete using (user_id = auth.uid() and status = 'open');
+  for delete using (
+    user_id = (select auth.uid())
+    and status = 'open'
+    and not exists (
+      select 1 from public.support_request_comments c
+      where c.request_id = support_requests.id
+    )
+    and not exists (
+      select 1 from public.support_request_attachments a
+      where a.request_id = support_requests.id
+    )
+  );
 
 create policy support_requests_admin_all on public.support_requests
   for all using (public.is_admin()) with check (public.is_admin());
@@ -174,7 +231,11 @@ create policy "support-requests owner write" on storage.objects
 create policy "support-requests owner delete" on storage.objects
   for delete using (
     bucket_id = 'support-requests'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and (select auth.uid())::text = (storage.foldername(name))[1]
+    and not exists (
+      select 1 from public.support_request_attachments a
+      where a.storage_path = storage.objects.name
+    )
   );
 
 create policy "support-requests admin all" on storage.objects
@@ -199,7 +260,7 @@ begin
   if v_user is null or not public.is_active() then
     raise exception 'FORBIDDEN';
   end if;
-  if p_category not in ('exchange','return','cs','other') then
+  if p_category is null or p_category not in ('exchange','return','cs','other') then
     raise exception 'INVALID_CATEGORY';
   end if;
   if coalesce(p_reference_type, 'none') not in ('none','order','tracking','other') then
@@ -234,6 +295,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.submit_support_request_rpc(text, text, text, text, text) from public, anon;
 grant execute on function public.submit_support_request_rpc(text, text, text, text, text) to authenticated;
 
 create or replace function public.set_support_status(
@@ -271,6 +333,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.set_support_status(uuid, text) from public, anon;
 grant execute on function public.set_support_status(uuid, text) to authenticated;
 
 create or replace function public.cancel_support_request(
@@ -306,6 +369,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.cancel_support_request(uuid) from public, anon;
 grant execute on function public.cancel_support_request(uuid) to authenticated;
 
 create or replace function public.mark_support_read(
@@ -324,15 +388,40 @@ begin
   end if;
 
   if public.is_admin() then
-    update public.support_requests set admin_last_read_at = now() where id = p_request_id;
+    if v_req.last_comment_at is not null
+       and (
+         v_req.admin_last_read_at is null
+         or v_req.last_comment_at > v_req.admin_last_read_at
+       ) then
+      update public.support_requests
+      set admin_last_read_at = v_req.last_comment_at
+      where id = p_request_id
+        and (
+          admin_last_read_at is null
+          or admin_last_read_at < v_req.last_comment_at
+        );
+    end if;
   elsif v_req.user_id = auth.uid() then
-    update public.support_requests set user_last_read_at = now() where id = p_request_id;
+    if v_req.last_comment_at is not null
+       and (
+         v_req.user_last_read_at is null
+         or v_req.last_comment_at > v_req.user_last_read_at
+       ) then
+      update public.support_requests
+      set user_last_read_at = v_req.last_comment_at
+      where id = p_request_id
+        and (
+          user_last_read_at is null
+          or user_last_read_at < v_req.last_comment_at
+        );
+    end if;
   else
     raise exception 'FORBIDDEN';
   end if;
 end;
 $$;
 
+revoke execute on function public.mark_support_read(uuid) from public, anon;
 grant execute on function public.mark_support_read(uuid) to authenticated;
 
 create or replace function public.add_support_comment(
@@ -384,6 +473,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.add_support_comment(uuid, text) from public, anon;
 grant execute on function public.add_support_comment(uuid, text) to authenticated;
 
 create or replace function public.count_support_unread(
@@ -416,6 +506,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.count_support_unread(text) from public, anon;
 grant execute on function public.count_support_unread(text) to authenticated;
 
 create or replace function public.search_support_requests(
@@ -477,6 +568,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.search_support_requests(text, text, text, integer) from public, anon;
 grant execute on function public.search_support_requests(text, text, text, integer) to authenticated;
 
 do $$
