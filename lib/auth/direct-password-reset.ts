@@ -22,7 +22,7 @@ type ServiceClient = {
 };
 
 type ResetContext = {
-  ip: string;
+  ip?: string | null;
   secret: string;
   now?: Date;
 };
@@ -71,8 +71,8 @@ function lookupHash(input: { email: string; phone: string }, secret: string) {
   return hmac(`${normalizeEmail(input.email)}|${normalizePhone(input.phone)}`, secret);
 }
 
-function ipHash(ip: string, secret: string) {
-  return hmac(ip || 'unknown', secret);
+function ipHash(ip: string | null | undefined, secret: string, fallbackScope: string) {
+  return hmac(ip ? `ip:${ip}` : `missing-ip:${fallbackScope}`, secret);
 }
 
 async function countRecentFailures(
@@ -100,7 +100,7 @@ async function recordFailedAttempt(
 ) {
   const { error } = await service.from('password_reset_attempts').insert({
     lookup_hash: lookupHash(input, context.secret),
-    ip_hash: ipHash(context.ip, context.secret),
+    ip_hash: ipHash(context.ip, context.secret, lookupHash(input, context.secret)),
     success: false,
   });
   if (error) throw new Error(error.message);
@@ -127,14 +127,16 @@ export async function startDirectPasswordReset(
 ): Promise<{ ok: true; resetToken: string } | { ok: false; error: string }> {
   const now = context.now ?? new Date();
   const targetLookupHash = lookupHash(input, context.secret);
-  const targetIpHash = ipHash(context.ip, context.secret);
+  const targetIpHash = ipHash(context.ip, context.secret, targetLookupHash);
   const lookupFailures = await countRecentFailures(
     service,
     'lookup_hash',
     targetLookupHash,
     now,
   );
-  const ipFailures = await countRecentFailures(service, 'ip_hash', targetIpHash, now);
+  const ipFailures = context.ip
+    ? await countRecentFailures(service, 'ip_hash', targetIpHash, now)
+    : 0;
 
   if (lookupFailures >= RESET_ATTEMPT_LIMIT || ipFailures >= RESET_ATTEMPT_LIMIT) {
     return { ok: false, error: DIRECT_PASSWORD_RESET_RATE_LIMIT_ERROR };
@@ -143,7 +145,7 @@ export async function startDirectPasswordReset(
   const { data: profile, error } = await service
     .from('profiles')
     .select('id,role,status,email,name,phone')
-    .ilike('email', normalizeEmail(input.email))
+    .eq('email', normalizeEmail(input.email))
     .maybeSingle();
 
   if (error) throw new Error(error.message);

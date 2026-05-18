@@ -15,6 +15,7 @@ const baseInput = {
 function createService({
   profile = { id: 'user-1', role: 'user', status: 'active', email: 'user@example.com', name: '홍길동', phone: '01012345678' },
   failedAttempts = 0,
+  failedAttemptsByColumn,
   challenge = {
     id: 'challenge-1',
     user_id: 'user-1',
@@ -25,11 +26,17 @@ function createService({
 }: {
   profile?: any;
   failedAttempts?: number;
+  failedAttemptsByColumn?: Partial<Record<'lookup_hash' | 'ip_hash', number>>;
   challenge?: any;
   authError?: { message: string } | null;
 } = {}) {
   const profileMaybeSingle = vi.fn().mockResolvedValue({ data: profile, error: null });
-  const attemptSelect = vi.fn().mockResolvedValue({ count: failedAttempts, error: null });
+  const attemptSelect = vi.fn((column?: 'lookup_hash' | 'ip_hash') =>
+    Promise.resolve({
+      count: failedAttemptsByColumn?.[column ?? 'lookup_hash'] ?? failedAttempts,
+      error: null,
+    }),
+  );
   const attemptInsert = vi.fn().mockResolvedValue({ error: null });
   const challengeInsertSelect = vi.fn().mockResolvedValue({
     data: { id: 'challenge-1' },
@@ -38,6 +45,7 @@ function createService({
   const challengeMaybeSingle = vi.fn().mockResolvedValue({ data: challenge, error: null });
   const challengeUpdate = vi.fn().mockResolvedValue({ error: null });
   const updateUserById = vi.fn().mockResolvedValue({ error: authError });
+  const profileEq = vi.fn(() => ({ maybeSingle: profileMaybeSingle }));
 
   const service = {
     auth: { admin: { updateUserById } },
@@ -45,16 +53,19 @@ function createService({
       if (table === 'profiles') {
         return {
           select: vi.fn(() => ({
-            ilike: vi.fn(() => ({ maybeSingle: profileMaybeSingle })),
+            eq: profileEq,
+            ilike: vi.fn(() => {
+              throw new Error('profile lookup must use exact email equality');
+            }),
           })),
         };
       }
       if (table === 'password_reset_attempts') {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({
+            eq: vi.fn((column: 'lookup_hash' | 'ip_hash') => ({
               eq: vi.fn(() => ({
-                gte: vi.fn(() => attemptSelect()),
+                gte: vi.fn(() => attemptSelect(column)),
               })),
             })),
           })),
@@ -85,6 +96,8 @@ function createService({
   return {
     service,
     profileMaybeSingle,
+    profileEq,
+    attemptSelect,
     attemptInsert,
     challengeInsertSelect,
     updateUserById,
@@ -131,6 +144,37 @@ describe('direct password reset', () => {
 
     expect(result).toEqual({ ok: false, error: DIRECT_PASSWORD_RESET_RATE_LIMIT_ERROR });
     expect(attemptInsert).not.toHaveBeenCalled();
+  });
+
+  it('does not apply a global IP failure bucket when the client IP is unavailable', async () => {
+    const { service, attemptSelect } = createService({
+      failedAttemptsByColumn: { lookup_hash: 0, ip_hash: 5 },
+    });
+
+    const result = await startDirectPasswordReset(baseInput, service, {
+      ip: null,
+      secret: 'test-secret',
+      now: new Date('2026-05-18T00:00:00Z'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(attemptSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('looks up profiles with exact normalized email equality', async () => {
+    const { service, profileEq } = createService();
+
+    await startDirectPasswordReset(
+      { ...baseInput, email: 'USER_%@example.com' },
+      service,
+      {
+        ip: '203.0.113.1',
+        secret: 'test-secret',
+        now: new Date('2026-05-18T00:00:00Z'),
+      },
+    );
+
+    expect(profileEq).toHaveBeenCalledWith('email', 'user_%@example.com');
   });
 
   it('rejects admin or inactive accounts even if all details match', async () => {

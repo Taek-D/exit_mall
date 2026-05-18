@@ -174,7 +174,7 @@ function getRequestIp() {
     forwardedFor ||
     headerStore.get('x-real-ip') ||
     headerStore.get('cf-connecting-ip') ||
-    'unknown'
+    null
   );
 }
 
