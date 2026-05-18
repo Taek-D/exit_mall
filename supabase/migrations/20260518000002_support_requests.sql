@@ -38,6 +38,33 @@ create table public.support_request_comments (
 
 create index support_comments_request_idx on public.support_request_comments (request_id, created_at);
 
+create or replace function public.support_comments_pin_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  NEW.author_id := OLD.author_id;
+  NEW.author_role := OLD.author_role;
+  NEW.request_id := OLD.request_id;
+  NEW.created_at := OLD.created_at;
+  NEW.deleted_at := OLD.deleted_at;
+  return NEW;
+end;
+$$;
+
+drop trigger if exists support_comments_pin_columns_trg on public.support_request_comments;
+create trigger support_comments_pin_columns_trg
+  before update on public.support_request_comments
+  for each row execute function public.support_comments_pin_columns();
+
+revoke execute on function public.support_comments_pin_columns() from public, anon, authenticated;
+
 create table public.support_request_attachments (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null references public.support_requests(id) on delete cascade,
@@ -77,14 +104,17 @@ create policy support_comments_select on public.support_request_comments
 create policy support_comments_self_update on public.support_request_comments
   for update using (
     author_id = auth.uid()
-    and created_at >= now() - interval '10 minutes'
+    and now() < created_at + interval '10 minutes'
   )
-  with check (author_id = auth.uid());
+  with check (
+    author_id = auth.uid()
+    and now() < created_at + interval '10 minutes'
+  );
 
 create policy support_comments_self_delete on public.support_request_comments
   for delete using (
     author_id = auth.uid()
-    and created_at >= now() - interval '10 minutes'
+    and now() < created_at + interval '10 minutes'
   );
 
 create policy support_comments_admin_all on public.support_request_comments
@@ -183,13 +213,8 @@ begin
   if p_reference_value is not null and length(trim(p_reference_value)) > 100 then
     raise exception 'INVALID_REFERENCE';
   end if;
-  if (
-    select count(*)
-    from public.support_requests
-    where user_id = v_user and created_at > now() - interval '1 minute'
-  ) >= 5 then
-    raise exception 'RATE_LIMITED';
-  end if;
+
+  perform public.rate_limit_check('support_request_create', 5, 60);
 
   insert into public.support_requests (
     user_id, category, title, body, reference_type, reference_value, user_last_read_at
@@ -342,13 +367,7 @@ begin
     raise exception 'FORBIDDEN';
   end if;
 
-  if (
-    select count(*)
-    from public.support_request_comments
-    where author_id = auth.uid() and created_at > now() - interval '1 minute'
-  ) >= 20 then
-    raise exception 'RATE_LIMITED';
-  end if;
+  perform public.rate_limit_check('support_comment', 20, 60);
 
   insert into public.support_request_comments (request_id, author_id, author_role, body)
   values (p_request_id, auth.uid(), v_role, trim(p_body))
