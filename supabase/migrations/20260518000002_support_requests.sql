@@ -49,6 +49,7 @@ begin
     return NEW;
   end if;
 
+  NEW.id := OLD.id;
   NEW.author_id := OLD.author_id;
   NEW.author_role := OLD.author_role;
   NEW.request_id := OLD.request_id;
