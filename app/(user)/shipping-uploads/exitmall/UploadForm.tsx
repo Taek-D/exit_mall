@@ -14,7 +14,7 @@ export function UploadForm() {
 
   return (
     <div className="rounded-lg border bg-card p-5 space-y-3">
-      <h3 className="font-medium">배송대행 양식 업로드</h3>
+      <h3 className="font-medium">배송대행 양식 업로드(파일명을 바꾸지 마세요)</h3>
       <input
         type="file"
         accept=".xlsx"
