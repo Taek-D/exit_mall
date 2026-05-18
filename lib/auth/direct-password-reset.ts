@@ -22,7 +22,7 @@ type ServiceClient = {
 };
 
 type ResetContext = {
-  ip: string;
+  ip?: string | null;
   secret: string;
   now?: Date;
 };
@@ -71,8 +71,8 @@ function lookupHash(input: { email: string; phone: string }, secret: string) {
   return hmac(`${normalizeEmail(input.email)}|${normalizePhone(input.phone)}`, secret);
 }
 
-function ipHash(ip: string, secret: string) {
-  return hmac(ip || 'unknown', secret);
+function ipHash(ip: string | null | undefined, secret: string, fallbackScope: string) {
+  return hmac(ip ? `ip:${ip}` : `missing-ip:${fallbackScope}`, secret);
 }
 
 async function countRecentFailures(
@@ -100,7 +100,7 @@ async function recordFailedAttempt(
 ) {
   const { error } = await service.from('password_reset_attempts').insert({
     lookup_hash: lookupHash(input, context.secret),
-    ip_hash: ipHash(context.ip, context.secret),
+    ip_hash: ipHash(context.ip, context.secret, lookupHash(input, context.secret)),
     success: false,
   });
   if (error) throw new Error(error.message);
@@ -127,14 +127,16 @@ export async function startDirectPasswordReset(
 ): Promise<{ ok: true; resetToken: string } | { ok: false; error: string }> {
   const now = context.now ?? new Date();
   const targetLookupHash = lookupHash(input, context.secret);
-  const targetIpHash = ipHash(context.ip, context.secret);
+  const targetIpHash = ipHash(context.ip, context.secret, targetLookupHash);
   const lookupFailures = await countRecentFailures(
     service,
     'lookup_hash',
     targetLookupHash,
     now,
   );
-  const ipFailures = await countRecentFailures(service, 'ip_hash', targetIpHash, now);
+  const ipFailures = context.ip
+    ? await countRecentFailures(service, 'ip_hash', targetIpHash, now)
+    : 0;
 
   if (lookupFailures >= RESET_ATTEMPT_LIMIT || ipFailures >= RESET_ATTEMPT_LIMIT) {
     return { ok: false, error: DIRECT_PASSWORD_RESET_RATE_LIMIT_ERROR };
@@ -143,7 +145,7 @@ export async function startDirectPasswordReset(
   const { data: profile, error } = await service
     .from('profiles')
     .select('id,role,status,email,name,phone')
-    .ilike('email', normalizeEmail(input.email))
+    .eq('email', normalizeEmail(input.email))
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -176,32 +178,41 @@ export async function completeDirectPasswordReset(
   context: CompleteContext,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const now = context.now ?? new Date();
-  const { data: challenge, error } = await service
+  const nowIso = now.toISOString();
+  const tokenHash = hashToken(input.resetToken);
+
+  // 토큰을 원자적으로 소진(claim)한다. consumed_at IS NULL + 만료 전 조건을
+  // WHERE에 두고 단일 UPDATE로 consumed_at=now를 박는 방식이라, 동시에 들어온
+  // 두 요청 중 첫 번째만 행을 잡고(returning rows >= 1) 두 번째는 0행을 받게
+  // 된다. 비밀번호 변경은 claim에 성공한 흐름에서만 이어진다.
+  const { data: claimed, error: claimError } = await service
     .from('password_reset_challenges')
-    .select('id,user_id,expires_at,consumed_at')
-    .eq('token_hash', hashToken(input.resetToken))
+    .update({ consumed_at: nowIso })
+    .eq('token_hash', tokenHash)
+    .is('consumed_at', null)
+    .gt('expires_at', nowIso)
+    .select('id,user_id')
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
-  if (
-    !challenge ||
-    challenge.consumed_at ||
-    new Date(challenge.expires_at).getTime() <= now.getTime()
-  ) {
+  if (claimError) throw new Error(claimError.message);
+  if (!claimed) {
     return { ok: false, error: DIRECT_PASSWORD_RESET_GENERIC_ERROR };
   }
 
   const { error: updateError } = await service.auth.admin.updateUserById(
-    challenge.user_id,
+    claimed.user_id,
     { password: input.newPassword },
   );
-  if (updateError) return { ok: false, error: updateError.message };
-
-  const { error: consumeError } = await service
-    .from('password_reset_challenges')
-    .update({ consumed_at: now.toISOString() })
-    .eq('id', challenge.id);
-  if (consumeError) throw new Error(consumeError.message);
+  if (updateError) {
+    // 비밀번호 변경 자체가 실패했으면 소진 표시를 되돌려 사용자가 동일 토큰으로
+    // 다시 시도할 수 있게 한다. 롤백이 실패해도 비밀번호는 안 바뀌었으므로
+    // 사용자는 새 재설정을 요청하면 된다 (worst case: 토큰 1회 더 낭비).
+    await service
+      .from('password_reset_challenges')
+      .update({ consumed_at: null })
+      .eq('id', claimed.id);
+    return { ok: false, error: updateError.message };
+  }
 
   return { ok: true };
 }
