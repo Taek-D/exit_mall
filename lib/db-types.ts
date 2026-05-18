@@ -1348,12 +1348,24 @@ export type Database = {
         }
         Returns: number
       }
+      cleanup_failed_support_request: {
+        Args: {
+          p_request_id: string
+        }
+        Returns: undefined
+      }
       delete_user_custom_inventory: {
         Args: {
           target_user: string
           custom_id: string
         }
         Returns: undefined
+      }
+      delete_support_comment: {
+        Args: {
+          p_comment_id: string
+        }
+        Returns: string
       }
       is_active: {
         Args: Record<PropertyKey, never>

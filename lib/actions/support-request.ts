@@ -211,10 +211,43 @@ export async function submitSupportRequestAction(
       insertedAttachmentIds.push(attachmentId);
     }
   } catch (error) {
-    const cleanupSupabase = (
-      process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : supabase
-    ) as ReturnType<typeof createClient>;
+    await cleanupFailedSupportRequest({
+      supabase,
+      requestId,
+      insertedAttachmentIds,
+    });
+    const cleanupPaths = supportCleanupPaths(uploadedPaths);
+    if (cleanupPaths.length > 0) {
+      const cleanupSupabase = (
+        process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : supabase
+      ) as ReturnType<typeof createClient>;
+      const { error: storageCleanupError } = await cleanupSupabase.storage
+        .from('support-requests')
+        .remove(cleanupPaths);
+      if (storageCleanupError) {
+        console.error('[support] rollback storage cleanup failed', storageCleanupError);
+      }
+    }
 
+    console.error('[support] attachment upload failed', error);
+    return { ok: false, error: '첨부파일 업로드에 실패했습니다. 다시 시도해주세요.' };
+  }
+
+  revalidatePaths(['/support-requests', '/admin/support-requests']);
+  redirect(`/support-requests/${requestId}`);
+}
+
+async function cleanupFailedSupportRequest({
+  supabase,
+  requestId,
+  insertedAttachmentIds,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requestId: string;
+  insertedAttachmentIds: string[];
+}): Promise<void> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const cleanupSupabase = createServiceRoleClient() as unknown as ReturnType<typeof createClient>;
     if (insertedAttachmentIds.length > 0) {
       const { error: metadataCleanupError } = await mutationTable(cleanupSupabase, 'support_request_attachments')
         .delete()
@@ -224,29 +257,21 @@ export async function submitSupportRequestAction(
       }
     }
 
-    const cleanupPaths = supportCleanupPaths(uploadedPaths);
-    if (cleanupPaths.length > 0) {
-      const { error: storageCleanupError } = await cleanupSupabase.storage
-        .from('support-requests')
-        .remove(cleanupPaths);
-      if (storageCleanupError) {
-        console.error('[support] rollback storage cleanup failed', storageCleanupError);
-      }
-    }
-
     const { error: requestCleanupError } = await mutationTable(cleanupSupabase, 'support_requests')
       .delete()
       .eq('id', requestId);
     if (requestCleanupError) {
       console.error('[support] rollback request cleanup failed', requestCleanupError);
     }
-
-    console.error('[support] attachment upload failed', error);
-    return { ok: false, error: '첨부파일 업로드에 실패했습니다. 다시 시도해주세요.' };
+    return;
   }
 
-  revalidatePaths(['/support-requests', '/admin/support-requests']);
-  redirect(`/support-requests/${requestId}`);
+  const { error: requestCleanupError } = await callRpc(supabase, 'cleanup_failed_support_request', {
+    p_request_id: requestId,
+  });
+  if (requestCleanupError) {
+    console.error('[support] rollback request cleanup failed', requestCleanupError);
+  }
 }
 
 export async function cancelSupportRequestAction(requestId: string): Promise<ActionResult> {
@@ -425,14 +450,16 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
   const editable = await assertSupportRequestEditable(supabase, row.request_id);
   if (!editable.ok) return editable;
 
-  const { error } = await mutationTable(supabase, 'support_request_comments')
-    .delete()
-    .eq('id', commentId);
+  const { error } = await callRpc(supabase, 'delete_support_comment', {
+    p_comment_id: commentId,
+  });
   if (error) {
+    const mapped = mapSupportCommentError(error.message);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[support] deleteComment', { commentId, error });
     return { ok: false, error: '댓글 삭제에 실패했습니다.' };
   }
-  revalidatePaths([`/support-requests/${row.request_id}`, `/admin/support-requests/${row.request_id}`]);
+  revalidatePaths(supportDetailPaths(row.request_id));
   return { ok: true };
 }
 
