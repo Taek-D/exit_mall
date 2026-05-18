@@ -6,6 +6,7 @@ import { GuideBanner } from '@/components/guide/GuideBanner';
 import { CartProvider } from '@/components/CartProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { fetchUnreadCount } from '@/lib/inbound/queries';
+import { fetchSupportUnreadCount } from '@/lib/support/queries';
 
 type ProductLimitRow = {
   id: string;
@@ -41,7 +42,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
     profile.user_group === 'group2' ? 'group2' : 'group1';
   const isGroup2 = userGroup === 'group2';
 
-  const [{ data: products }, { data: purchased }, inboundUnread] = await Promise.all([
+  const [{ data: products }, { data: purchased }, inboundUnread, supportUnread] = await Promise.all([
     supabase.from('products').select('id,per_user_limit').is('deleted_at', null),
     supabase
       .from('order_items')
@@ -49,6 +50,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
       .eq('orders.user_id', user.id)
       .neq('orders.status', 'cancelled'),
     fetchUnreadCount('user'),
+    fetchSupportUnreadCount('user'),
   ]);
 
   const purchasedMap = new Map<string, number>();
@@ -73,6 +75,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
           balance={Number(profile.deposit_balance)}
           name={profile.name}
           inboundUnread={inboundUnread}
+          supportUnread={supportUnread}
           userGroup={userGroup}
         />
         {profile.guide_banner_dismissed_at === null && (

@@ -29,6 +29,7 @@ Next.js 14 + Supabase 기반입니다.
 - 보유 재고 화면 (`/inventory`) — 엑시트몰 상품 + 사용자 수기 재고 통합 표시, 항목별 가용/예약/총보유 + 변동 내역 timeline (`/inventory/product/[id]`, `/inventory/custom/[id]`)
 - 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 준비중
 - 입고리스트(`/inbound-requests`) — 입고 요청 비공개 게시글 등록, 엑셀 양식 다운로드/첨부 업로드, 관리자와 댓글(편집 윈도우 적용)로 진행상황 추적, 미확인 답변 배지
+- 교환/반품 및 CS 문의(`/support-requests`) — 비공개 문의 등록, 선택 첨부, 관리자 댓글/상태 추적, 미확인 답변 배지
 - 비밀번호 변경, 아이디 찾기, 비밀번호 재설정
 
 ### 관리자
@@ -40,6 +41,7 @@ Next.js 14 + Supabase 기반입니다.
 - 배송대행 업로드 — 엑시트몰 배송대행(`/admin/shipping-uploads/exitmall`)에서 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리. 사입재고 배송대행(`/admin/shipping-uploads/purchased`)은 준비중
 - 송장 채운 엑셀 재업로드 시 행별 `tracking_number` 갱신 + status=shipped (멱등)
 - 입고리스트(`/admin/inbound-requests`) — 사용자 게시글 검토, 상태 변경(접수/검토/입고완료/취소), 첨부 다운로드, 댓글 응답, 미확인 답변 배지
+- 교환/반품 및 CS 문의(`/admin/support-requests`) — 문의 검색/필터, 상태 변경, 댓글, 첨부 확인, 미확인 답변 배지
 - 사용자 관리(잔액 조정·상태·임계치 + 보유 재고 표시·수동 조정 + 사용자별 수기 재고 등록/조정)
 - Legacy 주문 화면(`/admin/orders-legacy`) — 구 일반 주문 열람 전용 (URL 직접 접근)
 - Realtime: 새 `stock_orders` / `order_uploads` 검토대기 토스트 알림
@@ -151,6 +153,7 @@ node scripts/build-shipping-template.cjs
 - `/inventory` 보유 재고 (엑시트몰 + 수기 통합) / `/inventory/product/[id]` 상품별 변동 내역 / `/inventory/custom/[id]` 수기 재고 변동 내역
 - `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행(준비중)
 - `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
+- `/support-requests` 교환/반품 및 CS 문의 / `/support-requests/new` 새 문의 / `/support-requests/[id]` 상세·댓글·첨부
 - `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
 - `/find-account`, `/forgot-password` 아이디 찾기·비밀번호 재설정
@@ -164,6 +167,7 @@ node scripts/build-shipping-template.cjs
 - `/admin/orders` 주문관리 (stock_orders 탭·상세·승인/반려)
 - `/admin/shipping-uploads/exitmall` 엑시트몰 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리) / `/admin/shipping-uploads/purchased` 사입재고 배송대행(준비중)
 - `/admin/inbound-requests` 입고리스트 (목록·상태 변경·댓글·첨부) / `/admin/inbound-requests/[id]` 상세
+- `/admin/support-requests` 교환/반품 및 CS 문의 (검색·필터·상태·댓글·첨부) / `/admin/support-requests/[id]` 상세
 - `/admin/products` 상품 CRUD + 비활성/소프트 삭제 + `?view=deleted` 복구 탭 / `/admin/products/import` 엑셀 가져오기 (업로드 → 미리보기 → 적용)
 - `/admin/users` 사용자 관리 (잔액·상태·임계치 + 보유 재고 + 수동 조정 + 사용자별 수기 재고)
 - `/admin/low-balance` 잔액 부족 고객
@@ -215,6 +219,7 @@ node scripts/build-shipping-template.cjs
 - 사용자 그룹 설계/계획: `docs/superpowers/specs/2026-05-14-user-groups-design.md`, `docs/superpowers/plans/2026-05-14-user-groups.md`
 - 사용자 수기 보유재고: `docs/superpowers/specs/2026-05-13-user-custom-inventory-design.md`, `docs/superpowers/plans/2026-05-13-user-custom-inventory.md`
 - 입고 요청 게시판: `docs/superpowers/specs/2026-05-12-inbound-requests-design.md`, `docs/superpowers/plans/2026-05-12-inbound-requests.md`, `docs/superpowers/plans/2026-05-13-inbound-followups.md`
+- 교환/반품 및 CS 문의: `docs/superpowers/specs/2026-05-18-support-requests-design.md`, `docs/superpowers/plans/2026-05-18-support-requests.md`
 - 배송대행 양식/메뉴 분리: `docs/superpowers/specs/2026-05-12-shipping-form-and-menu-split-design.md`, `docs/superpowers/plans/2026-05-12-shipping-form-and-menu-split.md`
 - 신규 흐름 설계: `docs/superpowers/specs/2026-05-08-shipping-flow-restructure-design.md`
 - 신규 흐름 구현 계획: `docs/superpowers/plans/2026-05-08-shipping-flow-phase{1..5}-*.md`

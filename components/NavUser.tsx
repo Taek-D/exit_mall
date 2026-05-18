@@ -15,9 +15,11 @@ import {
   KeyRound,
   Boxes,
   Inbox,
+  LifeBuoy,
   BookOpen,
 } from 'lucide-react';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
+import { SupportUnreadBadge } from '@/components/support/SupportUnreadBadge';
 import type { UserGroup } from '@/lib/auth/user-groups';
 import {
   DropdownMenu,
@@ -43,6 +45,7 @@ const NAV: readonly NavItem[] = [
   { href: '/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: Upload, groups: ['group1'] },
   { href: '/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: Upload, groups: ['group1', 'group2'] },
   { href: '/inbound-requests', label: '입고리스트', Icon: Inbox, groups: ['group1', 'group2'] },
+  { href: '/support-requests', label: '교환/반품 및 CS 문의', Icon: LifeBuoy, groups: ['group1', 'group2'] },
   { href: '/deposit', label: '예치금', Icon: Wallet, groups: ['group1'] },
   { href: '/guide', label: '가이드', Icon: BookOpen, groups: ['group1', 'group2'] }
 ];
@@ -63,11 +66,13 @@ export function NavUser({
   balance,
   name,
   inboundUnread,
+  supportUnread,
   userGroup,
 }: {
   balance: number;
   name: string;
   inboundUnread: number;
+  supportUnread: number;
   userGroup: UserGroup;
 }) {
   const pathname = usePathname();
@@ -107,6 +112,9 @@ export function NavUser({
                     <span className="text-center leading-tight">{formatNavLabel(label)}</span>
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
+                    )}
+                    {href === '/support-requests' && (
+                      <SupportUnreadBadge role="user" initial={supportUnread} />
                     )}
                   </span>
                 </Link>
@@ -198,6 +206,9 @@ export function NavUser({
                     <span className="text-center leading-tight">{formatNavLabel(label)}</span>
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
+                    )}
+                    {href === '/support-requests' && (
+                      <SupportUnreadBadge role="user" initial={supportUnread} />
                     )}
                   </span>
                 </Link>

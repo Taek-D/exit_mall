@@ -5,6 +5,7 @@ import { AdminHeader } from '@/components/AdminHeader';
 import { GuideBanner } from '@/components/guide/GuideBanner';
 import { Toaster } from '@/components/ui/toaster';
 import { fetchUnreadCount } from '@/lib/inbound/queries';
+import { fetchSupportUnreadCount } from '@/lib/support/queries';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -19,13 +20,21 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .single<{ name: string; role: string; guide_banner_dismissed_at: string | null }>();
   if (!profile || profile.role !== 'admin') redirect('/shop');
 
-  const inboundUnread = await fetchUnreadCount('admin');
+  const [inboundUnread, supportUnread] = await Promise.all([
+    fetchUnreadCount('admin'),
+    fetchSupportUnreadCount('admin'),
+  ]);
 
   return (
     <div className="min-h-screen flex bg-surface">
-      <AdminSidebar inboundUnread={inboundUnread} />
+      <AdminSidebar inboundUnread={inboundUnread} supportUnread={supportUnread} />
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader name={profile.name} email={user.email} inboundUnread={inboundUnread} />
+        <AdminHeader
+          name={profile.name}
+          email={user.email}
+          inboundUnread={inboundUnread}
+          supportUnread={supportUnread}
+        />
         {profile.guide_banner_dismissed_at === null && (
           <GuideBanner guideHref="/admin/guide" />
         )}

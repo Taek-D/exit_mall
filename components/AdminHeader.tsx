@@ -21,6 +21,7 @@ const TITLES: Record<string, string> = {
   '/admin/orders': '주문 관리',
   '/admin/products': '상품 관리',
   '/admin/users': '사용자 관리',
+  '/admin/support-requests': '교환/반품 및 CS 문의',
   '/admin/low-balance': '잔액 부족 고객',
   '/admin/settings': '설정',
   '/admin/account/password': '비밀번호 변경',
@@ -30,10 +31,12 @@ export function AdminHeader({
   name,
   email,
   inboundUnread,
+  supportUnread,
 }: {
   name: string;
   email?: string | null;
   inboundUnread: number;
+  supportUnread: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -105,7 +108,12 @@ export function AdminHeader({
         </DropdownMenu>
       </div>
 
-      <MobileAdminNav open={open} onOpenChange={setOpen} inboundUnread={inboundUnread} />
+      <MobileAdminNav
+        open={open}
+        onOpenChange={setOpen}
+        inboundUnread={inboundUnread}
+        supportUnread={supportUnread}
+      />
     </header>
   );
 }

@@ -3,9 +3,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
+import { SupportUnreadBadge } from '@/components/support/SupportUnreadBadge';
 import { ADMIN_NAV_ITEMS } from '@/components/admin-nav-items';
 
-export function AdminSidebar({ inboundUnread }: { inboundUnread: number }) {
+export function AdminSidebar({
+  inboundUnread,
+  supportUnread,
+}: {
+  inboundUnread: number;
+  supportUnread: number;
+}) {
   const pathname = usePathname();
   return (
     <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r bg-background">
@@ -40,6 +47,9 @@ export function AdminSidebar({ inboundUnread }: { inboundUnread: number }) {
                     {label}
                     {href === '/admin/inbound-requests' && (
                       <InboundUnreadBadge role="admin" initial={inboundUnread} />
+                    )}
+                    {href === '/admin/support-requests' && (
+                      <SupportUnreadBadge role="admin" initial={supportUnread} />
                     )}
                   </span>
                 </Link>
