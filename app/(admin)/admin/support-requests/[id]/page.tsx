@@ -33,7 +33,7 @@ export default async function AdminSupportRequestDetailPage({
     .eq('id', request.user_id)
     .maybeSingle<{ name: string; email: string }>();
 
-  await markSupportReadAction(request.id);
+  await markSupportReadAction(request.id, request.last_comment_at);
 
   const locked = isSupportLocked(request.status);
   const hasReference = request.reference_type !== 'none' && request.reference_value;

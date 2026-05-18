@@ -27,7 +27,7 @@ export default async function SupportRequestDetailPage({
   const { request, comments } = await fetchSupportRequest(params.id);
   if (!request) notFound();
 
-  await markSupportReadAction(request.id);
+  await markSupportReadAction(request.id, request.last_comment_at);
 
   const locked = isSupportLocked(request.status);
   const hasReference = request.reference_type !== 'none' && request.reference_value;

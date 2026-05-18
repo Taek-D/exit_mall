@@ -29,6 +29,10 @@ const CATEGORY_OPTIONS: { value: SupportCategory | 'all'; label: string }[] = [
   })),
 ];
 
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function isStatus(value: string | undefined): value is SupportStatus | 'all' {
   return value === 'all' || Object.keys(SUPPORT_STATUS_LABEL).includes(value ?? '');
 }
@@ -40,11 +44,18 @@ function isCategory(value: string | undefined): value is SupportCategory | 'all'
 export default async function AdminSupportRequestsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; category?: string; q?: string };
+  searchParams: {
+    status?: string | string[];
+    category?: string | string[];
+    q?: string | string[];
+  };
 }) {
-  const status = isStatus(searchParams.status) ? searchParams.status : 'all';
-  const category = isCategory(searchParams.category) ? searchParams.category : 'all';
-  const q = searchParams.q?.trim() ?? '';
+  const rawStatus = firstParam(searchParams.status);
+  const rawCategory = firstParam(searchParams.category);
+  const rawQ = firstParam(searchParams.q);
+  const status = isStatus(rawStatus) ? rawStatus : 'all';
+  const category = isCategory(rawCategory) ? rawCategory : 'all';
+  const q = rawQ?.trim() ?? '';
   const rows = await fetchAllSupportRequests({
     status,
     category,
@@ -126,7 +137,7 @@ export default async function AdminSupportRequestsPage({
           <p className="text-sm font-medium">등록된 문의가 없습니다</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-x-auto rounded-lg border bg-card">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>

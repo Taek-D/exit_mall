@@ -277,10 +277,14 @@ export async function setSupportStatusAction(
   return { ok: true };
 }
 
-export async function markSupportReadAction(requestId: string): Promise<ActionResult> {
+export async function markSupportReadAction(
+  requestId: string,
+  seenLastCommentAt: string | null = null,
+): Promise<ActionResult> {
   const supabase = createClient();
   const { error } = await callRpc(supabase, 'mark_support_read', {
     p_request_id: requestId,
+    p_seen_last_comment_at: seenLastCommentAt,
   });
   if (error) {
     console.error('[support] markRead', { requestId, error });

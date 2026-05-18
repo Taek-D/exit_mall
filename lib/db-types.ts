@@ -1372,6 +1372,7 @@ export type Database = {
       mark_support_read: {
         Args: {
           p_request_id: string
+          p_seen_last_comment_at?: string | null
         }
         Returns: undefined
       }
@@ -1617,4 +1618,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

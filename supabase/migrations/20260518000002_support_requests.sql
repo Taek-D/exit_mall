@@ -372,8 +372,11 @@ $$;
 revoke execute on function public.cancel_support_request(uuid) from public, anon;
 grant execute on function public.cancel_support_request(uuid) to authenticated;
 
+drop function if exists public.mark_support_read(uuid);
+
 create or replace function public.mark_support_read(
-  p_request_id uuid
+  p_request_id uuid,
+  p_seen_last_comment_at timestamptz default null
 ) returns void
 language plpgsql
 security definer
@@ -381,38 +384,43 @@ set search_path = public, pg_temp
 as $$
 declare
   v_req public.support_requests%rowtype;
+  v_seen timestamptz;
 begin
-  select * into v_req from public.support_requests where id = p_request_id;
+  select * into v_req from public.support_requests where id = p_request_id for update;
   if not found then
     raise exception 'NOT_FOUND';
   end if;
 
+  if p_seen_last_comment_at is not null and v_req.last_comment_at is not null then
+    v_seen := least(p_seen_last_comment_at, v_req.last_comment_at);
+  end if;
+
   if public.is_admin() then
-    if v_req.last_comment_at is not null
+    if v_seen is not null
        and (
          v_req.admin_last_read_at is null
-         or v_req.last_comment_at > v_req.admin_last_read_at
+         or v_seen > v_req.admin_last_read_at
        ) then
       update public.support_requests
-      set admin_last_read_at = v_req.last_comment_at
+      set admin_last_read_at = v_seen
       where id = p_request_id
         and (
           admin_last_read_at is null
-          or admin_last_read_at < v_req.last_comment_at
+          or admin_last_read_at < v_seen
         );
     end if;
   elsif v_req.user_id = auth.uid() then
-    if v_req.last_comment_at is not null
+    if v_seen is not null
        and (
          v_req.user_last_read_at is null
-         or v_req.last_comment_at > v_req.user_last_read_at
+         or v_seen > v_req.user_last_read_at
        ) then
       update public.support_requests
-      set user_last_read_at = v_req.last_comment_at
+      set user_last_read_at = v_seen
       where id = p_request_id
         and (
           user_last_read_at is null
-          or user_last_read_at < v_req.last_comment_at
+          or user_last_read_at < v_seen
         );
     end if;
   else
@@ -421,8 +429,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.mark_support_read(uuid) from public, anon;
-grant execute on function public.mark_support_read(uuid) to authenticated;
+revoke execute on function public.mark_support_read(uuid, timestamptz) from public, anon;
+grant execute on function public.mark_support_read(uuid, timestamptz) to authenticated;
 
 create or replace function public.add_support_comment(
   p_request_id uuid,
