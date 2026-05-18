@@ -44,6 +44,7 @@ const ATTACHMENT_CONTENT_TYPES: Record<string, string> = {
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.txt': 'text/plain',
 };
+const SUPPORT_ATTACHMENT_SIGNED_URL_SECONDS = 30 * 60;
 
 type PreparedAttachment = {
   file: File;
@@ -412,7 +413,9 @@ export async function getSupportAttachmentUrlAction(
 
   const { data, error } = await supabase.storage
     .from('support-requests')
-    .createSignedUrl(attachment.storage_path, 60);
+    // Server-rendered links/previews stay visible on detail pages; keep URLs bounded
+    // but long enough for users to open or download attachments without immediate expiry.
+    .createSignedUrl(attachment.storage_path, SUPPORT_ATTACHMENT_SIGNED_URL_SECONDS);
   if (error || !data?.signedUrl) {
     return { ok: false, error: error?.message ?? '서명 URL 생성 실패' };
   }

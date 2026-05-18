@@ -19,6 +19,10 @@ export function SupportUnreadBadge({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setCount(initial);
+  }, [initial]);
+
+  useEffect(() => {
     const supabase = createClient();
     let cancelled = false;
 

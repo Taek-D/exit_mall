@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ export function SupportCommentForm({
   disabledReason?: string;
 }) {
   const [body, setBody] = useState('');
-  const [pending, start] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -40,19 +40,26 @@ export function SupportCommentForm({
       onSubmit={(event) => {
         event.preventDefault();
         const trimmed = body.trim();
-        if (!trimmed) return;
+        if (!trimmed || submitting) return;
 
-        start(async () => {
+        async function submit() {
+          setSubmitting(true);
           setError(null);
-          const result = await addSupportCommentAction(requestId, trimmed);
-          if (!result.ok) {
-            setError(result.error);
-            return;
+          try {
+            const result = await addSupportCommentAction(requestId, trimmed);
+            if (!result.ok) {
+              setError(result.error);
+              return;
+            }
+            setBody('');
+            toast({ title: '댓글을 등록했습니다.' });
+            router.refresh();
+          } finally {
+            setSubmitting(false);
           }
-          setBody('');
-          toast({ title: '댓글을 등록했습니다.' });
-          router.refresh();
-        });
+        }
+
+        void submit();
       }}
       className="space-y-2"
     >
@@ -71,8 +78,8 @@ export function SupportCommentForm({
         </p>
       )}
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending || body.trim().length === 0}>
-          {pending ? '등록 중...' : '댓글 등록'}
+        <Button type="submit" disabled={submitting || body.trim().length === 0}>
+          {submitting ? '등록 중...' : '댓글 등록'}
         </Button>
       </div>
     </form>
@@ -96,7 +103,8 @@ export function CommentRowActions({
   const [now, setNow] = useState(() => Date.now());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(body);
-  const [pending, start] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { confirm, element } = useConfirm();
@@ -107,10 +115,16 @@ export function CommentRowActions({
     return () => clearInterval(timer);
   }, [isAdmin, isAuthor]);
 
+  useEffect(() => {
+    if (!editing) setDraft(body);
+  }, [body, editing]);
+
   const editable = isAdmin || (isAuthor && now - created < SUPPORT_COMMENT_EDIT_WINDOW_MS);
   if (!editable) return null;
 
   async function onDelete() {
+    if (deleting) return;
+
     const result = await confirm({
       title: '이 댓글을 삭제할까요?',
       description: '삭제하면 되돌릴 수 없습니다.',
@@ -120,7 +134,8 @@ export function CommentRowActions({
     });
     if (!result.ok) return;
 
-    start(async () => {
+    setDeleting(true);
+    try {
       const actionResult = await deleteSupportCommentAction(commentId);
       if (!actionResult.ok) {
         toast({ title: '삭제 실패', description: actionResult.error, variant: 'destructive' });
@@ -128,7 +143,28 @@ export function CommentRowActions({
       }
       toast({ title: '삭제했습니다.' });
       router.refresh();
-    });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function onSave() {
+    const trimmed = draft.trim();
+    if (!trimmed || saving) return;
+
+    setSaving(true);
+    try {
+      const result = await updateSupportCommentAction(commentId, trimmed);
+      if (!result.ok) {
+        toast({ title: '수정 실패', description: result.error, variant: 'destructive' });
+        return;
+      }
+      setEditing(false);
+      toast({ title: '수정했습니다.' });
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (editing) {
@@ -147,19 +183,9 @@ export function CommentRowActions({
             <Button
               type="button"
               size="sm"
-              disabled={pending || draft.trim().length === 0}
-              onClick={() =>
-                start(async () => {
-                  const result = await updateSupportCommentAction(commentId, draft.trim());
-                  if (!result.ok) {
-                    toast({ title: '수정 실패', description: result.error, variant: 'destructive' });
-                    return;
-                  }
-                  setEditing(false);
-                  toast({ title: '수정했습니다.' });
-                  router.refresh();
-                })
-              }
+              disabled={saving || draft.trim().length === 0}
+              onClick={() => void onSave()}
+              aria-label="댓글 수정 저장"
             >
               저장
             </Button>
@@ -167,6 +193,8 @@ export function CommentRowActions({
               type="button"
               size="sm"
               variant="ghost"
+              disabled={saving}
+              aria-label="댓글 수정 취소"
               onClick={() => {
                 setEditing(false);
                 setDraft(body);
@@ -184,10 +212,24 @@ export function CommentRowActions({
   return (
     <>
       <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-        <button type="button" className="hover:underline" onClick={() => setEditing(true)}>
+        <button
+          type="button"
+          className="hover:underline"
+          aria-label="댓글 수정"
+          onClick={() => {
+            setDraft(body);
+            setEditing(true);
+          }}
+        >
           수정
         </button>
-        <button type="button" className="text-destructive hover:underline" onClick={onDelete}>
+        <button
+          type="button"
+          className="text-destructive hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={deleting}
+          aria-label="댓글 삭제"
+          onClick={onDelete}
+        >
           삭제
         </button>
       </div>
