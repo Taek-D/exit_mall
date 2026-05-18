@@ -116,7 +116,7 @@ export function NavUser({
             </div>
             <span className="font-heading font-semibold tracking-tight hidden sm:inline">엑시트몰</span>
           </Link>
-          <nav className="hidden md:flex min-w-0 items-center gap-1">
+          <nav className="hidden md:flex min-w-0 items-center gap-1 overflow-x-auto">
             {visibleNav.map(({ href, label, Icon, exact }) => {
               const active = isActivePath(pathname, href, exact);
               const shouldRenderShipping = href === '/inbound-requests' && visibleShippingNav.length > 0;
