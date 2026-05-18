@@ -1,4 +1,5 @@
 'use client';
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
@@ -7,7 +8,6 @@ import { cn } from '@/lib/utils';
 import {
   Wallet,
   ShoppingBag,
-  ClipboardList,
   Package,
   LogOut,
   Upload,
@@ -16,6 +16,7 @@ import {
   Inbox,
   LifeBuoy,
   BookOpen,
+  ChevronDown,
 } from 'lucide-react';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
 import { SupportUnreadBadge } from '@/components/support/SupportUnreadBadge';
@@ -36,21 +37,36 @@ type NavItem = {
   groups: readonly UserGroup[];
 };
 
-const NAV: readonly NavItem[] = [
+type ShippingNavItem = NavItem & {
+  description: string;
+};
+
+const PRIMARY_NAV: readonly NavItem[] = [
   { href: '/shop', label: '상품', Icon: Package, groups: ['group1'] },
-  { href: '/cart', label: '장바구니', Icon: ShoppingBag, groups: ['group1'] },
-  { href: '/orders', label: '주문 내역', Icon: ClipboardList, exact: true, groups: ['group1'] },
   { href: '/inventory', label: '보유 재고', Icon: Boxes, groups: ['group1'] },
-  { href: '/shipping-uploads/exitmall', label: '엑시트몰 배송대행', Icon: Upload, groups: ['group1'] },
-  { href: '/shipping-uploads/purchased', label: '사입재고 배송대행', Icon: Upload, groups: ['group1', 'group2'] },
   { href: '/inbound-requests', label: '입고리스트', Icon: Inbox, groups: ['group1', 'group2'] },
-  { href: '/support-requests', label: '교환/반품 및 CS 문의', Icon: LifeBuoy, groups: ['group1', 'group2'] },
-  { href: '/deposit', label: '예치금', Icon: Wallet, groups: ['group1'] },
+  { href: '/support-requests', label: '문의', Icon: LifeBuoy, groups: ['group1', 'group2'] },
   { href: '/guide', label: '가이드', Icon: BookOpen, groups: ['group1', 'group2'] }
 ];
 
+const SHIPPING_NAV: readonly ShippingNavItem[] = [
+  {
+    href: '/shipping-uploads/exitmall',
+    label: '엑시트몰 배송대행',
+    description: '엑시트몰에서 구매한 재고 발송',
+    Icon: Upload,
+    groups: ['group1'],
+  },
+  {
+    href: '/shipping-uploads/purchased',
+    label: '사입재고 배송대행',
+    description: '직접 사입한 재고 발송',
+    Icon: Upload,
+    groups: ['group1', 'group2'],
+  },
+];
+
 function getNavLabelLines(label: string) {
-  if (label.includes(' ')) return label.split(' ').filter(Boolean);
   if (label.length > 5) return [label.slice(0, 5), label.slice(5)];
   return [label];
 }
@@ -63,6 +79,10 @@ function NavLabel({ label }: { label: string }) {
       ))}
     </span>
   );
+}
+
+function isActivePath(pathname: string, href: string, exact?: boolean) {
+  return exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
 }
 
 export function NavUser({
@@ -80,9 +100,11 @@ export function NavUser({
 }) {
   const pathname = usePathname();
   const initial = (name || 'U').charAt(0).toUpperCase();
-  const visibleNav = NAV.filter((item) => item.groups.includes(userGroup));
+  const visibleNav = PRIMARY_NAV.filter((item) => item.groups.includes(userGroup));
+  const visibleShippingNav = SHIPPING_NAV.filter((item) => item.groups.includes(userGroup));
   const isGroup2 = userGroup === 'group2';
   const homeHref = isGroup2 ? '/shipping-uploads/purchased' : '/shop';
+  const shippingActive = visibleShippingNav.some((item) => isActivePath(pathname, item.href));
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-sm">
@@ -96,38 +118,80 @@ export function NavUser({
           </Link>
           <nav className="hidden md:flex min-w-0 items-center gap-1 overflow-x-auto">
             {visibleNav.map(({ href, label, Icon, exact }) => {
-              const active = exact
-                ? pathname === href
-                : pathname === href || pathname.startsWith(href + '/');
+              const active = isActivePath(pathname, href, exact);
+              const shouldRenderShipping = href === '/inbound-requests' && visibleShippingNav.length > 0;
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex shrink-0 items-center gap-1.5 px-2.5 lg:px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
-                    active
-                      ? 'bg-muted text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                <Fragment key={href}>
+                  {shouldRenderShipping && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-current={shippingActive ? 'page' : undefined}
+                          className={cn(
+                            'flex shrink-0 items-center gap-1.5 px-2.5 lg:px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
+                            shippingActive
+                              ? 'bg-muted text-foreground font-medium'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                          )}
+                        >
+                          <Upload className="h-4 w-4 shrink-0" aria-hidden />
+                          <span>배송대행</span>
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-64 p-1.5">
+                        {visibleShippingNav.map(({ href: shippingHref, label: shippingLabel, description }) => (
+                          <DropdownMenuItem key={shippingHref} asChild className="items-start gap-3 rounded-md p-3">
+                            <Link href={shippingHref}>
+                              <Upload className="mt-0.5 h-4 w-4 text-muted-foreground" aria-hidden />
+                              <span className="grid gap-0.5">
+                                <span className="font-medium text-foreground">{shippingLabel}</span>
+                                <span className="text-xs text-muted-foreground">{description}</span>
+                              </span>
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="inline-flex min-w-max items-center gap-1">
-                    <NavLabel label={label} />
-                    {href === '/inbound-requests' && (
-                      <InboundUnreadBadge role="user" initial={inboundUnread} />
+                  <Link
+                    href={href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5 px-2.5 lg:px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
+                      active
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                     )}
-                    {href === '/support-requests' && (
-                      <SupportUnreadBadge role="user" initial={supportUnread} />
-                    )}
-                  </span>
-                </Link>
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="inline-flex min-w-max items-center gap-1">
+                      <NavLabel label={label} />
+                      {href === '/inbound-requests' && (
+                        <InboundUnreadBadge role="user" initial={inboundUnread} />
+                      )}
+                      {href === '/support-requests' && (
+                        <SupportUnreadBadge role="user" initial={supportUnread} />
+                      )}
+                    </span>
+                  </Link>
+                </Fragment>
               );
             })}
           </nav>
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {!isGroup2 && (
+            <Link
+              href="/cart"
+              className="inline-flex h-8 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+              aria-label="장바구니"
+            >
+              <ShoppingBag className="h-4 w-4" aria-hidden />
+            </Link>
+          )}
           {!isGroup2 && (
             <div
               className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-accent/10 text-accent"
@@ -193,31 +257,67 @@ export function NavUser({
       <nav className="md:hidden border-t overflow-x-auto">
         <ul className="mx-auto flex min-w-full max-w-7xl px-2">
           {visibleNav.map(({ href, label, Icon, exact }) => {
-            const active = exact
-              ? pathname === href
-              : pathname === href || pathname.startsWith(href + '/');
+            const active = isActivePath(pathname, href, exact);
+            const shouldRenderShipping = href === '/inbound-requests' && visibleShippingNav.length > 0;
             return (
-              <li key={href} className="w-20 flex-none">
-                <Link
-                  href={href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex flex-col items-center justify-center gap-0.5 h-12 text-[11px] transition-colors',
-                    active ? 'text-foreground font-medium' : 'text-muted-foreground',
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="inline-flex items-center gap-1">
-                    <NavLabel label={label} />
-                    {href === '/inbound-requests' && (
-                      <InboundUnreadBadge role="user" initial={inboundUnread} />
+              <Fragment key={href}>
+                {shouldRenderShipping && (
+                  <li className="w-20 flex-none">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-current={shippingActive ? 'page' : undefined}
+                          className={cn(
+                            'flex h-12 w-full flex-col items-center justify-center gap-0.5 text-[11px] transition-colors',
+                            shippingActive ? 'text-foreground font-medium' : 'text-muted-foreground',
+                          )}
+                        >
+                          <Upload className="h-4 w-4 shrink-0" aria-hidden />
+                          <span className="inline-flex items-center gap-0.5">
+                            배송대행
+                            <ChevronDown className="h-3 w-3" aria-hidden />
+                          </span>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-64 p-1.5">
+                        {visibleShippingNav.map(({ href: shippingHref, label: shippingLabel, description }) => (
+                          <DropdownMenuItem key={shippingHref} asChild className="items-start gap-3 rounded-md p-3">
+                            <Link href={shippingHref}>
+                              <Upload className="mt-0.5 h-4 w-4 text-muted-foreground" aria-hidden />
+                              <span className="grid gap-0.5">
+                                <span className="font-medium text-foreground">{shippingLabel}</span>
+                                <span className="text-xs text-muted-foreground">{description}</span>
+                              </span>
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </li>
+                )}
+                <li className="w-20 flex-none">
+                  <Link
+                    href={href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'flex flex-col items-center justify-center gap-0.5 h-12 text-[11px] transition-colors',
+                      active ? 'text-foreground font-medium' : 'text-muted-foreground',
                     )}
-                    {href === '/support-requests' && (
-                      <SupportUnreadBadge role="user" initial={supportUnread} />
-                    )}
-                  </span>
-                </Link>
-              </li>
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="inline-flex items-center gap-1">
+                      <NavLabel label={label} />
+                      {href === '/inbound-requests' && (
+                        <InboundUnreadBadge role="user" initial={inboundUnread} />
+                      )}
+                      {href === '/support-requests' && (
+                        <SupportUnreadBadge role="user" initial={supportUnread} />
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              </Fragment>
             );
           })}
         </ul>
