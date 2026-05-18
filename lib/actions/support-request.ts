@@ -1,6 +1,7 @@
 'use server';
 
 import { randomUUID } from 'crypto';
+import { redirect } from 'next/navigation';
 import {
   callRpc,
   formatZodError,
@@ -245,7 +246,7 @@ export async function submitSupportRequestAction(
   }
 
   revalidatePaths(['/support-requests', '/admin/support-requests']);
-  return { ok: true, requestId };
+  redirect(`/support-requests/${requestId}`);
 }
 
 export async function cancelSupportRequestAction(requestId: string): Promise<ActionResult> {
