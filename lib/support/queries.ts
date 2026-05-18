@@ -127,7 +127,11 @@ export async function fetchSupportRequest(id: string): Promise<{
   comments: SupportCommentRow[];
 }> {
   const supabase = createClient();
-  const [{ data: request }, { data: attachments }, { data: comments }] = await Promise.all([
+  const [
+    { data: request, error: requestError },
+    { data: attachments, error: attachmentsError },
+    { data: comments, error: commentsError },
+  ] = await Promise.all([
     supabase
       .from('support_requests')
       .select(
@@ -147,16 +151,28 @@ export async function fetchSupportRequest(id: string): Promise<{
       .order('created_at', { ascending: true }),
   ]);
 
+  if (requestError) {
+    console.error('[support] fetchSupportRequest request', requestError);
+    return { request: null, comments: [] };
+  }
+
   if (!request) {
     return { request: null, comments: [] };
+  }
+
+  if (attachmentsError) {
+    console.error('[support] fetchSupportRequest attachments', attachmentsError);
+  }
+  if (commentsError) {
+    console.error('[support] fetchSupportRequest comments', commentsError);
   }
 
   return {
     request: {
       ...(request as unknown as Omit<SupportRequestDetail, 'attachments'>),
-      attachments: (attachments ?? []) as unknown as SupportAttachmentRow[],
+      attachments: attachmentsError ? [] : (attachments ?? []) as unknown as SupportAttachmentRow[],
     },
-    comments: (comments ?? []) as unknown as SupportCommentRow[],
+    comments: commentsError ? [] : (comments ?? []) as unknown as SupportCommentRow[],
   };
 }
 
