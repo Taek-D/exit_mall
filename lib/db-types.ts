@@ -648,6 +648,71 @@ export type Database = {
           },
         ]
       }
+      password_reset_attempts: {
+        Row: {
+          id: number
+          ip_hash: string
+          lookup_hash: string
+          occurred_at: string
+          success: boolean
+        }
+        Insert: {
+          id?: number
+          ip_hash: string
+          lookup_hash: string
+          occurred_at?: string
+          success?: boolean
+        }
+        Update: {
+          id?: number
+          ip_hash?: string
+          lookup_hash?: string
+          occurred_at?: string
+          success?: boolean
+        }
+        Relationships: []
+      }
+      password_reset_challenges: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          ip_hash: string
+          lookup_hash: string
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_hash: string
+          lookup_hash: string
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_hash?: string
+          lookup_hash?: string
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_challenges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_imports: {
         Row: {
           admin_id: string
@@ -891,6 +956,171 @@ export type Database = {
           },
         ]
       }
+      support_request_attachments: {
+        Row: {
+          content_type: string
+          created_at: string
+          id: string
+          original_name: string
+          request_id: string
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          original_name: string
+          request_id: string
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          original_name?: string
+          request_id?: string
+          size_bytes?: number
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_request_attachments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_request_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_request_comments: {
+        Row: {
+          author_id: string
+          author_role: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          request_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          author_role: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          request_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          author_role?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          request_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_request_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_request_comments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_requests: {
+        Row: {
+          admin_last_read_at: string | null
+          body: string
+          category: string
+          created_at: string
+          id: string
+          last_comment_at: string | null
+          last_comment_by_role: string | null
+          reference_type: string
+          reference_value: string | null
+          reviewed_by: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+          user_last_read_at: string | null
+        }
+        Insert: {
+          admin_last_read_at?: string | null
+          body: string
+          category: string
+          created_at?: string
+          id?: string
+          last_comment_at?: string | null
+          last_comment_by_role?: string | null
+          reference_type?: string
+          reference_value?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          user_last_read_at?: string | null
+        }
+        Update: {
+          admin_last_read_at?: string | null
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          last_comment_at?: string | null
+          last_comment_by_role?: string | null
+          reference_type?: string
+          reference_value?: string | null
+          reviewed_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          user_last_read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_custom_inventory: {
         Row: {
           created_at: string
@@ -981,6 +1211,13 @@ export type Database = {
         Args: {
           request_id: string
           body: string
+        }
+        Returns: string
+      }
+      add_support_comment: {
+        Args: {
+          p_request_id: string
+          p_body: string
         }
         Returns: string
       }
@@ -1075,6 +1312,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      cancel_support_request: {
+        Args: {
+          p_request_id: string
+        }
+        Returns: undefined
+      }
       cleanup_orphan_inbound_pending: {
         Args: {
           p_older_than?: unknown
@@ -1099,6 +1342,12 @@ export type Database = {
         }
         Returns: number
       }
+      count_support_unread: {
+        Args: {
+          p_role: string
+        }
+        Returns: number
+      }
       delete_user_custom_inventory: {
         Args: {
           target_user: string
@@ -1117,6 +1366,13 @@ export type Database = {
       mark_inbound_read: {
         Args: {
           request_id: string
+        }
+        Returns: undefined
+      }
+      mark_support_read: {
+        Args: {
+          p_request_id: string
+          p_seen_last_comment_at?: string | null
         }
         Returns: undefined
       }
@@ -1190,10 +1446,40 @@ export type Database = {
           profile_email: string
         }[]
       }
+      search_support_requests: {
+        Args: {
+          p_q?: string
+          p_status?: string
+          p_category?: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          user_id: string
+          category: string
+          title: string
+          status: string
+          last_comment_at: string
+          last_comment_by_role: string
+          user_last_read_at: string
+          admin_last_read_at: string
+          created_at: string
+          updated_at: string
+          profile_name: string
+          profile_email: string
+        }[]
+      }
       set_inbound_status: {
         Args: {
           request_id: string
           new_status: string
+        }
+        Returns: undefined
+      }
+      set_support_status: {
+        Args: {
+          p_request_id: string
+          p_new_status: string
         }
         Returns: undefined
       }
@@ -1204,6 +1490,16 @@ export type Database = {
           p_excel_path: string
           p_excel_name: string
           p_image_paths: string[]
+        }
+        Returns: string
+      }
+      submit_support_request_rpc: {
+        Args: {
+          p_category: string
+          p_title: string
+          p_body: string
+          p_reference_type?: string
+          p_reference_value?: string
         }
         Returns: string
       }
@@ -1322,4 +1618,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

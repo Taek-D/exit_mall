@@ -127,6 +127,30 @@ export const thresholdSchema = z.object({
   threshold: z.number().int().min(0).max(10_000_000),
 });
 
+const supportCategorySchema = z.enum(['exchange', 'return', 'cs', 'other']);
+const supportReferenceTypeSchema = z.enum(['none', 'order', 'tracking', 'other']);
+
+export const supportRequestCreateSchema = z.object({
+  category: supportCategorySchema,
+  title: z.string().trim().min(1, '제목을 입력해주세요').max(200, '제목은 200자 이하여야 합니다'),
+  body: z.string().trim().min(1, '내용을 입력해주세요').max(5000, '내용은 5000자 이하여야 합니다'),
+  referenceType: supportReferenceTypeSchema.default('none'),
+  referenceValue: z
+    .string()
+    .trim()
+    .max(100, '참고번호는 100자 이하여야 합니다')
+    .optional()
+    .transform((value) => (value ? value : null)),
+});
+
+export const supportCommentSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, '내용을 입력해주세요')
+    .max(2000, '댓글은 2000자 이하여야 합니다'),
+});
+
 export const inboundRequestCreateSchema = z.object({
   title: z.string().trim().min(1, '제목을 입력해주세요').max(200, '제목은 200자 이하여야 합니다'),
   body: z.string().max(5000, '본문은 5000자 이하여야 합니다').optional().default(''),

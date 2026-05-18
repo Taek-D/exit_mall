@@ -21,26 +21,38 @@ const TITLES: Record<string, string> = {
   '/admin/orders': '주문 관리',
   '/admin/products': '상품 관리',
   '/admin/users': '사용자 관리',
+  '/admin/support-requests': '교환/반품 및 CS 문의',
   '/admin/low-balance': '잔액 부족 고객',
   '/admin/settings': '설정',
   '/admin/account/password': '비밀번호 변경',
 };
 
+function getAdminTitle(pathname: string) {
+  const exactTitle = TITLES[pathname];
+  if (exactTitle) return exactTitle;
+
+  return (
+    Object.entries(TITLES)
+      .filter(([path]) => path !== '/admin')
+      .sort(([a], [b]) => b.length - a.length)
+      .find(([path]) => pathname.startsWith(path + '/'))?.[1] ?? '관리자'
+  );
+}
+
 export function AdminHeader({
   name,
   email,
   inboundUnread,
+  supportUnread,
 }: {
   name: string;
   email?: string | null;
   inboundUnread: number;
+  supportUnread: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const title =
-    TITLES[pathname] ??
-    Object.entries(TITLES).find(([p]) => pathname.startsWith(p + '/'))?.[1] ??
-    '관리자';
+  const title = getAdminTitle(pathname);
   const initial = (name || email || 'A').charAt(0).toUpperCase();
 
   return (
@@ -105,7 +117,12 @@ export function AdminHeader({
         </DropdownMenu>
       </div>
 
-      <MobileAdminNav open={open} onOpenChange={setOpen} inboundUnread={inboundUnread} />
+      <MobileAdminNav
+        open={open}
+        onOpenChange={setOpen}
+        inboundUnread={inboundUnread}
+        supportUnread={supportUnread}
+      />
     </header>
   );
 }

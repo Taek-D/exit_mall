@@ -18,6 +18,7 @@ export const USER_GROUP_SHORT_LABEL: Record<UserGroup, string> = {
 export const GROUP2_ALLOWED_PREFIXES = [
   '/shipping-uploads/purchased',
   '/inbound-requests',
+  '/support-requests',
   '/inbound-template.xlsx',
   '/account',
   '/guide',

@@ -4,16 +4,19 @@ import { usePathname } from 'next/navigation';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { InboundUnreadBadge } from '@/components/inbound/InboundUnreadBadge';
+import { SupportUnreadBadge } from '@/components/support/SupportUnreadBadge';
 import { ADMIN_NAV_ITEMS } from '@/components/admin-nav-items';
 
 export function MobileAdminNav({
   open,
   onOpenChange,
   inboundUnread,
+  supportUnread,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   inboundUnread: number;
+  supportUnread: number;
 }) {
   const pathname = usePathname();
   return (
@@ -48,6 +51,9 @@ export function MobileAdminNav({
                       {label}
                       {href === '/admin/inbound-requests' && (
                         <InboundUnreadBadge role="admin" initial={inboundUnread} />
+                      )}
+                      {href === '/admin/support-requests' && (
+                        <SupportUnreadBadge role="admin" initial={supportUnread} />
                       )}
                     </span>
                   </Link>
