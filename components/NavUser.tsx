@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logoutAction } from '@/lib/actions/auth';
-import { Button } from '@/components/ui/button';
 import { formatKRW } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import {
@@ -50,15 +49,19 @@ const NAV: readonly NavItem[] = [
   { href: '/guide', label: '가이드', Icon: BookOpen, groups: ['group1', 'group2'] }
 ];
 
-function formatNavLabel(label: string) {
-  if (label.length <= 5) return label;
+function getNavLabelLines(label: string) {
+  if (label.includes(' ')) return label.split(' ').filter(Boolean);
+  if (label.length > 5) return [label.slice(0, 5), label.slice(5)];
+  return [label];
+}
 
+function NavLabel({ label }: { label: string }) {
   return (
-    <>
-      {label.slice(0, 5).trimEnd()}
-      <br />
-      {label.slice(5).trimStart()}
-    </>
+    <span className="flex flex-col items-center leading-tight whitespace-nowrap">
+      {getNavLabelLines(label).map((line) => (
+        <span key={line}>{line}</span>
+      ))}
+    </span>
   );
 }
 
@@ -84,14 +87,14 @@ export function NavUser({
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl h-16 px-4 lg:px-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
-          <Link href={homeHref} className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-5 lg:gap-6">
+          <Link href={homeHref} className="flex shrink-0 items-center gap-2">
             <div className="h-7 w-7 rounded-md bg-primary grid place-items-center">
               <span className="text-primary-foreground text-xs font-heading font-semibold">E</span>
             </div>
             <span className="font-heading font-semibold tracking-tight hidden sm:inline">엑시트몰</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex min-w-0 items-center gap-1 overflow-x-auto">
             {visibleNav.map(({ href, label, Icon, exact }) => {
               const active = exact
                 ? pathname === href
@@ -100,16 +103,17 @@ export function NavUser({
                 <Link
                   key={href}
                   href={href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
+                    'flex shrink-0 items-center gap-1.5 px-2.5 lg:px-3 min-h-9 py-1 rounded-md text-sm transition-colors duration-150',
                     active
                       ? 'bg-muted text-foreground font-medium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-center leading-tight">{formatNavLabel(label)}</span>
+                  <span className="inline-flex min-w-max items-center gap-1">
+                    <NavLabel label={label} />
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
                     )}
@@ -123,7 +127,7 @@ export function NavUser({
           </nav>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {!isGroup2 && (
             <div
               className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-accent/10 text-accent"
@@ -186,16 +190,17 @@ export function NavUser({
       </div>
 
       {/* mobile bottom strip for primary nav */}
-      <nav className="md:hidden border-t">
-        <ul className="mx-auto max-w-7xl px-2 flex">
+      <nav className="md:hidden border-t overflow-x-auto">
+        <ul className="mx-auto flex min-w-full max-w-7xl px-2">
           {visibleNav.map(({ href, label, Icon, exact }) => {
             const active = exact
               ? pathname === href
               : pathname === href || pathname.startsWith(href + '/');
             return (
-              <li key={href} className="flex-1">
+              <li key={href} className="w-20 flex-none">
                 <Link
                   href={href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
                     'flex flex-col items-center justify-center gap-0.5 h-12 text-[11px] transition-colors',
                     active ? 'text-foreground font-medium' : 'text-muted-foreground',
@@ -203,7 +208,7 @@ export function NavUser({
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="inline-flex items-center gap-1">
-                    <span className="text-center leading-tight">{formatNavLabel(label)}</span>
+                    <NavLabel label={label} />
                     {href === '/inbound-requests' && (
                       <InboundUnreadBadge role="user" initial={inboundUnread} />
                     )}
