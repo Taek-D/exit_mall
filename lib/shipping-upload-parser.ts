@@ -25,7 +25,7 @@ export type ParsedShippingUpload = {
 };
 
 const HEADER_KEYS = [
-  ['no'],
+  ['no', '고객주문번호'],
   ['받는사람', '받는분성명'],
   ['연락처', '받는분전화번호'],
   ['주소', '받는분주소(전체,분할)', '받는분주소'],
@@ -109,14 +109,17 @@ export async function parseShippingExcel(
   if (!ws) throw new Error('시트가 없습니다.');
 
   let headerRow = -1;
+  const firstColumnHeaderKeys = HEADER_KEYS[0]!.map(normalizeHeader);
   for (let rowNumber = 1; rowNumber <= ws.rowCount; rowNumber += 1) {
     const first = cellString(ws.getRow(rowNumber).getCell(1).value);
-    if (first?.toLowerCase() === 'no') {
+    if (first && firstColumnHeaderKeys.includes(normalizeHeader(first))) {
       headerRow = rowNumber;
       break;
     }
   }
-  if (headerRow < 0) throw new Error('양식의 헤더 행을 찾을 수 없습니다 (첫 컬럼 "No").');
+  if (headerRow < 0) {
+    throw new Error('양식의 헤더 행을 찾을 수 없습니다 (첫 컬럼 "No" 또는 "고객주문번호").');
+  }
 
   const headerCells = rowValues(ws, headerRow, HEADER_KEYS.length).map((value) =>
     normalizeHeader(cellString(value) ?? ''),

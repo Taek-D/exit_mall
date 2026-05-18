@@ -30,6 +30,14 @@ async function workbookBuffer(header: string[], rows: unknown[][]): Promise<Buff
   return Buffer.from(buffer as ArrayBuffer);
 }
 
+async function workbookBufferFromFirstRow(header: string[], rows: unknown[][]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet1');
+  ws.addRows([header, ...rows]);
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
+}
+
 describe('parseShippingExcel - valid', () => {
   it('parses a valid 3-row template', async () => {
     const r = await parseShippingExcel(load('shipping-valid.xlsx'));
@@ -95,6 +103,53 @@ describe('parseShippingExcel - valid', () => {
       memo: '문 앞',
       tracking_number: null,
     });
+  });
+
+  it('accepts the customer-order-number template from the first row without storing column A', async () => {
+    const r = await parseShippingExcel(
+      await workbookBufferFromFirstRow(
+        [
+          '고객주문번호',
+          '받는분성명',
+          '받는분전화번호',
+          '받는분주소(전체, 분할)',
+          '품목명',
+          '내품명',
+          '내품수량',
+          '배송메세지1',
+          '송장번호',
+        ],
+        [
+          [
+            '20260518-001',
+            '홍길동',
+            '010-1234-5678',
+            '서울시 강남구 1',
+            '스니커즈',
+            '270',
+            2,
+            '문 앞',
+            '',
+          ],
+        ],
+      ),
+    );
+
+    expect(r.items[0]).toMatchObject({
+      no: 1,
+      recipient: '홍길동',
+      phone: '010-1234-5678',
+      address: '서울시 강남구 1',
+      product_code: '스니커즈',
+      product_name: '270',
+      quantity: 2,
+      memo: '문 앞',
+      tracking_number: null,
+    });
+    expect(r.items[0]).not.toHaveProperty('customer_order_number');
+    expect(r.uploader_company).toBeNull();
+    expect(r.uploader_phone).toBeNull();
+    expect(r.request_memo).toBeNull();
   });
 
   it('preserves numeric tracking numbers as integer strings (no scientific notation)', async () => {

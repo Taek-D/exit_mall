@@ -124,7 +124,7 @@ pnpm test                 # 단위 테스트 (money, Zod schemas, 배송/입고/
 pnpm test:e2e             # Playwright 인증 스모크 + 사용자 그룹 로컬 시나리오
 ```
 
-배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 이 스크립트가 공식 생성 경로이며, `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
+배송대행 엑셀 양식은 아래 명령으로 재생성합니다. 현재 공식 양식은 1행 헤더가 `고객주문번호, 받는분성명, 받는분전화번호, 받는분주소(전체, 분할), 품목명, 내품명, 내품수량, 배송메세지1, 송장번호`인 공용 양식입니다. A열 `고객주문번호`는 업로드 호환용 참고값으로만 허용하며 시스템에 저장하지 않습니다. `scripts/prepare-shipping-template.ts`는 외부 원본 CJ 엑셀을 보정할 때만 쓰는 일회성 도구입니다.
 
 ```bash
 node scripts/build-shipping-template.cjs
