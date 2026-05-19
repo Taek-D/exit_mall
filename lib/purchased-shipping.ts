@@ -149,6 +149,12 @@ export async function parseInboundInventoryExcel(
     }
 
     if (!productName) throw new Error(`${rowNumber}행 상품명이 비어 있습니다.`);
+    // Mirror purchased_inventory_lots.product_name's 1..100 check so the
+    // user sees a row-specific error before the RPC fires set_inbound_status
+    // can't complete.
+    if (productName.length > 100) {
+      throw new Error(`${rowNumber}행 상품명은 100자 이하여야 합니다.`);
+    }
     if (quantity === null || quantity < 1) {
       throw new Error(`${rowNumber}행 재고수량은 1 이상이어야 합니다.`);
     }

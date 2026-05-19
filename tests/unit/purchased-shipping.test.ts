@@ -62,6 +62,15 @@ describe('parseInboundInventoryExcel', () => {
       parseInboundInventoryExcel(await workbookBuffer([['', '샴푸', '500ml', 0]])),
     ).rejects.toThrow(/재고수량/);
   });
+
+  it('rejects product names longer than 100 chars before the RPC fires', async () => {
+    // purchased_inventory_lots.product_name caps trimmed length at 100, so a
+    // longer name would only fail on admin completion. Surface it at upload.
+    const longName = 'ㄱ'.repeat(101);
+    await expect(
+      parseInboundInventoryExcel(await workbookBuffer([['', longName, '500ml', 1]])),
+    ).rejects.toThrow(/100자/);
+  });
 });
 
 describe('allocatePurchasedInventoryFifo', () => {

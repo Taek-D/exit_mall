@@ -8,6 +8,18 @@ export function mapSubmitInboundRequestError(message: string, maxImages: number)
     return `이미지는 최대 ${maxImages}장까지 첨부할 수 있습니다.`;
   }
   if (message.includes('MISSING_EXCEL')) return '엑셀 파일이 누락되었습니다.';
+  if (message.includes('EMPTY_INBOUND_ITEMS')) {
+    return '입고 품목을 한 줄 이상 입력해주세요.';
+  }
+  if (message.includes('INVALID_INBOUND_PRODUCT')) {
+    return '상품명을 확인해주세요 (1~100자).';
+  }
+  if (message.includes('INVALID_INBOUND_QUANTITY')) {
+    return '재고수량은 1 이상이어야 합니다.';
+  }
+  if (message.includes('INVALID_INBOUND_ROW')) {
+    return '입고 품목 행 번호가 유효하지 않습니다.';
+  }
   return null;
 }
 

@@ -113,7 +113,11 @@ begin
     raise exception 'EMPTY_INBOUND_ITEMS';
   end if;
 
-  -- Validate every item up-front so the admin reviews well-formed rows.
+  -- Validate every item up-front so the admin reviews well-formed rows and
+  -- so the user gets an actionable error instead of an un-completable
+  -- request. Bounds mirror the check constraints on
+  -- purchased_inventory_lots (product_name 1..100, quantity > 0, row > 0)
+  -- so set_inbound_status('completed') can't fail on shape later.
   -- Lot rows are created in set_inbound_status when the admin transitions
   -- the request to `completed` — see comment on the inbound_items column.
   for v_item in select * from jsonb_array_elements(p_items) loop
@@ -121,7 +125,9 @@ begin
     v_quantity := coalesce((v_item->>'quantity')::int, 0);
     v_row_number := coalesce((v_item->>'row_number')::int, 0);
 
-    if length(v_product_name) = 0 then raise exception 'INVALID_INBOUND_PRODUCT'; end if;
+    if length(v_product_name) = 0 or length(v_product_name) > 100 then
+      raise exception 'INVALID_INBOUND_PRODUCT';
+    end if;
     if v_quantity < 1 then raise exception 'INVALID_INBOUND_QUANTITY'; end if;
     if v_row_number < 1 then raise exception 'INVALID_INBOUND_ROW'; end if;
   end loop;
@@ -861,7 +867,11 @@ begin
         v_quantity := coalesce((v_item->>'quantity')::int, 0);
         v_row_number := coalesce((v_item->>'row_number')::int, 0);
 
-        if length(v_product_name) = 0 then raise exception 'INVALID_INBOUND_PRODUCT'; end if;
+        -- Mirror the lots-table check constraint so the admin sees an
+        -- actionable error instead of a raw constraint violation.
+        if length(v_product_name) = 0 or length(v_product_name) > 100 then
+          raise exception 'INVALID_INBOUND_PRODUCT';
+        end if;
         if v_quantity < 1 then raise exception 'INVALID_INBOUND_QUANTITY'; end if;
         if v_row_number < 1 then raise exception 'INVALID_INBOUND_ROW'; end if;
 
