@@ -35,6 +35,7 @@ export type AdminShippingUploadItem = {
 export type AdminShippingUploadDetail = {
   id: string;
   user_id: string;
+  upload_type?: 'exitmall' | 'purchased';
   storage_path: string;
   original_name: string;
   status: string;
@@ -74,13 +75,17 @@ export async function fetchAdminStockOrderDetail(orderId: string): Promise<{
 
 export async function fetchAdminShippingUploadDetail(
   uploadId: string,
+  uploadType?: 'exitmall' | 'purchased',
 ): Promise<AdminShippingUploadDetail | null> {
   const supabase = createClient();
-  const { data } = await supabase
+  let query = supabase
     .from('order_uploads')
     .select('*, profiles!order_uploads_user_id_fkey(name,email,phone,deposit_balance)')
-    .eq('id', uploadId)
-    .single<AdminShippingUploadDetail>();
+    .eq('id', uploadId);
+
+  if (uploadType) query = query.eq('upload_type', uploadType);
+
+  const { data } = await query.single<AdminShippingUploadDetail>();
 
   return data ?? null;
 }

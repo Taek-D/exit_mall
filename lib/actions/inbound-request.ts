@@ -14,6 +14,7 @@ import {
 } from '@/lib/schemas';
 import { safeFilename } from '@/lib/inbound/storage';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
+import { parseInboundInventoryExcel } from '@/lib/purchased-shipping';
 import {
   applyInboundMoveOutcomes,
   chaseInboundPathsAfterRollback,
@@ -70,6 +71,16 @@ export async function submitInboundRequestAction(
   if (!excelUpload.ok) return excelUpload;
   const { file: excel, buffer: excelBuf } = excelUpload;
 
+  let inboundItems;
+  try {
+    inboundItems = await parseInboundInventoryExcel(excelBuf);
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : '입고리스트 엑셀을 읽을 수 없습니다.',
+    };
+  }
+
   const images: File[] = [];
   for (let i = 0; i < MAX_IMAGES; i++) {
     const f = fd.get(`image${i}`);
@@ -118,6 +129,7 @@ export async function submitInboundRequestAction(
     p_excel_path: excelPath,
     p_excel_name: excel.name,
     p_image_paths: imagePaths,
+    p_items: inboundItems,
   });
   if (rpcErr || !newId) {
     await supabase.storage.from('inbound-requests').remove(inboundCleanupPaths(excelPath, imagePaths));

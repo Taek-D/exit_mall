@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { ShippingUploadStatus, StockOrderStatus } from '@/lib/types';
 
 export type CountMap = Record<string, number>;
+export type ShippingUploadType = 'exitmall' | 'purchased';
 
 export type StockOrderItem = {
   product_id?: string;
@@ -49,6 +50,7 @@ export type LegacyOrderRow = {
 export type ShippingUploadRow = {
   id: string;
   user_id?: string;
+  upload_type?: ShippingUploadType;
   original_name: string;
   status: string;
   total_quantity: number;
@@ -115,13 +117,17 @@ export async function fetchMyOrders() {
   };
 }
 
-export async function fetchAdminShippingUploads(status: ShippingUploadStatus | 'all') {
+export async function fetchAdminShippingUploads(
+  status: ShippingUploadStatus | 'all',
+  uploadType: ShippingUploadType = 'exitmall',
+) {
   const supabase = createClient();
   let query = supabase
     .from('order_uploads')
     .select(
-      'id, user_id, original_name, status, total_quantity, shipping_fee_total, created_at, profiles!order_uploads_user_id_fkey(name)',
+      'id, user_id, upload_type, original_name, status, total_quantity, shipping_fee_total, created_at, profiles!order_uploads_user_id_fkey(name)',
     )
+    .eq('upload_type', uploadType)
     .order('created_at', { ascending: false });
 
   if (status !== 'all') {
@@ -130,7 +136,7 @@ export async function fetchAdminShippingUploads(status: ShippingUploadStatus | '
 
   const [{ data }, { data: countRows }] = await Promise.all([
     query,
-    supabase.from('order_uploads').select('status'),
+    supabase.from('order_uploads').select('status').eq('upload_type', uploadType),
   ]);
 
   return {
@@ -139,11 +145,15 @@ export async function fetchAdminShippingUploads(status: ShippingUploadStatus | '
   };
 }
 
-export async function fetchRecentShippingUploads(limit = 30) {
+export async function fetchRecentShippingUploads(
+  limit = 30,
+  uploadType: ShippingUploadType = 'exitmall',
+) {
   const supabase = createClient();
   const { data } = await supabase
     .from('order_uploads')
-    .select('id, original_name, status, total_quantity, shipping_fee_total, admin_memo, created_at')
+    .select('id, upload_type, original_name, status, total_quantity, shipping_fee_total, admin_memo, created_at')
+    .eq('upload_type', uploadType)
     .order('created_at', { ascending: false })
     .limit(limit);
 

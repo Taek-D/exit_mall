@@ -1,4 +1,13 @@
 export function mapShippingUploadError(message: string): string {
+  if (message.startsWith('INSUFFICIENT_PURCHASED_INVENTORY')) {
+    const parts = message.split(':');
+    const need = parts[2] ?? '?';
+    const have = parts[3] ?? '?';
+    return `사입재고가 부족합니다 (필요 ${need}개, 가능 ${have}개).`;
+  }
+  if (message.startsWith('EMPTY_ALLOCATIONS')) {
+    return '사입재고 배정 내역이 없습니다. 반려 후 다시 업로드해주세요.';
+  }
   if (message.startsWith('FORBIDDEN')) return '관리자만 처리할 수 있습니다.';
   if (message.startsWith('NOT_FOUND')) return '업로드를 찾을 수 없습니다.';
   if (message.startsWith('ALREADY_PROCESSED')) return '이미 처리된 업로드입니다.';

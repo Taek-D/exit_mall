@@ -4,13 +4,14 @@
 
 Next.js 14 + Supabase 기반입니다.
 
-최종 업데이트: 2026-05-14
+최종 업데이트: 2026-05-19
 
 ## 두 흐름 개요
 
 - **흐름 1 — 엑시트몰 상품 구매(재고 적립)**: 고객이 결제하면 `stock_orders.pending` 으로 들어가고, 관리자 승인 시 보유 재고에 적립 + 예치금 차감. 이 단계에서는 발송이 일어나지 않습니다.
 - **흐름 2 — 배송대행 업로드(재고 발송)**: 고객이 CJ식 1행 1택배 양식 엑셀로 받는사람 명단을 올리면 `order_uploads.pending` 으로 들어가고, 관리자 승인 시 보유 재고(엑시트몰 상품 + 사용자 수기 재고)에서 차감 + 행수 × ₩3,300 배송비 차감. 관리자가 송장 채운 엑셀을 재업로드하면 행별 송장이 노출됩니다.
-- **부속 흐름 — 입고 요청 게시판**: 고객이 사입 상품 입고를 비공개 게시글로 등록하고 관리자와 댓글로 진행 상황을 주고받습니다. 엑셀 양식 첨부 + 상태(접수/검토/입고완료/취소) 추적.
+- **흐름 3 — 사입재고 배송대행**: 고객이 입고리스트에서 입고완료된 사입재고를 같은 배송대행 양식으로 발송 요청하면 `order_uploads.upload_type = 'purchased'`로 접수됩니다. 관리자 승인 시 입고완료 재고만 차감하고 예치금은 차감하지 않습니다.
+- **부속 흐름 — 입고 요청 게시판**: 고객이 사입 상품 입고를 비공개 게시글로 등록하고 관리자와 댓글로 진행 상황을 주고받습니다. 엑셀 양식 첨부 + 상태(접수/검토/입고완료/취소) 추적, 입고완료 시 사입재고 배송대행 가능 수량에 반영.
 
 ## 현재 구현 상태
 
@@ -27,7 +28,7 @@ Next.js 14 + Supabase 기반입니다.
 - 예치금 잔액 (가용/검토대기 예약 분리), 이체 요청, 이체 요청 내역
 - 내 주문 내역(엑시트몰 상품 검토대기·승인·반려/취소, Legacy 일반 주문 분리)
 - 보유 재고 화면 (`/inventory`) — 엑시트몰 상품 + 사용자 수기 재고 통합 표시, 항목별 가용/예약/총보유 + 변동 내역 timeline (`/inventory/product/[id]`, `/inventory/custom/[id]`)
-- 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 준비중
+- 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 입고완료 재고의 가용/예약/총입고 수량을 보여주고 같은 양식으로 검토 요청
 - 입고리스트(`/inbound-requests`) — 입고 요청 비공개 게시글 등록, 엑셀 양식 다운로드/첨부 업로드, 관리자와 댓글(편집 윈도우 적용)로 진행상황 추적, 미확인 답변 배지
 - 교환/반품 및 CS 문의(`/support-requests`) — 비공개 문의 등록, 선택 첨부, 관리자 댓글/상태 추적, 미확인 답변 배지
 - 비밀번호 변경, 아이디 찾기, 비밀번호 재설정
@@ -38,7 +39,7 @@ Next.js 14 + Supabase 기반입니다.
 - 상품 CRUD, 1인 구매 한도 설정, 상품 이미지 Storage 업로드, 비활성 토글, **소프트 삭제 / 삭제됨 탭에서 복구**
 - 상품 엑셀 가져오기(`/admin/products/import`) — 업로드 → 미리보기로 검증(가격/한도/이미지 URL/중복) → 적용. 신규 상품은 비공개 상태로 생성
 - 주문관리(`/admin/orders`) — `stock_orders` 검토 목록·상세·승인/반려
-- 배송대행 업로드 — 엑시트몰 배송대행(`/admin/shipping-uploads/exitmall`)에서 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리. 사입재고 배송대행(`/admin/shipping-uploads/purchased`)은 준비중
+- 배송대행 업로드 — 엑시트몰 배송대행(`/admin/shipping-uploads/exitmall`)에서 검토 목록·상세·승인/반려·원본 다운로드·송장 재업로드·완료 처리. 사입재고 배송대행(`/admin/shipping-uploads/purchased`)은 별도 목록·상세·승인/반려·송장 재업로드·완료 처리와 승인 시 사입재고 차감
 - 송장 채운 엑셀 재업로드 시 행별 `tracking_number` 갱신 + status=shipped (멱등)
 - 입고리스트(`/admin/inbound-requests`) — 사용자 게시글 검토, 상태 변경(접수/검토/입고완료/취소), 첨부 다운로드, 댓글 응답, 미확인 답변 배지
 - 교환/반품 및 CS 문의(`/admin/support-requests`) — 문의 검색/필터, 상태 변경, 댓글, 첨부 확인, 미확인 답변 배지
@@ -58,7 +59,6 @@ Next.js 14 + Supabase 기반입니다.
 - FK 인덱스 보강 및 `product_images` 목록 RLS 제한, RLS initplan 최적화
 
 ### 아직 구현 범위가 아닌 것
-- 사입재고 배송대행 흐름(`/shipping-uploads/purchased`, `/admin/shipping-uploads/purchased`) — group2 홈 경로지만 페이지 자체는 준비중 placeholder
 - CJ 자동 폴링/캐싱
 - 비CJ 택배사의 앱 내 배송 상태 조회
 - 사진/OCR 기반 상품 자동 등록
@@ -151,7 +151,7 @@ node scripts/build-shipping-template.cjs
 - `/shop` 상품 목록 / `/cart` 장바구니 / `/checkout` 검토 요청 (배송정보 입력 없음)
 - `/orders` 내 주문 내역 (엑시트몰 상품 검토대기/승인/반려·취소 + Legacy 일반 주문)
 - `/inventory` 보유 재고 (엑시트몰 + 수기 통합) / `/inventory/product/[id]` 상품별 변동 내역 / `/inventory/custom/[id]` 수기 재고 변동 내역
-- `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행(준비중)
+- `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행 / `/shipping-uploads/purchased/[id]` 행별 미리보기·송장·다운로드
 - `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
 - `/support-requests` 교환/반품 및 CS 문의 / `/support-requests/new` 새 문의 / `/support-requests/[id]` 상세·댓글·첨부
 - `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
@@ -165,7 +165,7 @@ node scripts/build-shipping-template.cjs
 - `/admin/approvals` 가입 승인 (재신청 표시)
 - `/admin/deposits` 입금 확인
 - `/admin/orders` 주문관리 (stock_orders 탭·상세·승인/반려)
-- `/admin/shipping-uploads/exitmall` 엑시트몰 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리) / `/admin/shipping-uploads/purchased` 사입재고 배송대행(준비중)
+- `/admin/shipping-uploads/exitmall` 엑시트몰 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리) / `/admin/shipping-uploads/purchased` 사입재고 배송대행 (탭·상세·승인/반려·원본/송장 다운로드·재업로드·완료 처리)
 - `/admin/inbound-requests` 입고리스트 (목록·상태 변경·댓글·첨부) / `/admin/inbound-requests/[id]` 상세
 - `/admin/support-requests` 교환/반품 및 CS 문의 (검색·필터·상태·댓글·첨부) / `/admin/support-requests/[id]` 상세
 - `/admin/products` 상품 CRUD + 비활성/소프트 삭제 + `?view=deleted` 복구 탭 / `/admin/products/import` 엑셀 가져오기 (업로드 → 미리보기 → 적용)

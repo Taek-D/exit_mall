@@ -43,7 +43,8 @@ export default async function DepositListPage() {
       .from('order_uploads')
       .select('id, shipping_fee_total')
       .eq('user_id', user!.id)
-      .eq('status', 'pending'),
+      .eq('status', 'pending')
+      .eq('upload_type', 'exitmall'),
   ]);
 
   const reqs = (requestsRes.data ?? []) as unknown as Req[];

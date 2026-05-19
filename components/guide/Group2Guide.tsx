@@ -26,14 +26,14 @@ export function Group2Guide() {
         </GuideSection>
 
         <GuideSection id="shipping-upload" title="사입재고 배송대행">
-          <p><strong>현재 준비 중입니다.</strong> 오픈되면 직접 사 두신 상품을 엑시트몰을 통해 배송으로 내보낼 수 있습니다.</p>
+          <p>입고리스트에서 입고완료된 사입재고를 엑시트몰을 통해 배송으로 내보낼 수 있습니다.</p>
           <p>예상 흐름:</p>
           <ol>
             <li><Link href="/shipping-uploads/purchased">사입재고 배송대행</Link>에서 양식 엑셀을 내려받습니다.</li>
             <li>받는 사람 명단과 직접 사 두신 상품 정보를 적습니다.</li>
             <li>엑셀 올리기 → 검토 요청 → 관리자 승인 → 송장 표시 순으로 진행됩니다.</li>
           </ol>
-          <p>자세한 사용 방법은 오픈 시점에 가이드에 추가됩니다.</p>
+          <p>관리자 승인 후 입고완료 재고가 차감되며, 배송비는 안내만 표시되고 예치금에서는 차감되지 않습니다.</p>
         </GuideSection>
 
         <GuideSection id="inbound" title="입고 요청">
