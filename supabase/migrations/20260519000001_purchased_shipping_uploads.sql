@@ -194,6 +194,23 @@ begin
   if v_status is null then raise exception 'UNAUTHENTICATED'; end if;
   if v_status <> 'active' then raise exception 'INACTIVE'; end if;
 
+  -- This RPC is SECURITY DEFINER and granted to every authenticated user,
+  -- so p_storage_path is untrusted. The exitmall direct-insert RLS policy
+  -- (order_uploads_self_insert) enforces `storage_path like auth.uid()::text
+  -- || '/%'` to prevent a caller from claiming someone else's order-uploads
+  -- object — the admin download button signs the stored path with admin
+  -- privileges, so a foreign path becomes an admin-side info leak. Mirror
+  -- that policy here.
+  if p_storage_path is null or length(trim(p_storage_path)) = 0 then
+    raise exception 'MISSING_STORAGE_PATH';
+  end if;
+  if p_storage_path not like (v_uid::text || '/%') then
+    raise exception 'FORBIDDEN_STORAGE_PATH';
+  end if;
+  if p_original_name is null or length(trim(p_original_name)) = 0 then
+    raise exception 'MISSING_ORIGINAL_NAME';
+  end if;
+
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'EMPTY_ITEMS';
   end if;
