@@ -49,12 +49,24 @@ export function AdminGuide() {
         </GuideSection>
 
         <GuideSection id="products" title="상품 관리">
-          <p><Link href="/admin/products">상품 관리</Link>에서 상품을 등록·수정·삭제하고, 1인 구매 한도와 이미지를 관리합니다. 상품을 잠시 노출에서 빼고 싶을 때는 노출 여부를 끌 수 있습니다.</p>
+          <p><Link href="/admin/products">상품 관리</Link>에서 다음을 처리합니다.</p>
+          <ul>
+            <li>상품 등록 / 수정 / 삭제</li>
+            <li>1인 구매 한도 설정</li>
+            <li>이미지 업로드 및 관리</li>
+            <li>노출 여부 끄기 (잠시 상점에서 빼고 싶을 때)</li>
+          </ul>
           <p>삭제한 상품은 사라지지 않고 <Link href="/admin/products?view=deleted">삭제됨 탭</Link>에서 다시 복구할 수 있습니다.</p>
         </GuideSection>
 
         <GuideSection id="product-import" title="상품 엑셀 올리기">
-          <p><Link href="/admin/products/import">상품 가져오기</Link>에서 엑셀을 올리면 가격, 한도, 이미지 주소, 중복 여부를 먼저 보여 드립니다. 확인 후 적용을 누르면 등록됩니다. 새로 추가된 상품은 비공개 상태로 만들어지니, 검토 후 공개로 바꿔 주세요.</p>
+          <p><Link href="/admin/products/import">상품 가져오기</Link>에서 엑셀로 상품을 한 번에 등록할 수 있습니다.</p>
+          <ol>
+            <li>엑셀 파일을 업로드합니다.</li>
+            <li>미리보기에서 가격, 한도, 이미지 주소, 중복 여부를 확인합니다.</li>
+            <li>적용을 누르면 등록됩니다.</li>
+            <li>새로 추가된 상품은 비공개 상태로 만들어지니, 검토 후 공개로 바꿔 주세요.</li>
+          </ol>
         </GuideSection>
 
         <GuideSection id="orders" title="주문 검토">
@@ -63,7 +75,12 @@ export function AdminGuide() {
             <li><strong>승인</strong>: 예치금이 빠지고, 전체 재고가 줄고, 사용자 재고에 그만큼 쌓이며, 변동 내역이 기록됩니다.</li>
             <li><strong>반려</strong>: 아무것도 차감하지 않고, 적은 사유가 사용자 화면에 그대로 표시됩니다.</li>
           </ul>
-          <p><strong>반려 사유 작성 팁</strong>: 사용자에게 그대로 노출됩니다. &quot;재고 부족&quot;처럼 짧고 분명한 표현이 좋고, 무엇을 어떻게 고쳐 다시 요청해야 하는지가 보이면 사용자가 한 번에 처리할 수 있습니다.</p>
+          <p>반려 사유 작성 팁:</p>
+          <ul>
+            <li>사용자에게 그대로 노출됩니다.</li>
+            <li>짧고 분명하게 쓰세요. 예: &quot;재고 부족&quot;</li>
+            <li>무엇을 어떻게 고쳐 다시 요청하면 되는지가 보이면, 사용자가 한 번에 처리할 수 있습니다.</li>
+          </ul>
         </GuideSection>
 
         <GuideSection id="shipping-upload" title="배송대행 검토">
@@ -77,31 +94,57 @@ export function AdminGuide() {
         </GuideSection>
 
         <GuideSection id="inbound" title="입고 요청 처리">
-          <p><Link href="/admin/inbound-requests">입고리스트</Link>에서 사용자가 올린 글을 보고 상태(<strong>접수 / 검토 / 입고완료 / 취소</strong>)를 바꿉니다. 댓글로 답할 수 있고, 사용자가 아직 못 본 답변은 배지로 알려 드립니다.</p>
+          <p><Link href="/admin/inbound-requests">입고리스트</Link>에서 사용자가 올린 글을 처리합니다.</p>
+          <ul>
+            <li>상태 변경: <strong>접수 / 검토 / 입고완료 / 취소</strong></li>
+            <li>댓글로 사용자에게 답변할 수 있습니다.</li>
+            <li>사용자가 아직 못 본 답변은 배지로 표시됩니다.</li>
+          </ul>
         </GuideSection>
 
         <GuideSection id="support" title="CS 문의 처리">
           <p><Link href="/admin/support-requests">교환/반품 및 CS 문의</Link>에서 사용자가 비공개로 올린 문의를 처리합니다.</p>
-          <p>처리 단계는 <strong>접수 → 처리중 → 완료</strong> 순서이고, 필요하면 <strong>취소</strong>로 종결할 수 있어요. 단, 취소는 되돌릴 수 없으니 신중히 사용해 주세요.</p>
+          <p>처리 단계: <strong>접수 → 처리중 → 완료</strong> (또는 <strong>취소</strong>)</p>
           <ul>
-            <li><strong>접수</strong> 상태에서는 &quot;처리중으로&quot;를 눌러 작업을 시작합니다.</li>
-            <li><strong>처리중</strong> 상태에서는 댓글로 답변을 주고받고, 마무리되면 &quot;완료 처리&quot;를 누릅니다.</li>
-            <li><strong>완료 / 취소</strong> 상태에서는 추가 액션이 없습니다.</li>
+            <li><strong>접수</strong> 상태 → &quot;처리중으로&quot;를 눌러 작업을 시작합니다.</li>
+            <li><strong>처리중</strong> 상태 → 댓글로 답변을 주고받고, 마무리되면 &quot;완료 처리&quot;를 누릅니다.</li>
+            <li><strong>완료 / 취소</strong> 상태 → 추가 액션이 없습니다.</li>
+            <li><strong>취소는 되돌릴 수 없습니다.</strong> 신중히 사용해 주세요.</li>
           </ul>
-          <p>목록에서는 상태 탭과 유형(교환/반품/CS문의/기타)으로 추리고, 제목·작성자·이메일로 검색할 수 있습니다. 사용자가 새 댓글을 달면 목록에 &quot;새 댓글&quot; 표시가 뜹니다.</p>
+          <p>목록 사용법:</p>
+          <ul>
+            <li>상태 탭으로 필터합니다.</li>
+            <li>유형 드롭다운(교환 / 반품 / CS문의 / 기타)으로 추가 필터합니다.</li>
+            <li>제목, 작성자, 이메일로 검색할 수 있습니다.</li>
+            <li>사용자가 새 댓글을 달면 목록에 &quot;새 댓글&quot; 표시가 뜹니다.</li>
+          </ul>
         </GuideSection>
 
         <GuideSection id="users" title="사용자 관리">
-          <p><Link href="/admin/users">사용자 관리</Link>에서 예치금 잔액 조정, 계정 상태, <strong>잔액 부족 안내 기준</strong>, 사용자 그룹을 바꿀 수 있습니다. 잔액 부족 안내 기준은 &quot;이 금액보다 잔액이 적으면 사용자 화면에 안내 배너를 띄우는&quot; 기준선입니다. 사용자별로 직접 등록한 재고를 추가하거나 조정하는 것도 같은 화면에서 가능합니다.</p>
+          <p><Link href="/admin/users">사용자 관리</Link>에서 다음을 처리할 수 있습니다.</p>
+          <ul>
+            <li>예치금 잔액 조정</li>
+            <li>계정 상태 변경</li>
+            <li>잔액 부족 안내 기준 설정</li>
+            <li>사용자 그룹 변경</li>
+            <li>사용자별 재고(직접 등록한 분) 추가·조정</li>
+          </ul>
+          <p><strong>잔액 부족 안내 기준</strong>이란: 이 금액보다 잔액이 적으면 사용자 화면에 안내 배너가 표시되는 기준선입니다.</p>
         </GuideSection>
 
         <GuideSection id="low-balance-settings" title="잔액 부족 / 설정">
-          <p><Link href="/admin/low-balance">잔액 부족 고객</Link>에서 안내가 필요한 사용자 목록을 볼 수 있습니다.</p>
-          <p><Link href="/admin/settings">설정</Link>에서 입금받을 계좌 정보를 관리합니다.</p>
+          <ul>
+            <li><Link href="/admin/low-balance">잔액 부족 고객</Link>: 안내가 필요한 사용자 목록</li>
+            <li><Link href="/admin/settings">설정</Link>: 입금받을 계좌 정보 관리</li>
+          </ul>
         </GuideSection>
 
         <GuideSection id="legacy" title="예전 화면">
-          <p><Link href="/admin/orders-legacy">구 일반 주문</Link>과 <Link href="/admin/order-uploads">구 배송대행 업로드</Link>는 기록 확인용입니다. 새로 작업할 때는 사용하지 않습니다.</p>
+          <p>아래 화면은 기록 확인용입니다. 새로 작업할 때는 사용하지 않습니다.</p>
+          <ul>
+            <li><Link href="/admin/orders-legacy">구 일반 주문</Link></li>
+            <li><Link href="/admin/order-uploads">구 배송대행 업로드</Link></li>
+          </ul>
         </GuideSection>
 
         <GuideSection id="help" title="도움이 필요할 때">
