@@ -67,6 +67,8 @@ export type AdminUserStockOrderInput = {
   created_at: string;
 };
 
+export type AdminUserShippingUploadKind = 'exitmall' | 'purchased';
+
 export type AdminUserShippingUploadInput = {
   id: string;
   original_name: string;
@@ -74,6 +76,7 @@ export type AdminUserShippingUploadInput = {
   shipping_fee_total: number;
   status: string;
   created_at: string;
+  upload_type: AdminUserShippingUploadKind | null;
 };
 
 export type AdminUserLegacyOrderInput = {
@@ -86,6 +89,9 @@ export type AdminUserLegacyOrderInput = {
 export type AdminUserUnifiedOrder = {
   id: string;
   kind: 'stock_order' | 'shipping_upload' | 'legacy';
+  /** Only present when kind === 'shipping_upload'. Defaults to 'exitmall'
+   * for rows missing upload_type (pre-PR uploads). */
+  shippingKind?: AdminUserShippingUploadKind;
   status: string;
   amount: number;
   summary: string;
@@ -114,6 +120,7 @@ export function mergeUserOrders(input: {
   const shipping = input.shipping.map<AdminUserUnifiedOrder>((u) => ({
     id: u.id,
     kind: 'shipping_upload',
+    shippingKind: u.upload_type ?? 'exitmall',
     status: u.status,
     amount: Number(u.shipping_fee_total),
     summary: `${u.original_name} · ${u.total_quantity}개`,
@@ -169,7 +176,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .order('created_at', { ascending: false }),
     supabase
       .from('order_uploads')
-      .select('id, original_name, total_quantity, shipping_fee_total, status, created_at')
+      .select('id, original_name, total_quantity, shipping_fee_total, status, upload_type, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabase

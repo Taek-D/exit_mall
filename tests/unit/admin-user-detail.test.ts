@@ -26,6 +26,7 @@ describe('mergeUserOrders', () => {
         shipping_fee_total: 16500,
         status: 'pending',
         created_at: '2026-05-11T09:00:00Z',
+        upload_type: 'exitmall',
       },
     ];
     const legacy: AdminUserLegacyOrderInput[] = [
@@ -75,11 +76,42 @@ describe('mergeUserOrders', () => {
           shipping_fee_total: 9900,
           status: 'pending',
           created_at: '2026-05-11T09:00:00Z',
+          upload_type: 'exitmall',
         },
       ],
       legacy: [],
     });
     expect(merged[0]?.summary).toBe('orders.xlsx · 3개');
+  });
+
+  it('routes shippingKind from upload_type, defaulting legacy null rows to exitmall', () => {
+    const merged = mergeUserOrders({
+      stock: [],
+      shipping: [
+        {
+          id: 'p1',
+          original_name: 'purchased.xlsx',
+          total_quantity: 2,
+          shipping_fee_total: 6600,
+          status: 'pending',
+          created_at: '2026-05-12T09:00:00Z',
+          upload_type: 'purchased',
+        },
+        {
+          id: 'e1',
+          original_name: 'exit.xlsx',
+          total_quantity: 1,
+          shipping_fee_total: 3300,
+          status: 'pending',
+          created_at: '2026-05-11T09:00:00Z',
+          upload_type: null,
+        },
+      ],
+      legacy: [],
+    });
+    const byId = new Map(merged.map((row) => [row.id, row]));
+    expect(byId.get('p1')?.shippingKind).toBe('purchased');
+    expect(byId.get('e1')?.shippingKind).toBe('exitmall');
   });
 });
 
