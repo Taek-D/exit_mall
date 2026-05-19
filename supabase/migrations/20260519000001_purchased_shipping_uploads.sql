@@ -231,6 +231,47 @@ begin
     end if;
   end loop;
 
+  -- Verify each allocation lot's identity matches the corresponding item line.
+  -- Without this, a caller can submit p_items for product A while pointing
+  -- p_allocations at product B's completed lot. Approval would then deduct
+  -- product B's stock while the shipping sheet still ships product A.
+  for v_check in
+    with item_map as (
+      select (it->>'no')::int as item_no,
+             coalesce(it->>'product_code', '') as expected_product,
+             coalesce(it->>'product_name', '') as expected_option
+      from jsonb_array_elements(p_items) it
+    ),
+    alloc_lots as (
+      select distinct
+             (a->>'item_no')::int as item_no,
+             (a->>'lot_id')::uuid as lot_id
+      from jsonb_array_elements(p_allocations) a
+    )
+    select al.item_no,
+           al.lot_id,
+           im.expected_product,
+           im.expected_option,
+           pil.product_name as lot_product,
+           pil.option_name as lot_option
+    from alloc_lots al
+    left join item_map im on im.item_no = al.item_no
+    left join public.purchased_inventory_lots pil on pil.id = al.lot_id
+  loop
+    if v_check.expected_product is null then
+      raise exception 'ALLOCATION_ITEM_NOT_FOUND:%', v_check.item_no;
+    end if;
+    if v_check.lot_product is null then
+      raise exception 'PURCHASED_LOT_NOT_FOUND:%', v_check.lot_id;
+    end if;
+    if v_check.lot_product <> v_check.expected_product
+       or coalesce(v_check.lot_option, '') <> coalesce(v_check.expected_option, '') then
+      raise exception 'ALLOCATION_LOT_MISMATCH:%:%:%/%',
+        v_check.item_no, v_check.lot_id,
+        v_check.expected_product, v_check.expected_option;
+    end if;
+  end loop;
+
   for v_check in
     with requested as (
       select (a->>'lot_id')::uuid as lot_id,
