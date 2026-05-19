@@ -2,12 +2,12 @@ import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { formatKRW } from '@/lib/money';
-import { CancelButton } from './CancelButton';
-import { TrackingDownloadButton } from './TrackingDownloadButton';
-import { type ShippingUploadStatus, SHIPPING_UPLOAD_STATUS_LABEL } from '@/lib/types';
+import { type ShippingUploadStatus } from '@/lib/types';
 import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
 import { InvoiceLookupButton } from '@/components/InvoiceLookupButton';
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
+import { CancelButton } from '../../exitmall/[id]/CancelButton';
+import { TrackingDownloadButton } from '../../exitmall/[id]/TrackingDownloadButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,27 +32,29 @@ type Upload = {
   shipping_fee_total: number;
   admin_memo: string | null;
   admin_storage_path: string | null;
-  shipped_at: string | null;
-  completed_at: string | null;
   created_at: string;
 };
 
-export default async function ShippingUploadDetail({ params }: { params: { id: string } }) {
+export default async function PurchasedShippingUploadDetail({
+  params,
+}: {
+  params: { id: string };
+}) {
   const supabase = createClient();
   const { data } = await supabase
     .from('order_uploads')
     .select(
-      'id, original_name, status, items, total_quantity, shipping_fee_total, admin_memo, admin_storage_path, shipped_at, completed_at, created_at',
+      'id, original_name, status, items, total_quantity, shipping_fee_total, admin_memo, admin_storage_path, created_at',
     )
     .eq('id', params.id)
-    .eq('upload_type', 'exitmall')
+    .eq('upload_type', 'purchased')
     .single<Upload>();
   if (!data) notFound();
 
   return (
     <div className="space-y-5">
       <Link
-        href="/shipping-uploads/exitmall"
+        href="/shipping-uploads/purchased"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -88,10 +90,10 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
-              <th className="font-medium px-3">받는사람</th>
+              <th className="font-medium px-3">받는 사람</th>
               <th className="font-medium px-3">상품명 / 옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
-              <th className="font-medium px-3 text-right">배송비</th>
+              <th className="font-medium px-3 text-right">안내 배송비</th>
               <th className="font-medium px-3">송장 / 조회</th>
             </tr>
           </thead>
@@ -120,7 +122,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
                       <InvoiceLookupButton tracking={it.tracking_number} />
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">미발송</span>
+                    <span className="text-muted-foreground">미등록</span>
                   )}
                 </td>
               </tr>
@@ -129,7 +131,7 @@ export default async function ShippingUploadDetail({ params }: { params: { id: s
           <tfoot>
             <tr className="border-t bg-surface-muted/40">
               <td colSpan={3} className="px-4 py-3 text-right font-medium">
-                {data.items.length}건 (수량 {data.total_quantity}개) — 배송비 합계
+                {data.items.length}건(수량 {data.total_quantity}개) · 안내 배송비 합계
               </td>
               <td></td>
               <td className="px-3 py-3 text-right font-mono tabular text-base font-semibold">

@@ -29,6 +29,7 @@ describe('user-groups SSOT', () => {
       ['/inbound-requests/new'],
       ['/inbound-requests/abc-123'],
       ['/inbound-template.xlsx'],
+      ['/shipping-template.xlsx'],
       ['/account'],
       ['/account/password'],
     ])('허용된 경로: %s', (p) => {
@@ -55,6 +56,7 @@ describe('user-groups SSOT', () => {
     it('prefix가 부분 일치인 경로는 차단된다', () => {
       expect(isPathAllowedForGroup2('/account-fake')).toBe(false);
       expect(isPathAllowedForGroup2('/inbound-requests-other')).toBe(false);
+      expect(isPathAllowedForGroup2('/shipping-template.xlsx.bak')).toBe(false);
     });
   });
 });

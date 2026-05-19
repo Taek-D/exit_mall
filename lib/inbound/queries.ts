@@ -16,6 +16,17 @@ export type InboundListRow = {
   profile?: { name: string } | null;
 };
 
+export type InboundRequestItem = {
+  product_name: string;
+  option_name?: string | null;
+  quantity: number;
+  row_number?: number | null;
+  gift?: string | null;
+  carrier?: string | null;
+  tracking_number?: string | null;
+  memo?: string | null;
+};
+
 export type InboundRequestDetail = {
   id: string;
   user_id: string;
@@ -25,6 +36,7 @@ export type InboundRequestDetail = {
   excel_storage_path: string;
   excel_original_name: string;
   image_paths: string[];
+  inbound_items: InboundRequestItem[];
   last_comment_at: string | null;
   last_comment_by_role: 'user' | 'admin' | null;
   user_last_read_at: string | null;
@@ -117,7 +129,7 @@ export async function fetchInboundRequest(id: string): Promise<{
     supabase
       .from('inbound_requests')
       .select(
-        'id,user_id,title,body,status,excel_storage_path,excel_original_name,image_paths,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
+        'id,user_id,title,body,status,excel_storage_path,excel_original_name,image_paths,inbound_items,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -129,8 +141,17 @@ export async function fetchInboundRequest(id: string): Promise<{
       .eq('request_id', id)
       .order('created_at', { ascending: true }),
   ]);
+  if (!r) {
+    return { request: null, comments: (cs ?? []) as unknown as InboundCommentRow[] };
+  }
+  const rawRequest = r as unknown as Omit<InboundRequestDetail, 'inbound_items'> & {
+    inbound_items: unknown;
+  };
+  const items: InboundRequestItem[] = Array.isArray(rawRequest.inbound_items)
+    ? (rawRequest.inbound_items as InboundRequestItem[])
+    : [];
   return {
-    request: (r as unknown as InboundRequestDetail) ?? null,
+    request: { ...rawRequest, inbound_items: items } as InboundRequestDetail,
     comments: (cs ?? []) as unknown as InboundCommentRow[],
   };
 }

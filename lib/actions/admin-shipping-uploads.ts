@@ -18,8 +18,10 @@ export async function approveShippingUploadAction(
   revalidatePaths([
     '/admin/shipping-uploads',
     '/admin/shipping-uploads/exitmall',
+    '/admin/shipping-uploads/purchased',
     '/shipping-uploads',
     '/shipping-uploads/exitmall',
+    '/shipping-uploads/purchased',
   ]);
   return { ok: true };
 }
@@ -42,8 +44,10 @@ export async function rejectShippingUploadAction(
   revalidatePaths([
     '/admin/shipping-uploads',
     '/admin/shipping-uploads/exitmall',
+    '/admin/shipping-uploads/purchased',
     '/shipping-uploads',
     '/shipping-uploads/exitmall',
+    '/shipping-uploads/purchased',
   ]);
   return { ok: true };
 }
@@ -63,8 +67,10 @@ export async function completeShippingUploadAction(
   revalidatePaths([
     '/admin/shipping-uploads',
     '/admin/shipping-uploads/exitmall',
+    '/admin/shipping-uploads/purchased',
     '/shipping-uploads',
     '/shipping-uploads/exitmall',
+    '/shipping-uploads/purchased',
   ]);
   return { ok: true };
 }

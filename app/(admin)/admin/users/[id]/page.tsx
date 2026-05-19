@@ -155,11 +155,14 @@ export default async function AdminUserDetailPage({
             headers={['종류', '식별', '금액', '상태', '시간']}
             rightAligned={[2]}
             rows={orders.map((row) => {
+              const shippingSubKind = row.shippingKind ?? 'exitmall';
               const kindLabel =
                 row.kind === 'stock_order'
                   ? '엑시트몰 구매'
                   : row.kind === 'shipping_upload'
-                    ? '배송대행'
+                    ? shippingSubKind === 'purchased'
+                      ? '배송대행 (사입재고)'
+                      : '배송대행'
                     : 'Legacy';
               const statusBadge =
                 row.kind === 'stock_order' ? (
@@ -171,7 +174,9 @@ export default async function AdminUserDetailPage({
                 );
               const idHref =
                 row.kind === 'shipping_upload'
-                  ? `/admin/shipping-uploads/exitmall/${row.id}`
+                  ? shippingSubKind === 'purchased'
+                    ? `/admin/shipping-uploads/purchased/${row.id}`
+                    : `/admin/shipping-uploads/exitmall/${row.id}`
                   : row.kind === 'legacy'
                     ? `/admin/orders-legacy/${row.id}`
                     : `/admin/orders/${row.id}`;

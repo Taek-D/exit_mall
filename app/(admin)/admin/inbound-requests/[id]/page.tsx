@@ -7,6 +7,7 @@ import { InboundStatusBadge } from '@/components/StatusBadge';
 import { InboundAttachmentList } from '@/components/inbound/InboundAttachmentList';
 import { InboundCommentList } from '@/components/inbound/InboundCommentList';
 import { InboundCommentForm } from '@/components/inbound/InboundCommentForm';
+import { InboundItemsTable } from '@/components/inbound/InboundItemsTable';
 import { StatusControls } from './StatusControls';
 import { formatShortDateTimeKR } from '@/lib/dates';
 import { isLocked } from '@/lib/inbound/permissions';
@@ -70,6 +71,7 @@ export default async function AdminInboundRequestDetailPage({
           excelOriginalName={request.excel_original_name}
           imagePaths={request.image_paths}
         />
+        <InboundItemsTable items={request.inbound_items} status={status} />
       </section>
 
       <section className="space-y-3">

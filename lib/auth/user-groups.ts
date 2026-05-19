@@ -13,13 +13,15 @@ export const USER_GROUP_SHORT_LABEL: Record<UserGroup, string> = {
 };
 
 // group2가 접근 가능한 경로 prefix.
-// `/inbound-template.xlsx`는 입고리스트 페이지에서 직접 링크되는 공개 템플릿이라
-// 정확히 일치 검사를 위해 포함한다.
+// `/inbound-template.xlsx`, `/shipping-template.xlsx` 는 각각 입고리스트 페이지와
+// 사입재고 배송대행 페이지에서 직접 링크되는 공개 템플릿이라 정확히 일치 검사를
+// 위해 포함한다.
 export const GROUP2_ALLOWED_PREFIXES = [
   '/shipping-uploads/purchased',
   '/inbound-requests',
   '/support-requests',
   '/inbound-template.xlsx',
+  '/shipping-template.xlsx',
   '/account',
   '/guide',
 ] as const;

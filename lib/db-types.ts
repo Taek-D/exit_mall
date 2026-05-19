@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -513,6 +513,7 @@ export type Database = {
           storage_path: string
           total_amount: number
           total_quantity: number
+          upload_type: string
           user_id: string
         }
         Insert: {
@@ -541,6 +542,7 @@ export type Database = {
           storage_path: string
           total_amount?: number
           total_quantity?: number
+          upload_type?: string
           user_id: string
         }
         Update: {
@@ -569,6 +571,7 @@ export type Database = {
           storage_path?: string
           total_amount?: number
           total_quantity?: number
+          upload_type?: string
           user_id?: string
         }
         Relationships: [
@@ -875,6 +878,109 @@ export type Database = {
           user_group?: string | null
         }
         Relationships: []
+      }
+      purchased_inventory_lots: {
+        Row: {
+          created_at: string
+          id: string
+          inbound_request_id: string
+          initial_quantity: number
+          option_name: string
+          product_name: string
+          remaining_quantity: number
+          row_number: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inbound_request_id: string
+          initial_quantity: number
+          option_name?: string
+          product_name: string
+          remaining_quantity: number
+          row_number: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inbound_request_id?: string
+          initial_quantity?: number
+          option_name?: string
+          product_name?: string
+          remaining_quantity?: number
+          row_number?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchased_inventory_lots_inbound_request_id_fkey"
+            columns: ["inbound_request_id"]
+            isOneToOne: false
+            referencedRelation: "inbound_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_inventory_lots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchased_shipping_allocations: {
+        Row: {
+          created_at: string
+          id: string
+          item_no: number
+          lot_id: string
+          quantity: number
+          upload_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_no: number
+          lot_id: string
+          quantity: number
+          upload_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_no?: number
+          lot_id?: string
+          quantity?: number
+          upload_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchased_shipping_allocations_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "purchased_inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_shipping_allocations_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "order_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_shipping_allocations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rate_limits: {
         Row: {
@@ -1318,6 +1424,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      cleanup_failed_support_request: {
+        Args: {
+          p_request_id: string
+        }
+        Returns: undefined
+      }
       cleanup_orphan_inbound_pending: {
         Args: {
           p_older_than?: unknown
@@ -1348,11 +1460,25 @@ export type Database = {
         }
         Returns: number
       }
-      cleanup_failed_support_request: {
+      create_purchased_shipping_upload: {
         Args: {
-          p_request_id: string
+          p_storage_path: string
+          p_original_name: string
+          p_contact_person: string
+          p_buyer_phone: string
+          p_request_memo: string
+          p_items: Json
+          p_total_quantity: number
+          p_shipping_fee_total: number
+          p_allocations: Json
         }
-        Returns: undefined
+        Returns: string
+      }
+      delete_support_comment: {
+        Args: {
+          p_comment_id: string
+        }
+        Returns: string
       }
       delete_user_custom_inventory: {
         Args: {
@@ -1360,12 +1486,6 @@ export type Database = {
           custom_id: string
         }
         Returns: undefined
-      }
-      delete_support_comment: {
-        Args: {
-          p_comment_id: string
-        }
-        Returns: string
       }
       is_active: {
         Args: Record<PropertyKey, never>
@@ -1384,7 +1504,7 @@ export type Database = {
       mark_support_read: {
         Args: {
           p_request_id: string
-          p_seen_last_comment_at?: string | null
+          p_seen_last_comment_at?: string
         }
         Returns: undefined
       }
@@ -1495,16 +1615,28 @@ export type Database = {
         }
         Returns: undefined
       }
-      submit_inbound_request_rpc: {
-        Args: {
-          p_title: string
-          p_body: string
-          p_excel_path: string
-          p_excel_name: string
-          p_image_paths: string[]
-        }
-        Returns: string
-      }
+      submit_inbound_request_rpc:
+        | {
+            Args: {
+              p_title: string
+              p_body: string
+              p_excel_path: string
+              p_excel_name: string
+              p_image_paths: string[]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_title: string
+              p_body: string
+              p_excel_path: string
+              p_excel_name: string
+              p_image_paths: string[]
+              p_items: Json
+            }
+            Returns: string
+          }
       submit_support_request_rpc: {
         Args: {
           p_category: string

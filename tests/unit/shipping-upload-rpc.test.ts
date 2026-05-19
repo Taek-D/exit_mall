@@ -23,6 +23,15 @@ describe('mapShippingUploadError', () => {
     expect(r).toContain('10');
     expect(r).toContain('3');
   });
+  it('INSUFFICIENT_PURCHASED_INVENTORY', () => {
+    const r = mapShippingUploadError('INSUFFICIENT_PURCHASED_INVENTORY:abc:10:3');
+    expect(r).toContain('사입재고');
+    expect(r).toContain('10');
+    expect(r).toContain('3');
+  });
+  it('EMPTY_ALLOCATIONS', () => {
+    expect(mapShippingUploadError('EMPTY_ALLOCATIONS')).toContain('사입재고 배정');
+  });
   it('INSUFFICIENT_BALANCE', () => {
     expect(mapShippingUploadError('INSUFFICIENT_BALANCE')).toContain('예치금');
   });

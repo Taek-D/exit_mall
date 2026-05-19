@@ -5,37 +5,29 @@ import { type ShippingUploadStatus } from '@/lib/types';
 import { ShippingUploadStatusBadge } from '@/components/StatusBadge';
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { ReviewActions } from './ReviewActions';
-import { DownloadButton } from './DownloadButton';
-import { AttachTrackingForm } from './AttachTrackingForm';
-import { CompleteButton } from './CompleteButton';
+import { DownloadButton } from '../../exitmall/[id]/DownloadButton';
+import { AttachTrackingForm } from '../../exitmall/[id]/AttachTrackingForm';
+import { CompleteButton } from '../../exitmall/[id]/CompleteButton';
 import { formatShortDateTimeKR } from '@/lib/dates';
-import {
-  fetchAdminShippingUploadDetail,
-  hasInsufficientBalance,
-} from '@/lib/admin/order-details';
+import { fetchAdminShippingUploadDetail } from '@/lib/admin/order-details';
 import { CustomerSummaryCard } from '@/components/admin/DetailPanels';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminShippingUploadDetail({
+export default async function AdminPurchasedShippingUploadDetail({
   params,
 }: {
   params: { id: string };
 }) {
-  const upload = await fetchAdminShippingUploadDetail(params.id, 'exitmall');
+  const upload = await fetchAdminShippingUploadDetail(params.id, 'purchased');
   if (!upload) notFound();
 
   const balance = Number(upload.profiles?.deposit_balance ?? 0);
-  const insufficient = hasInsufficientBalance(
-    upload.status,
-    balance,
-    Number(upload.shipping_fee_total),
-  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <Link
-        href="/admin/shipping-uploads/exitmall"
+        href="/admin/shipping-uploads/purchased"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -76,18 +68,22 @@ export default async function AdminShippingUploadDetail({
         email={upload.profiles?.email ?? '-'}
         phone={upload.profiles?.phone ?? '-'}
         balance={formatKRW(balance)}
-        insufficient={insufficient}
+        insufficient={false}
       />
+
+      <section className="rounded-md border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+        배송비는 기존 배송대행 기준으로 안내만 표시합니다. 승인 시 예치금은 차감하지 않습니다.
+      </section>
 
       <section className="rounded-lg border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
-              <th className="font-medium px-3">받는사람</th>
+              <th className="font-medium px-3">받는 사람</th>
               <th className="font-medium px-3">상품명 / 옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
-              <th className="font-medium px-3 text-right">배송비</th>
+              <th className="font-medium px-3 text-right">안내 배송비</th>
               <th className="font-medium px-3">송장번호</th>
             </tr>
           </thead>
@@ -116,7 +112,7 @@ export default async function AdminShippingUploadDetail({
           <tfoot>
             <tr className="border-t bg-surface-muted/40">
               <td colSpan={3} className="px-4 py-3 text-right font-medium">
-                {upload.items.length}건 · 배송비 합계
+                {upload.items.length}건 · 안내 배송비 합계
               </td>
               <td></td>
               <td className="px-3 py-3 text-right font-mono tabular text-base font-semibold">
@@ -134,16 +130,7 @@ export default async function AdminShippingUploadDetail({
         </div>
       )}
 
-      {upload.status === 'pending' && (
-        <>
-          {insufficient && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-              가용 예치금이 배송비보다 부족합니다. 승인 시 차감 단계에서 실패할 수 있습니다.
-            </div>
-          )}
-          <ReviewActions uploadId={upload.id} />
-        </>
-      )}
+      {upload.status === 'pending' && <ReviewActions uploadId={upload.id} />}
 
       {(upload.status === 'approved' || upload.status === 'shipped') && (
         <AttachTrackingForm uploadId={upload.id} />

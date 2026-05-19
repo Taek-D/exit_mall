@@ -16,6 +16,21 @@ describe('mapSubmitInboundRequestError', () => {
     );
     expect(mapSubmitInboundRequestError('UNKNOWN', 3)).toBeNull();
   });
+
+  it('maps inbound item validation errors with actionable copy', () => {
+    expect(mapSubmitInboundRequestError('EMPTY_INBOUND_ITEMS', 3)).toBe(
+      '입고 품목을 한 줄 이상 입력해주세요.',
+    );
+    expect(mapSubmitInboundRequestError('INVALID_INBOUND_PRODUCT', 3)).toBe(
+      '상품명을 확인해주세요 (1~100자).',
+    );
+    expect(mapSubmitInboundRequestError('INVALID_INBOUND_QUANTITY', 3)).toBe(
+      '재고수량은 1 이상이어야 합니다.',
+    );
+    expect(mapSubmitInboundRequestError('INVALID_INBOUND_ROW', 3)).toBe(
+      '입고 품목 행 번호가 유효하지 않습니다.',
+    );
+  });
 });
 
 describe('inbound action error mappers', () => {
