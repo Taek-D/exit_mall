@@ -195,8 +195,38 @@ begin
     select 1
     from jsonb_array_elements(p_items) it
     where coalesce((it->>'quantity')::int, 0) < 1
+       or coalesce((it->>'no')::int, 0) < 1
   ) then
     raise exception 'INVALID_QUANTITY';
+  end if;
+
+  -- Reject duplicate item_no values in p_items. Without this, a caller could
+  -- submit two rows with the same `no` and the per-item allocation-sum check
+  -- below would pass on both rows by reusing the same allocation, but
+  -- approval would only deduct stock once — letting the upload ship more
+  -- units than were reserved/deducted.
+  if (
+    select count(*) from jsonb_array_elements(p_items)
+  ) <> (
+    select count(distinct (it->>'no')::int) from jsonb_array_elements(p_items) it
+  ) then
+    raise exception 'DUPLICATE_ITEM_NO';
+  end if;
+
+  -- Tie p_total_quantity to the sum of item quantities so a forged
+  -- p_total_quantity can't drift from what the items list actually claims.
+  if p_total_quantity <> coalesce(
+    (select sum((it->>'quantity')::int)::int
+     from jsonb_array_elements(p_items) it),
+    0
+  ) then
+    raise exception 'INVALID_TOTAL_QUANTITY:%:%',
+      p_total_quantity,
+      coalesce(
+        (select sum((it->>'quantity')::int)::int
+         from jsonb_array_elements(p_items) it),
+        0
+      );
   end if;
 
   if exists (
