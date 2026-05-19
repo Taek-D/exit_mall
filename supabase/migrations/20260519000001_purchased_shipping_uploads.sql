@@ -132,6 +132,11 @@ end; $$;
 grant execute on function public.submit_inbound_request_rpc(text, text, text, text, text[], jsonb)
   to authenticated;
 
+-- Backwards-compatible 5-arg overload for rolling deploys and any caller that
+-- hasn't migrated to the 6-arg signature yet. Mirrors the pre-PR behavior:
+-- inserts the inbound request without creating purchased_inventory_lots.
+-- Delegating to the 6-arg variant would tip every legacy caller into
+-- EMPTY_INBOUND_ITEMS, so this overload keeps its own self-contained body.
 create or replace function public.submit_inbound_request_rpc(
   p_title text,
   p_body text,
@@ -140,15 +145,25 @@ create or replace function public.submit_inbound_request_rpc(
   p_image_paths text[]
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_id uuid;
 begin
-  return public.submit_inbound_request_rpc(
-    p_title,
-    p_body,
-    p_excel_path,
-    p_excel_name,
-    p_image_paths,
-    '[]'::jsonb
-  );
+  perform set_config('app.inbound_rpc', 'true', true);
+  if v_uid is null then raise exception 'UNAUTHENTICATED'; end if;
+  if not public.is_active() then raise exception 'INACTIVE'; end if;
+
+  perform public.rate_limit_check('inbound_request_create', 5, 60);
+
+  if length(coalesce(p_title, '')) < 1 or length(p_title) > 200 then raise exception 'INVALID_TITLE'; end if;
+  if length(coalesce(p_body, '')) > 5000 then raise exception 'INVALID_BODY'; end if;
+  if p_image_paths is not null and cardinality(p_image_paths) > 3 then raise exception 'TOO_MANY_IMAGES'; end if;
+  if p_excel_path is null or p_excel_name is null then raise exception 'MISSING_EXCEL'; end if;
+
+  insert into public.inbound_requests (user_id, title, body, excel_storage_path, excel_original_name, image_paths)
+  values (v_uid, p_title, p_body, p_excel_path, p_excel_name, coalesce(p_image_paths, '{}'::text[]))
+  returning id into v_id;
+  return v_id;
 end; $$;
 
 grant execute on function public.submit_inbound_request_rpc(text, text, text, text, text[])
