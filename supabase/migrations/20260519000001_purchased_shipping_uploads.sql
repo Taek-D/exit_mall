@@ -16,6 +16,14 @@ alter table public.order_uploads
 create index if not exists order_uploads_type_status_idx
   on public.order_uploads (upload_type, status, created_at desc);
 
+-- Stash the parsed inbound items on the request itself so the admin can
+-- review them alongside the attachment. Lot creation is deferred until the
+-- admin actually transitions the request to `completed` (see set_inbound_status
+-- below), which closes the gap where a direct RPC caller could pass a
+-- different p_items array than what their uploaded spreadsheet shows.
+alter table public.inbound_requests
+  add column if not exists inbound_items jsonb not null default '[]'::jsonb;
+
 create table public.purchased_inventory_lots (
   id uuid primary key default gen_random_uuid(),
   inbound_request_id uuid not null references public.inbound_requests(id) on delete cascade,
@@ -88,7 +96,6 @@ declare
   v_id uuid;
   v_item jsonb;
   v_product_name text;
-  v_option_name text;
   v_quantity int;
   v_row_number int;
 begin
@@ -106,25 +113,28 @@ begin
     raise exception 'EMPTY_INBOUND_ITEMS';
   end if;
 
-  insert into public.inbound_requests (user_id, title, body, excel_storage_path, excel_original_name, image_paths)
-  values (v_uid, p_title, p_body, p_excel_path, p_excel_name, coalesce(p_image_paths, '{}'::text[]))
-  returning id into v_id;
-
+  -- Validate every item up-front so the admin reviews well-formed rows.
+  -- Lot rows are created in set_inbound_status when the admin transitions
+  -- the request to `completed` — see comment on the inbound_items column.
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_product_name := trim(coalesce(v_item->>'product_name', ''));
-    v_option_name := trim(coalesce(v_item->>'option_name', ''));
     v_quantity := coalesce((v_item->>'quantity')::int, 0);
     v_row_number := coalesce((v_item->>'row_number')::int, 0);
 
     if length(v_product_name) = 0 then raise exception 'INVALID_INBOUND_PRODUCT'; end if;
     if v_quantity < 1 then raise exception 'INVALID_INBOUND_QUANTITY'; end if;
     if v_row_number < 1 then raise exception 'INVALID_INBOUND_ROW'; end if;
-
-    insert into public.purchased_inventory_lots
-      (inbound_request_id, user_id, product_name, option_name, row_number, initial_quantity, remaining_quantity)
-    values
-      (v_id, v_uid, v_product_name, v_option_name, v_row_number, v_quantity, v_quantity);
   end loop;
+
+  insert into public.inbound_requests (
+    user_id, title, body, excel_storage_path, excel_original_name, image_paths, inbound_items
+  )
+  values (
+    v_uid, p_title, p_body, p_excel_path, p_excel_name,
+    coalesce(p_image_paths, '{}'::text[]),
+    p_items
+  )
+  returning id into v_id;
 
   return v_id;
 end; $$;
@@ -796,3 +806,79 @@ revoke execute on function public.create_purchased_shipping_upload(
 grant execute on function public.create_purchased_shipping_upload(
   text, text, text, text, text, jsonb, int, bigint, jsonb
 ) to authenticated;
+
+-- Re-define set_inbound_status so it materializes purchased_inventory_lots
+-- from inbound_requests.inbound_items at the moment of admin approval. The
+-- admin UI renders inbound_items alongside the attachment, so the approver
+-- can verify the claimed rows match the uploaded spreadsheet before flipping
+-- status to `completed`. This forecloses the prior gap where a direct RPC
+-- caller could submit a benign attachment but a forged p_items array — those
+-- forged rows never made it past the eyes of an admin.
+create or replace function public.set_inbound_status(
+  request_id uuid,
+  new_status text
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_admin uuid := auth.uid();
+  v_req record;
+  v_allowed boolean := false;
+  v_item jsonb;
+  v_product_name text;
+  v_option_name text;
+  v_quantity int;
+  v_row_number int;
+  v_existing int;
+begin
+  perform set_config('app.inbound_rpc', 'true', true);
+  if not public.is_admin() then raise exception 'FORBIDDEN'; end if;
+
+  select * into v_req from public.inbound_requests where id = request_id for update;
+  if v_req is null then raise exception 'NOT_FOUND'; end if;
+
+  v_allowed := case
+    when v_req.status = 'open' and new_status in ('in_progress','cancelled') then true
+    when v_req.status = 'in_progress' and new_status in ('completed','cancelled') then true
+    else false
+  end;
+  if not v_allowed then raise exception 'INVALID_TRANSITION'; end if;
+
+  if new_status = 'completed' then
+    -- Defense in depth: skip lot creation if rows already exist for this
+    -- request, so accidental replays can't double-mint stock. Once a
+    -- request enters `completed` the state machine never returns it here,
+    -- but the guard makes the function safe under manual ops.
+    select count(*) into v_existing
+      from public.purchased_inventory_lots
+      where inbound_request_id = request_id;
+
+    if v_existing = 0
+       and jsonb_typeof(v_req.inbound_items) = 'array'
+       and jsonb_array_length(v_req.inbound_items) > 0 then
+      for v_item in select * from jsonb_array_elements(v_req.inbound_items) loop
+        v_product_name := trim(coalesce(v_item->>'product_name', ''));
+        v_option_name := trim(coalesce(v_item->>'option_name', ''));
+        v_quantity := coalesce((v_item->>'quantity')::int, 0);
+        v_row_number := coalesce((v_item->>'row_number')::int, 0);
+
+        if length(v_product_name) = 0 then raise exception 'INVALID_INBOUND_PRODUCT'; end if;
+        if v_quantity < 1 then raise exception 'INVALID_INBOUND_QUANTITY'; end if;
+        if v_row_number < 1 then raise exception 'INVALID_INBOUND_ROW'; end if;
+
+        insert into public.purchased_inventory_lots
+          (inbound_request_id, user_id, product_name, option_name, row_number, initial_quantity, remaining_quantity)
+        values
+          (request_id, v_req.user_id, v_product_name, v_option_name, v_row_number, v_quantity, v_quantity);
+      end loop;
+    end if;
+  end if;
+
+  update public.inbound_requests
+    set status = new_status,
+        reviewed_by = case when new_status in ('completed','cancelled') then v_admin else reviewed_by end,
+        updated_at = now()
+    where id = request_id;
+end; $$;
+
+revoke execute on function public.set_inbound_status(uuid, text) from public, anon;
+grant execute on function public.set_inbound_status(uuid, text) to authenticated;
