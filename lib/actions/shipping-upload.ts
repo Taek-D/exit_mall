@@ -38,17 +38,24 @@ export async function requestShippingUploadAction(
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
 
-  // 엑시트몰 배송대행은 엑시트몰 상품 재고만 매칭한다.
+  // 2단계 매칭: products.name 우선 → user_custom_inventory.name fallback.
+  // products 우선 정책 — 같은 이름이 양쪽에 있으면 항상 products 가 이긴다.
+  // 사입재고 배송대행은 별도 흐름(requestPurchasedShippingUploadAction)에서
+  // purchased_inventory_lots 를 매칭하므로 여기에는 포함하지 않는다.
   const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
-  const { data: productRows } = await supabase
-    .from('products')
-    .select('id, name')
-    .in('name', productNames);
+  const [{ data: productRows }, { data: customRows }] = await Promise.all([
+    supabase.from('products').select('id, name').in('name', productNames),
+    supabase
+      .from('user_custom_inventory')
+      .select('id, name')
+      .eq('user_id', u.user.id)
+      .in('name', productNames),
+  ]);
 
   const match = matchInventoryRefs(
     productNames,
     (productRows ?? []) as Array<{ id: string; name: string }>,
-    [],
+    (customRows ?? []) as Array<{ id: string; name: string }>,
   );
   if (!match.ok) {
     if (match.duplicates.length > 0) {
@@ -69,7 +76,10 @@ export async function requestShippingUploadAction(
 
   const itemsWithRef = parsed.items.map((it) => {
     const ref = match.refs.get(it.product_code)!;
-    return { ...it, product_id: ref.id };
+    if (ref.kind === 'product') {
+      return { ...it, product_id: ref.id };
+    }
+    return { ...it, custom_inventory_id: ref.id };
   });
 
   // Storage 업로드
