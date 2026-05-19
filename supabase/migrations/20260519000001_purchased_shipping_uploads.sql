@@ -882,3 +882,46 @@ end; $$;
 
 revoke execute on function public.set_inbound_status(uuid, text) from public, anon;
 grant execute on function public.set_inbound_status(uuid, text) to authenticated;
+
+-- Re-define the column-pinning trigger so owners can never touch
+-- inbound_items via direct UPDATE. Without this, an owner could submit a
+-- benign spreadsheet, wait for the admin to start reviewing the still-`open`
+-- row, then rewrite inbound_items so set_inbound_status('completed') mints
+-- lots from the swapped JSON. The RPC bypass (`app.inbound_rpc=true`) and
+-- the is_admin() escape hatch above let submit_inbound_request_rpc and
+-- set_inbound_status keep writing to the column on behalf of the user.
+create or replace function public.inbound_requests_pin_columns()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.is_admin() then return NEW; end if;
+  if coalesce(current_setting('app.inbound_rpc', true), '') = 'true' then
+    return NEW;
+  end if;
+
+  -- Identity / lifecycle pins (always)
+  NEW.user_id := OLD.user_id;
+  NEW.status := OLD.status;
+  NEW.last_comment_at := OLD.last_comment_at;
+  NEW.last_comment_by_role := OLD.last_comment_by_role;
+  NEW.user_last_read_at := OLD.user_last_read_at;
+  NEW.admin_last_read_at := OLD.admin_last_read_at;
+  NEW.reviewed_by := OLD.reviewed_by;
+  NEW.created_at := OLD.created_at;
+  -- inbound_items is the canonical record of what the admin reviewed; it's
+  -- only written by submit_inbound_request_rpc (via the RPC bypass), and
+  -- read by set_inbound_status to materialize purchased_inventory_lots.
+  NEW.inbound_items := OLD.inbound_items;
+
+  -- excel_storage_path / excel_original_name / image_paths: allowed while
+  -- the row is still 'open' (so the action layer can rename _pending_ paths
+  -- to canonical paths). Storage RLS bounds the writable path to the owner's
+  -- own folder, so this can't be used to point at someone else's file.
+  if OLD.status <> 'open' then
+    NEW.excel_storage_path := OLD.excel_storage_path;
+    NEW.excel_original_name := OLD.excel_original_name;
+    NEW.image_paths := OLD.image_paths;
+  end if;
+
+  return NEW;
+end; $$;
