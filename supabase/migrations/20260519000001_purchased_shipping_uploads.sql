@@ -317,6 +317,22 @@ begin
     end if;
   end loop;
 
+  -- Serialize concurrent submissions for the same lot. Without these row
+  -- locks, two transactions can both read the same pending allocations
+  -- and remaining_quantity, then both insert their own allocations,
+  -- "reserving" more than the lot actually has. The approval-time
+  -- update only rejects one of them — by then the loser already has a
+  -- stuck pending upload they can't fulfill. Locking in lot_id order
+  -- keeps the lock acquisition deterministic across submissions.
+  perform 1
+    from public.purchased_inventory_lots pil
+    where pil.id in (
+      select distinct (a->>'lot_id')::uuid
+      from jsonb_array_elements(p_allocations) a
+    )
+    order by pil.id
+    for update;
+
   for v_check in
     with requested as (
       select (a->>'lot_id')::uuid as lot_id,
