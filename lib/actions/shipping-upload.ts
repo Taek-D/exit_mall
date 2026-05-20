@@ -44,8 +44,12 @@ export async function requestShippingUploadAction(
   // 사입재고 배송대행은 별도 흐름(requestPurchasedShippingUploadAction)에서
   // purchased_inventory_lots 를 매칭하므로 여기에는 포함하지 않는다.
   const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
+  // 활성+삭제되지 않은 카탈로그 외에, 사용자가 user_inventory 로 이미 보유 중인
+  // 상품도 후보에 포함한다. 관리자가 사후에 비활성화/소프트삭제한 상품이라도
+  // 보유 재고가 있으면 approve_shipping_upload 가 product_id 로 처리할 수 있다.
   const [
     { data: productRows, error: productErr },
+    { data: ownedInventoryRows, error: ownedErr },
     { data: customRows, error: customErr },
   ] = await Promise.all([
     supabase
@@ -54,18 +58,37 @@ export async function requestShippingUploadAction(
       .eq('is_active', true)
       .is('deleted_at', null),
     supabase
+      .from('user_inventory')
+      .select('products(id, name)')
+      .eq('user_id', u.user.id),
+    supabase
       .from('user_custom_inventory')
       .select('id, name')
       .eq('user_id', u.user.id),
   ]);
-  if (productErr || customErr) {
-    const message = productErr?.message ?? customErr?.message ?? 'unknown';
+  if (productErr || ownedErr || customErr) {
+    const message =
+      productErr?.message ?? ownedErr?.message ?? customErr?.message ?? 'unknown';
     return { ok: false, error: `상품 후보 조회에 실패했습니다: ${message}` };
   }
 
+  const productById = new Map<string, { id: string; name: string }>();
+  for (const row of (productRows ?? []) as Array<{ id: string; name: string }>) {
+    productById.set(row.id, row);
+  }
+  for (const row of (ownedInventoryRows ?? []) as Array<{
+    products: { id: string; name: string } | { id: string; name: string }[] | null;
+  }>) {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products;
+    if (product && !productById.has(product.id)) {
+      productById.set(product.id, { id: product.id, name: product.name });
+    }
+  }
+  const mergedProducts = Array.from(productById.values());
+
   const match = matchInventoryRefs(
     productNames,
-    (productRows ?? []) as Array<{ id: string; name: string }>,
+    mergedProducts,
     (customRows ?? []) as Array<{ id: string; name: string }>,
   );
   if (!match.ok) {
@@ -85,9 +108,7 @@ export async function requestShippingUploadAction(
     };
   }
 
-  const productNameById = new Map(
-    ((productRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
-  );
+  const productNameById = new Map(mergedProducts.map((row) => [row.id, row.name]));
   const customNameById = new Map(
     ((customRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
   );
