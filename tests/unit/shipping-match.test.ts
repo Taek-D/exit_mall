@@ -85,6 +85,22 @@ describe('matchInventoryRefs', () => {
     expect(r.duplicates).toEqual(['ABC']);
   });
 
+  it('ignores duplicate normalized names that are unrelated to uploaded names', () => {
+    const r = matchInventoryRefs(
+      ['Product C'],
+      [
+        { id: 'p-1', name: 'A BC' },
+        { id: 'p-2', name: 'AB C' },
+        { id: 'p-3', name: 'ProductC' },
+      ],
+      [],
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.refs.get('Product C')).toEqual({ kind: 'product', id: 'p-3' });
+  });
+
   it('reports duplicate custom names after whitespace normalization when no product wins', () => {
     const r = matchInventoryRefs(
       ['CustomABC'],

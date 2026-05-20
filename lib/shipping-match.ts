@@ -23,13 +23,14 @@ export function matchInventoryRefs(
   customs: CustomInventoryLite[],
 ): MatchResult {
   const inputNames = Array.from(new Set(names));
+  const inputKeys = new Set(inputNames.map((name) => normalizeProductMatchKey(name)));
   const productByKey = new Map<string, string>();
   const duplicateKeys = new Set<string>();
 
   for (const product of products) {
     const key = normalizeProductMatchKey(product.name);
     if (productByKey.has(key)) {
-      duplicateKeys.add(key);
+      if (inputKeys.has(key)) duplicateKeys.add(key);
     } else {
       productByKey.set(key, product.id);
     }
@@ -39,7 +40,7 @@ export function matchInventoryRefs(
   for (const custom of customs) {
     const key = normalizeProductMatchKey(custom.name);
     if (customByKey.has(key) && !productByKey.has(key)) {
-      duplicateKeys.add(key);
+      if (inputKeys.has(key)) duplicateKeys.add(key);
     } else if (!customByKey.has(key)) {
       customByKey.set(key, custom.id);
     }

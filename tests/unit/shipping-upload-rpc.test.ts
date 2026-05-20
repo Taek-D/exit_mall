@@ -91,6 +91,16 @@ describe('20260520000001 shipping fee policy migration', () => {
     expect(requestSql).not.toContain('shipping_fee_total');
   });
 
+  it('checks stock against summed duplicate product quantities in stock orders', () => {
+    const requestStart = sql.indexOf('create or replace function public.request_stock_order');
+    expect(requestStart).toBeGreaterThanOrEqual(0);
+    const requestSql = sql.slice(requestStart);
+
+    expect(requestSql).toContain('v_stock_check record');
+    expect(requestSql).toMatch(/sum\(ir\.quantity\)::int\s+as\s+requested_qty/i);
+    expect(requestSql).toContain('v_stock_check.stock < v_stock_check.requested_qty');
+  });
+
   it('compares approval product names after removing whitespace', () => {
     expect(sql).toContain('public.product_match_key');
     expect(sql).toContain('grant execute on function public.product_match_key(text) to authenticated;');

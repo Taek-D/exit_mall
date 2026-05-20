@@ -237,6 +237,7 @@ declare
   v_pending_qty int;
   v_legacy_qty int;
   v_check record;
+  v_stock_check record;
 begin
   if v_user_id is null then raise exception 'UNAUTHORIZED'; end if;
 
@@ -287,6 +288,22 @@ begin
       raise exception 'PER_USER_LIMIT_EXCEEDED:%:%:%',
         v_check.product_id, v_check.per_user_limit,
         v_already_bought + v_pending_qty + v_legacy_qty;
+    end if;
+  end loop;
+
+  for v_stock_check in
+    with input_rows as (
+      select (e->>'product_id')::uuid as product_id,
+             coalesce((e->>'quantity')::int, 0) as quantity
+      from jsonb_array_elements(items) as e
+    )
+    select p.id, p.stock, sum(ir.quantity)::int as requested_qty
+    from input_rows ir
+    join public.products p on p.id = ir.product_id
+    group by p.id, p.stock
+  loop
+    if v_stock_check.stock >= 0 and v_stock_check.stock < v_stock_check.requested_qty then
+      raise exception 'OUT_OF_STOCK:%', v_stock_check.id;
     end if;
   end loop;
 
