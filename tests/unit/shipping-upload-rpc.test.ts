@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
 describe('mapShippingUploadError', () => {
@@ -53,5 +55,35 @@ describe('mapShippingUploadError', () => {
   });
   it('unknown fallback', () => {
     expect(mapShippingUploadError('XXX')).toBe('처리 중 오류가 발생했습니다.');
+  });
+});
+
+describe('20260520000001 shipping fee policy migration', () => {
+  const sql = readFileSync(
+    join(process.cwd(), 'supabase/migrations/20260520000001_shipping_fee_cart_stock_name_match.sql'),
+    'utf8',
+  );
+
+  it('does not deduct deposit balance in approve_shipping_upload', () => {
+    const approveStart = sql.indexOf('create or replace function public.approve_shipping_upload');
+    const requestStart = sql.indexOf('create or replace function public.request_stock_order');
+    const approveSql = sql.slice(approveStart, requestStart);
+
+    expect(approveSql).not.toContain('deposit_balance = deposit_balance - v_upload.shipping_fee_total');
+    expect(approveSql).not.toContain('INSUFFICIENT_BALANCE');
+    expect(approveSql).not.toContain("'배송대행 승인 (배송비)'");
+  });
+
+  it('does not reserve pending shipping fees for stock orders', () => {
+    const requestStart = sql.indexOf('create or replace function public.request_stock_order');
+    const requestSql = sql.slice(requestStart);
+
+    expect(requestSql).not.toContain('from public.order_uploads');
+    expect(requestSql).not.toContain('shipping_fee_total');
+  });
+
+  it('compares approval product names after removing whitespace', () => {
+    expect(sql).toContain('public.product_match_key');
+    expect(sql).toContain("public.product_match_key(v_resolved_name) <> public.product_match_key(v_row->>'product_code')");
   });
 });
