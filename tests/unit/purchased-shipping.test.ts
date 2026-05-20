@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import {
   allocatePurchasedInventoryFifo,
+  detectPurchasedInventoryAmbiguities,
   parseInboundInventoryExcel,
   summarizePurchasedInventory,
   type PurchasedInventoryLot,
@@ -130,6 +131,56 @@ describe('allocatePurchasedInventoryFifo', () => {
     if (result.ok) return;
     expect(result.shortages).toEqual([
       { product_name: '샴푸', option_name: '500ml', requested: 20, available: 15 },
+    ]);
+  });
+  it('matches purchased stock product and option while ignoring whitespace', () => {
+    const result = allocatePurchasedInventoryFifo(
+      [
+        {
+          id: 'lot-space',
+          product_name: 'Tobi  Com',
+          option_name: '500 ml',
+          available_quantity: 4,
+          created_at: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+      [
+        {
+          item_no: 1,
+          product_name: 'TobiCom',
+          option_name: '500ml',
+          quantity: 3,
+        },
+      ],
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.allocations).toEqual([{ item_no: 1, lot_id: 'lot-space', quantity: 3 }]);
+  });
+});
+
+describe('detectPurchasedInventoryAmbiguities', () => {
+  it('reports distinct purchased labels that collapse to the same product and option key', () => {
+    const ambiguities = detectPurchasedInventoryAmbiguities([
+      {
+        id: 'lot-1',
+        product_name: 'A BC',
+        option_name: '500 ml',
+        available_quantity: 1,
+        created_at: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'lot-2',
+        product_name: 'AB C',
+        option_name: '500ml',
+        available_quantity: 1,
+        created_at: '2026-05-02T00:00:00.000Z',
+      },
+    ]);
+
+    expect(ambiguities).toEqual([
+      { key: 'ABC\u0000500ml', labels: ['A BC / 500 ml', 'AB C / 500ml'] },
     ]);
   });
 });
