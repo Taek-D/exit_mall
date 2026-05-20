@@ -10,6 +10,12 @@ export const signupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 
+export const adminUserContactSchema = z.object({
+  name: z.string().trim().min(1, '이름을 입력하세요').max(30, '이름은 30자 이하입니다'),
+  phone: z.string().trim().regex(PHONE_RX, '휴대폰 번호 형식이 아닙니다'),
+});
+export type AdminUserContactInput = z.infer<typeof adminUserContactSchema>;
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
