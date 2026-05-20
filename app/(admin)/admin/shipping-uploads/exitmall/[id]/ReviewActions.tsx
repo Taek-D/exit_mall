@@ -40,13 +40,13 @@ export function ReviewActions({ uploadId }: { uploadId: string }) {
               }
               toast({
                 title: '승인 완료',
-                description: '보유 재고와 배송비가 차감되었습니다.',
+                description: '보유 재고가 차감되었습니다. 배송비는 예치금에서 차감하지 않습니다.',
               });
               router.refresh();
             })
           }
         >
-          승인 (재고/배송비 차감)
+          승인 (재고 차감)
         </Button>
         <Button
           variant="outline"

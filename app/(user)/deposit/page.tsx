@@ -83,18 +83,15 @@ export default async function DepositListPage() {
             <p className="font-mono tabular text-3xl font-semibold mt-1 leading-none">
               {formatKRW(dep.available)}
             </p>
-            {(dep.stockReserved > 0 || dep.shippingReserved > 0) && (
+            {dep.stockReserved > 0 && (
               <p className="text-xs text-muted-foreground mt-1.5">
                 잔액 <span className="font-mono tabular text-foreground">{formatKRW(dep.balance)}</span> ·
-                검토대기 예약{' '}
+                검토대기 상품 구매 예약{' '}
                 <span className="font-mono tabular text-warning">
-                  {formatKRW(dep.stockReserved + dep.shippingReserved)}
+                  {formatKRW(dep.stockReserved)}
                 </span>
                 {dep.stockReserved > 0 && (
                   <span className="ml-1 text-[11px]">(재고 {formatKRW(dep.stockReserved)})</span>
-                )}
-                {dep.shippingReserved > 0 && (
-                  <span className="ml-1 text-[11px]">(배송 {formatKRW(dep.shippingReserved)})</span>
                 )}
               </p>
             )}
