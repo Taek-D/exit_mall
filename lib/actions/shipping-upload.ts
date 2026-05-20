@@ -7,6 +7,7 @@ import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 import {
   allocatePurchasedInventoryFifo,
+  detectPurchasedInventoryAmbiguities,
   type PurchasedInventoryLot,
   type PurchasedShippingDemand,
 } from '@/lib/purchased-shipping';
@@ -44,12 +45,15 @@ export async function requestShippingUploadAction(
   // purchased_inventory_lots 를 매칭하므로 여기에는 포함하지 않는다.
   const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
   const [{ data: productRows }, { data: customRows }] = await Promise.all([
-    supabase.from('products').select('id, name').in('name', productNames),
+    supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null),
     supabase
       .from('user_custom_inventory')
       .select('id, name')
-      .eq('user_id', u.user.id)
-      .in('name', productNames),
+      .eq('user_id', u.user.id),
   ]);
 
   const match = matchInventoryRefs(
@@ -144,13 +148,11 @@ type PurchasedAllocationRow = {
 async function fetchPurchasedLotsForUpload(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  productNames: string[],
 ): Promise<PurchasedInventoryLot[]> {
   const { data: lotData } = await (supabase.from as any)('purchased_inventory_lots')
     .select('id, product_name, option_name, remaining_quantity, created_at, inbound_requests!inner(status)')
     .eq('user_id', userId)
     .eq('inbound_requests.status', 'completed')
-    .in('product_name', productNames)
     .order('created_at', { ascending: true });
 
   const lots = (lotData ?? []) as PurchasedLotRow[];
@@ -217,8 +219,17 @@ export async function requestPurchasedShippingUploadAction(
     option_name: item.product_name ?? '',
     quantity: item.quantity,
   }));
-  const productNames = Array.from(new Set(demands.map((demand) => demand.product_name)));
-  const lots = await fetchPurchasedLotsForUpload(supabase, u.user.id, productNames);
+  const lots = await fetchPurchasedLotsForUpload(supabase, u.user.id);
+  const ambiguities = detectPurchasedInventoryAmbiguities(lots);
+  if (ambiguities.length > 0) {
+    const shown = ambiguities
+      .slice(0, 3)
+      .map((ambiguity) => ambiguity.labels.join(' / '))
+      .join(', ');
+    const more = ambiguities.length > 3 ? ' 외' : '';
+    return { ok: false, error: `공백 제거 후 같은 사입재고명이 여러 개 있습니다: ${shown}${more}` };
+  }
+
   const allocation = allocatePurchasedInventoryFifo(lots, demands);
   if (!allocation.ok) {
     const shown = allocation.shortages
@@ -230,6 +241,21 @@ export async function requestPurchasedShippingUploadAction(
     const more = allocation.shortages.length > 3 ? ' 외' : '';
     return { ok: false, error: `입고완료 재고가 부족합니다: ${shown}${more}` };
   }
+
+  const lotById = new Map(lots.map((lot) => [lot.id, lot]));
+  const lotByItemNo = new Map<number, PurchasedInventoryLot>();
+  for (const itemAllocation of allocation.allocations) {
+    if (!lotByItemNo.has(itemAllocation.item_no)) {
+      const lot = lotById.get(itemAllocation.lot_id);
+      if (lot) lotByItemNo.set(itemAllocation.item_no, lot);
+    }
+  }
+  const itemsForRpc = parsed.items.map((item) => {
+    const lot = lotByItemNo.get(item.no);
+    return lot
+      ? { ...item, product_code: lot.product_name, product_name: lot.option_name }
+      : item;
+  });
 
   const safeName = safeStorageName(file.name, { allowKorean: true });
   const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
@@ -252,7 +278,7 @@ export async function requestPurchasedShippingUploadAction(
       p_contact_person: parsed.uploader_company,
       p_buyer_phone: parsed.uploader_phone,
       p_request_memo: parsed.request_memo,
-      p_items: parsed.items as Json,
+      p_items: itemsForRpc as Json,
       p_total_quantity: parsed.total_quantity,
       p_shipping_fee_total: fee,
       p_allocations: allocation.allocations as Json,
