@@ -85,12 +85,26 @@ export async function requestShippingUploadAction(
     };
   }
 
+  const productNameById = new Map(
+    ((productRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
+  );
+  const customNameById = new Map(
+    ((customRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
+  );
   const itemsWithRef = parsed.items.map((it) => {
     const ref = match.refs.get(it.product_code)!;
     if (ref.kind === 'product') {
-      return { ...it, product_id: ref.id };
+      return {
+        ...it,
+        product_code: productNameById.get(ref.id) ?? it.product_code,
+        product_id: ref.id,
+      };
     }
-    return { ...it, custom_inventory_id: ref.id };
+    return {
+      ...it,
+      product_code: customNameById.get(ref.id) ?? it.product_code,
+      custom_inventory_id: ref.id,
+    };
   });
 
   // Storage 업로드

@@ -67,15 +67,24 @@ describe('20260520000001 shipping fee policy migration', () => {
   it('does not deduct deposit balance in approve_shipping_upload', () => {
     const approveStart = sql.indexOf('create or replace function public.approve_shipping_upload');
     const requestStart = sql.indexOf('create or replace function public.request_stock_order');
+    expect(approveStart).toBeGreaterThanOrEqual(0);
+    expect(requestStart).toBeGreaterThan(approveStart);
     const approveSql = sql.slice(approveStart, requestStart);
 
     expect(approveSql).not.toContain('deposit_balance = deposit_balance - v_upload.shipping_fee_total');
     expect(approveSql).not.toContain('INSUFFICIENT_BALANCE');
+    expect(approveSql).not.toMatch(
+      /update\s+public\.profiles[\s\S]*deposit_balance\s*=\s*deposit_balance\s*-\s*v_upload\.shipping_fee_total/i,
+    );
+    expect(approveSql).not.toMatch(
+      /insert\s+into\s+public\.balance_transactions[\s\S]*shipping_upload/i,
+    );
     expect(approveSql).not.toContain("'배송대행 승인 (배송비)'");
   });
 
   it('does not reserve pending shipping fees for stock orders', () => {
     const requestStart = sql.indexOf('create or replace function public.request_stock_order');
+    expect(requestStart).toBeGreaterThanOrEqual(0);
     const requestSql = sql.slice(requestStart);
 
     expect(requestSql).not.toContain('from public.order_uploads');
@@ -84,6 +93,7 @@ describe('20260520000001 shipping fee policy migration', () => {
 
   it('compares approval product names after removing whitespace', () => {
     expect(sql).toContain('public.product_match_key');
+    expect(sql).toContain('grant execute on function public.product_match_key(text) to authenticated;');
     expect(sql).toContain("public.product_match_key(v_resolved_name) <> public.product_match_key(v_row->>'product_code')");
   });
 });

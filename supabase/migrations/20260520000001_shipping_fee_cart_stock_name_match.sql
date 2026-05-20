@@ -6,6 +6,8 @@ as $$
   select regexp_replace(coalesce(value, ''), '\s+', '', 'g')
 $$;
 
+grant execute on function public.product_match_key(text) to authenticated;
+
 create or replace function public.approve_shipping_upload(upload_id uuid)
 returns void
 language plpgsql security definer set search_path = public as $$
