@@ -49,4 +49,17 @@ describe('computeCartLimitInfo', () => {
       stockExceeded: false,
     });
   });
+
+  it('uses fallback stock for existing stored cart items without stock', () => {
+    const items: CartItem[] = [
+      { productId: 'p1', name: 'A', price: 1000, quantity: 5 },
+    ];
+    const fallback: CartItem = { productId: 'p1', name: 'A', price: 1000, quantity: 1, stock: 3 };
+
+    expect(computeCartLimitInfo('p1', items, {}, fallback)).toMatchObject({
+      stock: 3,
+      stockExceeded: true,
+      maxCartQuantity: 3,
+    });
+  });
 });

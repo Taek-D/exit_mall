@@ -136,7 +136,7 @@ export function computeCartLimitInfo(
   const serverLimit = limits[productId];
   const perUserLimit = serverLimit?.perUserLimit ?? item?.perUserLimit ?? null;
   const alreadyBought = serverLimit?.alreadyBought ?? item?.alreadyBought ?? 0;
-  const stock = serverLimit?.stock ?? item?.stock ?? null;
+  const stock = serverLimit?.stock ?? item?.stock ?? fallback?.stock ?? null;
   const quantity = item?.quantity ?? 0;
   const remaining = perUserLimit === null ? null : Math.max(0, perUserLimit - alreadyBought);
   const stockLimit = stock === null || stock < 0 ? null : Math.max(0, stock);

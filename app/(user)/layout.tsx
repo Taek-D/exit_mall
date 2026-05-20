@@ -11,6 +11,7 @@ import { fetchSupportUnreadCount } from '@/lib/support/queries';
 type ProductLimitRow = {
   id: string;
   per_user_limit: number | null;
+  stock: number;
 };
 
 type PurchasedRow = {
@@ -43,7 +44,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
   const isGroup2 = userGroup === 'group2';
 
   const [{ data: products }, { data: purchased }, inboundUnread, supportUnread] = await Promise.all([
-    supabase.from('products').select('id,per_user_limit').is('deleted_at', null),
+    supabase.from('products').select('id,per_user_limit,stock').is('deleted_at', null),
     supabase
       .from('order_items')
       .select('product_id, quantity, orders!inner(user_id, status)')
@@ -64,6 +65,7 @@ export default async function UserLayout({ children }: { children: React.ReactNo
       {
         perUserLimit: product.per_user_limit,
         alreadyBought: purchasedMap.get(product.id) ?? 0,
+        stock: product.stock,
       },
     ]),
   );
