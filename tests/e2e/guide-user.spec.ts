@@ -40,7 +40,7 @@ test.describe('local guide visibility by user group', () => {
   test('group1 user sees Group1Guide content on /guide', async ({ page }) => {
     await login(page, seed.group1.email, seed.credential);
     await page.goto('/guide');
-    await expect(page.getByRole('heading', { name: '흐름 1: 상품 구매 (재고 적립)' })).toBeVisible();
+    await expect(page.locator('section#purchase')).toBeVisible();
   });
 
   test('group1 user sees their FAQ on /guide/faq', async ({ page }) => {
@@ -52,15 +52,15 @@ test.describe('local guide visibility by user group', () => {
   test('group2 user sees Group2Guide content and not Group1Guide content', async ({ page }) => {
     await login(page, seed.group2.email, seed.credential);
     await page.goto('/guide');
-    await expect(page.getByRole('heading', { name: '사입재고 배송대행' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '흐름 1: 상품 구매 (재고 적립)' })).toHaveCount(0);
+    await expect(page.locator('section#shipping-upload')).toBeVisible();
+    await expect(page.locator('section#purchase')).toHaveCount(0);
   });
 
   test('group2 user cannot use ?as=group1 to view Group1Guide', async ({ page }) => {
     await login(page, seed.group2.email, seed.credential);
     await page.goto('/guide?as=group1');
-    await expect(page.getByRole('heading', { name: '흐름 1: 상품 구매 (재고 적립)' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: '사입재고 배송대행' })).toBeVisible();
+    await expect(page.locator('section#purchase')).toHaveCount(0);
+    await expect(page.locator('section#shipping-upload')).toBeVisible();
   });
 });
 

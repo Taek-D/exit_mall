@@ -24,6 +24,8 @@ const BLOCKED_GROUP2_ROUTES = [
 const ALLOWED_GROUP2_ROUTES = [
   '/shipping-uploads/purchased',
   '/inbound-requests',
+  '/support-requests',
+  '/guide',
   '/account/password',
 ];
 
@@ -78,11 +80,15 @@ test.describe('local user-group access control', () => {
 
     await expect(page).toHaveURL(/\/shipping-uploads\/purchased$/);
     const primaryLinks = primaryUserNavLinks(page);
-    await expect(primaryLinks).toHaveCount(2);
-    await expect(primaryLinks.filter({ hasText: '사입재고 배송대행' })).toBeVisible();
-    await expect(primaryLinks.filter({ hasText: '입고리스트' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /^상품$/ })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /^예치금$/ })).toHaveCount(0);
+    await expect(primaryLinks).toHaveCount(3);
+    await expect(primaryUserNavHref(page, '/inbound-requests')).toBeVisible();
+    await expect(primaryUserNavHref(page, '/support-requests')).toBeVisible();
+    await expect(primaryUserNavHref(page, '/guide')).toBeVisible();
+    await openShippingMenu(page);
+    await expect(shippingMenuItem(page, '/shipping-uploads/purchased')).toBeVisible();
+    await expect(shippingMenuItem(page, '/shipping-uploads/exitmall')).toHaveCount(0);
+    await expect(primaryUserNavHref(page, '/shop')).toHaveCount(0);
+    await expect(page.locator('header a[href="/deposit"]')).toHaveCount(0);
   });
 
   test('group2 user is redirected away from group1-only routes', async ({ page }) => {
@@ -132,8 +138,11 @@ test.describe('local user-group access control', () => {
     const userPage = await newPageLoggedIn(browser, seed.pending.email, seed.credential);
     await userPage.goto('/shop');
     await expect(userPage).toHaveURL(/\/shop$/);
-    await expect(primaryUserNavLinks(userPage)).toHaveCount(8);
-    await expect(userPage.getByRole('link', { name: /^상품$/ })).toBeVisible();
+    await expect(primaryUserNavLinks(userPage)).toHaveCount(5);
+    await expect(primaryUserNavHref(userPage, '/shop')).toBeVisible();
+    await openShippingMenu(userPage);
+    await expect(shippingMenuItem(userPage, '/shipping-uploads/exitmall')).toBeVisible();
+    await expect(shippingMenuItem(userPage, '/shipping-uploads/purchased')).toBeVisible();
     await userPage.close();
   });
 
@@ -141,7 +150,10 @@ test.describe('local user-group access control', () => {
     await login(page, seed.group1.email, seed.credential);
 
     await expect(page).toHaveURL(/\/shop$/);
-    await expect(primaryUserNavLinks(page)).toHaveCount(8);
+    await expect(primaryUserNavLinks(page)).toHaveCount(5);
+    await openShippingMenu(page);
+    await expect(shippingMenuItem(page, '/shipping-uploads/exitmall')).toBeVisible();
+    await expect(shippingMenuItem(page, '/shipping-uploads/purchased')).toBeVisible();
 
     for (const route of ['/shop', '/cart', '/orders', '/deposit', '/inventory', '/shipping-uploads/exitmall']) {
       await page.goto(route);
@@ -187,6 +199,18 @@ function approvalRow(page: Page, email: string) {
 
 function primaryUserNavLinks(page: Page) {
   return page.locator('header nav').first().getByRole('link');
+}
+
+function primaryUserNavHref(page: Page, href: string) {
+  return page.locator('header nav').first().locator(`a[href="${href}"]`);
+}
+
+async function openShippingMenu(page: Page) {
+  await page.locator('header nav').first().getByRole('button').first().click();
+}
+
+function shippingMenuItem(page: Page, href: string) {
+  return page.locator(`[role="menuitem"][href="${href}"]`);
 }
 
 async function createSeed(supabase: SupabaseClient<Database>): Promise<UserGroupSeed> {

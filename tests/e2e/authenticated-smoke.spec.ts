@@ -58,14 +58,14 @@ test.describe('authenticated smoke', () => {
     await page.getByLabel(`${seed.product.name} 장바구니 담기`).click();
     await page.getByRole('link', { name: '장바구니' }).click();
     await expect(page.getByRole('heading', { name: '장바구니' })).toBeVisible();
-    await expect(page.getByText(seed.product.name)).toBeVisible();
+    await expect(page.locator('section[aria-label="주문 항목"]').getByText(seed.product.name)).toBeVisible();
 
     await page.getByRole('link', { name: /주문하기/ }).click();
     await expect(page.getByRole('heading', { name: '검토 요청' })).toBeVisible();
     await page.getByRole('button', { name: /검토 요청/ }).click();
 
     await expect(page).toHaveURL(/\/orders$/);
-    await expect(page.getByText(seed.product.name)).toBeVisible();
+    await expect(page.locator('main').getByText(seed.product.name).first()).toBeVisible();
     await expect(page.getByText('검토대기').first()).toBeVisible();
   });
 
@@ -96,15 +96,16 @@ test.describe('authenticated smoke', () => {
       'href',
       '/shipping-template.xlsx',
     );
-    await expect(page.getByText(/최근 업로드|업로드 내역이 없습니다/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: '최근 업로드' })).toBeVisible();
   });
 });
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/login');
-  await page.getByLabel('이메일').fill(email);
-  await page.getByLabel('비밀번호').fill(password);
+  await page.locator('input[name="email"]').fill(email);
+  await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: /^로그인$/ }).click();
+  await page.waitForURL((url) => url.pathname !== '/login');
 }
 
 async function createQaSeed(supabase: SupabaseClient<Database>): Promise<QaSeed> {
