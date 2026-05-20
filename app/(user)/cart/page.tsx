@@ -30,6 +30,7 @@ export default function CartPage() {
   }
 
   const itemCount = items.reduce((n, i) => n + i.quantity, 0);
+  const hasStockShortage = items.some((item) => getLimitInfo(item.productId).stockExceeded);
 
   return (
     <div className="space-y-6">
@@ -47,7 +48,7 @@ export default function CartPage() {
             const sub = item.price * item.quantity;
             const limitInfo = getLimitInfo(item.productId);
             const hasLimit = limitInfo.perUserLimit !== null;
-            const plusDisabled = hasLimit && limitInfo.reached;
+            const plusDisabled = limitInfo.reached;
             return (
               <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-4">
                 <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-md bg-surface-muted overflow-hidden">
@@ -76,6 +77,11 @@ export default function CartPage() {
                           개
                         </>
                       )}
+                    </p>
+                  )}
+                  {limitInfo.stockExceeded && limitInfo.stock !== null && (
+                    <p className="text-xs text-destructive mt-1">
+                      현재 재고 {limitInfo.stock}개라서 {item.quantity}개 주문할 수 없습니다.
                     </p>
                   )}
                 </div>
@@ -148,12 +154,24 @@ export default function CartPage() {
             </div>
           </dl>
           <div className="p-5 pt-0">
-            <Button asChild className="w-full h-11">
-              <Link href="/checkout">
+            {hasStockShortage && (
+              <p className="mb-3 text-sm text-destructive">
+                재고가 부족한 상품의 수량을 줄이면 주문할 수 있습니다.
+              </p>
+            )}
+            {hasStockShortage ? (
+              <Button className="w-full h-11" disabled>
                 주문하기
                 <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-            </Button>
+              </Button>
+            ) : (
+              <Button asChild className="w-full h-11">
+                <Link href="/checkout">
+                  주문하기
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </Button>
+            )}
           </div>
         </aside>
       </div>

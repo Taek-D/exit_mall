@@ -32,10 +32,19 @@ export function ProductCard({
   const lowStock = product.stock > 0 && product.stock <= 9;
   const limit = product.per_user_limit;
   const inCart = items.find((item) => item.productId === product.id)?.quantity ?? 0;
-  const reached = limit !== null && alreadyBought + inCart >= limit;
+  const stockReached = product.stock >= 0 && inCart >= product.stock;
+  const reached = (limit !== null && alreadyBought + inCart >= limit) || stockReached;
   const remaining = limit !== null ? Math.max(0, limit - alreadyBought - inCart) : null;
 
   function onAdd() {
+    if (stockReached) {
+      toast({
+        title: '재고가 부족합니다',
+        description: `현재 재고는 ${product.stock}개입니다.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     if (reached) {
       toast({
         title: '구매 한도에 도달했어요',
@@ -52,6 +61,7 @@ export function ProductCard({
       imageUrl: product.image_url,
       perUserLimit: limit,
       alreadyBought,
+      stock: product.stock,
     });
     if (!added) {
       toast({
@@ -119,6 +129,8 @@ export function ProductCard({
         >
           {soldOut ? (
             '품절'
+          ) : stockReached ? (
+            '재고 부족'
           ) : reached ? (
             '한도 도달'
           ) : justAdded ? (
