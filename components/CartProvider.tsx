@@ -21,6 +21,7 @@ export type CartItem = {
 export type CartLimitInfo = {
   perUserLimit: number | null;
   alreadyBought: number;
+  purchaseMaxQuantity: number | null;
   maxCartQuantity: number | null;
   remaining: number | null;
   quantity: number;
@@ -66,7 +67,7 @@ export function CartProvider({
 
   useEffect(() => {
     if (!loaded) return;
-    setItems((prev) => applyLimits(prev, limits));
+    setItems((prev) => applyCartLimits(prev, limits));
   }, [loaded, limits]);
 
   const add: CartCtx['add'] = (item) => {
@@ -116,11 +117,11 @@ export function useCart() {
   return ctx;
 }
 
-function applyLimits(items: CartItem[], limits: Record<string, CartLimit>) {
+export function applyCartLimits(items: CartItem[], limits: Record<string, CartLimit>) {
   return items
     .map((item) => {
       const limitInfo = computeCartLimitInfo(item.productId, items, limits, item);
-      const quantity = clampQuantity(item.quantity, limitInfo.maxCartQuantity);
+      const quantity = clampQuantity(item.quantity, limitInfo.purchaseMaxQuantity);
       return { ...item, quantity };
     })
     .filter((item) => item.quantity > 0);
@@ -139,16 +140,18 @@ export function computeCartLimitInfo(
   const stock = serverLimit?.stock ?? item?.stock ?? fallback?.stock ?? null;
   const quantity = item?.quantity ?? 0;
   const remaining = perUserLimit === null ? null : Math.max(0, perUserLimit - alreadyBought);
+  const purchaseMaxQuantity = remaining;
   const stockLimit = stock === null || stock < 0 ? null : Math.max(0, stock);
   const maxCartQuantity =
-    remaining === null && stockLimit === null
+    purchaseMaxQuantity === null && stockLimit === null
       ? null
-      : Math.min(remaining ?? Number.POSITIVE_INFINITY, stockLimit ?? Number.POSITIVE_INFINITY);
+      : Math.min(purchaseMaxQuantity ?? Number.POSITIVE_INFINITY, stockLimit ?? Number.POSITIVE_INFINITY);
 
   return {
     perUserLimit,
     alreadyBought,
     stock,
+    purchaseMaxQuantity,
     maxCartQuantity,
     remaining,
     quantity,

@@ -49,6 +49,10 @@ export default function CartPage() {
             const limitInfo = getLimitInfo(item.productId);
             const hasLimit = limitInfo.perUserLimit !== null;
             const plusDisabled = limitInfo.reached;
+            const plusDisabledLabel =
+              limitInfo.stock !== null && limitInfo.stock >= 0 && item.quantity >= limitInfo.stock
+                ? '재고가 부족합니다'
+                : '구매 한도에 도달했습니다';
             return (
               <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-4">
                 <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-md bg-surface-muted overflow-hidden">
@@ -107,7 +111,7 @@ export default function CartPage() {
                     onClick={() => updateQty(item.productId, item.quantity + 1)}
                     disabled={plusDisabled}
                     className="h-9 w-9 grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-r-md"
-                    aria-label={plusDisabled ? '구매 한도에 도달했습니다' : '수량 증가'}
+                    aria-label={plusDisabled ? plusDisabledLabel : '수량 증가'}
                   >
                     <Plus className="h-3.5 w-3.5" aria-hidden />
                   </button>

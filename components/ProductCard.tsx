@@ -32,8 +32,9 @@ export function ProductCard({
   const lowStock = product.stock > 0 && product.stock <= 9;
   const limit = product.per_user_limit;
   const inCart = items.find((item) => item.productId === product.id)?.quantity ?? 0;
+  const purchaseLimitReached = limit !== null && alreadyBought + inCart >= limit;
   const stockReached = product.stock >= 0 && inCart >= product.stock;
-  const reached = (limit !== null && alreadyBought + inCart >= limit) || stockReached;
+  const reached = purchaseLimitReached || stockReached;
   const remaining = limit !== null ? Math.max(0, limit - alreadyBought - inCart) : null;
 
   function onAdd() {
@@ -97,8 +98,8 @@ export function ProductCard({
         )}
         {limit !== null && !soldOut && (
           <div className="absolute top-2 right-2">
-            <StatusPill tone={reached ? 'danger' : 'info'}>
-              {reached ? '한도 도달' : `1인 ${limit}개`}
+            <StatusPill tone={purchaseLimitReached ? 'danger' : 'info'}>
+              {purchaseLimitReached ? '한도 도달' : `1인 ${limit}개`}
             </StatusPill>
           </div>
         )}
@@ -123,7 +124,7 @@ export function ProductCard({
         <Button
           className="w-full"
           variant={justAdded ? 'secondary' : 'default'}
-          disabled={soldOut || reached}
+          disabled={soldOut || purchaseLimitReached}
           onClick={onAdd}
           aria-label={`${product.name} 장바구니 담기`}
         >

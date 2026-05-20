@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeCartLimitInfo, type CartItem, type CartLimit } from '@/components/CartProvider';
+import {
+  applyCartLimits,
+  computeCartLimitInfo,
+  type CartItem,
+  type CartLimit,
+} from '@/components/CartProvider';
 
 describe('computeCartLimitInfo', () => {
   it('uses stock as the max cart quantity when stock is finite', () => {
@@ -44,6 +49,7 @@ describe('computeCartLimitInfo', () => {
 
     expect(computeCartLimitInfo('p1', items, limits)).toMatchObject({
       remaining: 2,
+      purchaseMaxQuantity: 2,
       maxCartQuantity: 2,
       reached: true,
       stockExceeded: false,
@@ -61,5 +67,40 @@ describe('computeCartLimitInfo', () => {
       stockExceeded: true,
       maxCartQuantity: 3,
     });
+  });
+});
+
+describe('applyCartLimits', () => {
+  it('preserves existing quantity above stock so the cart can show a shortage warning', () => {
+    const items: CartItem[] = [
+      { productId: 'p1', name: 'A', price: 1000, quantity: 5, stock: 10 },
+    ];
+    const limits: Record<string, CartLimit> = {
+      p1: { perUserLimit: null, alreadyBought: 0, stock: 3 },
+    };
+
+    const applied = applyCartLimits(items, limits);
+
+    expect(applied).toEqual([
+      { productId: 'p1', name: 'A', price: 1000, quantity: 5, stock: 10 },
+    ]);
+    expect(computeCartLimitInfo('p1', applied, limits)).toMatchObject({
+      stock: 3,
+      stockExceeded: true,
+      maxCartQuantity: 3,
+    });
+  });
+
+  it('still clamps existing quantity to the remaining purchase limit', () => {
+    const items: CartItem[] = [
+      { productId: 'p1', name: 'A', price: 1000, quantity: 5, stock: 10 },
+    ];
+    const limits: Record<string, CartLimit> = {
+      p1: { perUserLimit: 4, alreadyBought: 1, stock: 10 },
+    };
+
+    expect(applyCartLimits(items, limits)).toEqual([
+      { productId: 'p1', name: 'A', price: 1000, quantity: 3, stock: 10 },
+    ]);
   });
 });
