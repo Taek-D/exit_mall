@@ -106,4 +106,8 @@ describe('20260520000001 shipping fee policy migration', () => {
     expect(sql).toContain('grant execute on function public.product_match_key(text) to authenticated;');
     expect(sql).toContain("public.product_match_key(v_resolved_name) <> public.product_match_key(v_row->>'product_code')");
   });
+
+  it('normalizes product match keys with NFKC to mirror the client helper', () => {
+    expect(sql).toMatch(/normalize\(\s*coalesce\(value, ''\)\s*,\s*nfkc\s*\)/i);
+  });
 });

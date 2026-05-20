@@ -3,7 +3,9 @@ returns text
 language sql
 immutable
 as $$
-  select regexp_replace(coalesce(value, ''), '\s+', '', 'g')
+  -- 클라이언트의 normalizeProductMatchKey(NFKC → 공백 제거)와 동일한 정규화.
+  -- 양쪽이 어긋나면 업로드 시 매칭된 행이 승인 시 PRODUCT_MISMATCH 로 떨어질 수 있다.
+  select regexp_replace(normalize(coalesce(value, ''), nfkc), '\s+', '', 'g')
 $$;
 
 grant execute on function public.product_match_key(text) to authenticated;
