@@ -86,14 +86,13 @@ export function computeAvailableInventory(
 export function computeAvailableDeposit(
   balance: number,
   pendingStockOrders: PendingStockOrderRow[],
-  pendingShippingFees: PendingShippingFeeRow[],
+  _pendingShippingFees: PendingShippingFeeRow[],
 ): AvailableDeposit {
   const stockReserved = pendingStockOrders.reduce((s, r) => s + r.total_amount, 0);
-  const shippingReserved = pendingShippingFees.reduce((s, r) => s + r.shipping_fee_total, 0);
   return {
     balance,
     stockReserved,
-    shippingReserved,
-    available: balance - stockReserved - shippingReserved,
+    shippingReserved: 0,
+    available: balance - stockReserved,
   };
 }
