@@ -10,6 +10,7 @@ import {
   checkoutSchema,
   productSchema,
   adjustBalanceSchema,
+  adminUserContactSchema,
 } from '@/lib/schemas';
 
 describe('signupSchema', () => {
@@ -17,6 +18,24 @@ describe('signupSchema', () => {
   it('passes valid', () => expect(signupSchema.safeParse(valid).success).toBe(true));
   it('rejects short password', () => expect(signupSchema.safeParse({ ...valid, password: 'pw' }).success).toBe(false));
   it('rejects invalid phone', () => expect(signupSchema.safeParse({ ...valid, phone: '12345' }).success).toBe(false));
+});
+
+describe('adminUserContactSchema', () => {
+  it('accepts valid admin-edited contact fields', () => {
+    const parsed = adminUserContactSchema.safeParse({
+      name: '  Kim Exit  ',
+      phone: '01012345678',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).toEqual({ name: 'Kim Exit', phone: '01012345678' });
+    }
+  });
+
+  it('rejects empty names and invalid phone numbers', () => {
+    expect(adminUserContactSchema.safeParse({ name: '   ', phone: '010-1234-5678' }).success).toBe(false);
+    expect(adminUserContactSchema.safeParse({ name: 'Kim Exit', phone: '12345' }).success).toBe(false);
+  });
 });
 
 describe('passwordChangeSchema', () => {

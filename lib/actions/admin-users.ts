@@ -1,5 +1,5 @@
 'use server';
-import { adjustBalanceSchema, thresholdSchema } from '@/lib/schemas';
+import { adjustBalanceSchema, adminUserContactSchema, thresholdSchema } from '@/lib/schemas';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, formatZodError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 import { isSelfUserGroupChange, isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
@@ -32,6 +32,29 @@ export async function updateThresholdAction(userId: string, fd: FormData) {
     return { error: '알림 기준을 저장하지 못했습니다.' };
   }
   revalidatePaths([`/admin/users/${userId}`]);
+  return { ok: true };
+}
+
+export async function updateUserContactAction(userId: string, fd: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
+  const parsed = adminUserContactSchema.safeParse({
+    name: fd.get('name'),
+    phone: fd.get('phone'),
+  });
+  if (!parsed.success) return { error: formatZodError(parsed.error) };
+
+  const { error } = await mutationTable(guard.supabase, 'profiles')
+    .update({
+      name: parsed.data.name,
+      phone: parsed.data.phone,
+    })
+    .eq('id', userId);
+  if (error) {
+    console.error('[admin-users] updateContact', { userId, error });
+    return { error: '사용자 기본정보를 저장하지 못했습니다.' };
+  }
+  revalidatePaths(['/admin/users', `/admin/users/${userId}`]);
   return { ok: true };
 }
 

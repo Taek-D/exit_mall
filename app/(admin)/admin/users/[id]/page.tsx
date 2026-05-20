@@ -6,6 +6,7 @@ import { BalanceAdjustForm } from './BalanceAdjustForm';
 import { UserStatusButtons } from './UserStatusButtons';
 import { ThresholdForm } from './ThresholdForm';
 import { GroupChangeForm } from './GroupChangeForm';
+import { UserContactForm } from './UserContactForm';
 import type { UserGroup } from '@/lib/auth/user-groups';
 import {
   UserStatusBadge,
@@ -98,6 +99,12 @@ export default async function AdminUserDetailPage({
           <Metric label="누적 거래" value={`${orders.length}건`} />
         </dl>
       </header>
+
+      <UserContactForm
+        userId={user.id}
+        defaultName={user.name}
+        defaultPhone={user.phone}
+      />
 
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <BalanceAdjustForm userId={user.id} />
