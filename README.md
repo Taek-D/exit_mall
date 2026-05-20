@@ -25,7 +25,7 @@ Next.js 14 + Supabase 기반입니다.
 - 승인된 회원만 상점/주문/예치금/입고 화면 접근. 거절된 회원도 재신청 가능
 - 상품 목록(재고 ≤ 9 시 "품절 임박" 배지, 수량은 비표시), 장바구니, 검토 요청 (배송정보 입력 없음)
 - 상품별 1인 누적 구매 한도 검사 — 승인 + 검토대기 합산
-- 예치금 잔액 (가용/검토대기 예약 분리), 이체 요청, 이체 요청 내역
+- 예치금 잔액 (가용/검토대기 상품 구매 예약 분리), 이체 요청, 이체 요청 내역
 - 내 주문 내역(엑시트몰 상품 검토대기·승인·반려/취소, Legacy 일반 주문 분리)
 - 보유 재고 화면 (`/inventory`) — 엑시트몰 상품 + 사용자 수기 재고 통합 표시, 항목별 가용/예약/총보유 + 변동 내역 timeline (`/inventory/product/[id]`, `/inventory/custom/[id]`)
 - 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 입고완료 재고의 가용/예약/총입고 수량을 보여주고 같은 양식으로 검토 요청
@@ -154,7 +154,7 @@ node scripts/build-shipping-template.cjs
 - `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행 / `/shipping-uploads/purchased/[id]` 행별 미리보기·송장·다운로드
 - `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
 - `/support-requests` 교환/반품 및 CS 문의 / `/support-requests/new` 새 문의 / `/support-requests/[id]` 상세·댓글·첨부
-- `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
+- `/deposit` 예치금 (가용/검토대기 상품 구매 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
 - `/find-account`, `/forgot-password` 아이디 찾기·비밀번호 재설정
 - `/orders/upload` → `/shipping-uploads/exitmall` 로 redirect (legacy)

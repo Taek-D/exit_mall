@@ -136,7 +136,7 @@ export function Group1Guide() {
             <li><strong>배송이 반려됐어요</strong> — <Link href="/shipping-uploads/exitmall">배송대행 목록</Link>에서 사유를 확인하고 엑셀을 고쳐 다시 올려 주세요.</li>
             <li><strong>1인 한도에 걸려요</strong> — 검토대기 중인 주문도 한도에 포함됩니다. 일부 주문을 취소하면 다시 담을 수 있어요.</li>
             <li><strong>엑셀 미리보기에 빨간 줄이 떠요</strong> — 상품명이 정확히 일치하지 않거나 수량이 비어 있을 가능성이 큽니다. 상품명을 그대로 복사해 다시 적어 보세요.</li>
-            <li><strong>예치금이 모자라요</strong> — 검토대기 예약 분이 잔액을 묶고 있을 수 있어요. <Link href="/deposit">예치금</Link>에서 가용 잔액을 확인하고 부족하면 <Link href="/deposit/new">충전 요청</Link>을 등록해 주세요.</li>
+            <li><strong>예치금이 모자라요</strong> — 검토대기 상품 구매 예약 분이 잔액을 묶고 있을 수 있어요. <Link href="/deposit">예치금</Link>에서 가용 잔액을 확인하고 부족하면 <Link href="/deposit/new">충전 요청</Link>을 등록해 주세요.</li>
           </ul>
         </GuideSection>
 
