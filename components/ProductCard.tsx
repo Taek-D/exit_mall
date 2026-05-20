@@ -32,10 +32,20 @@ export function ProductCard({
   const lowStock = product.stock > 0 && product.stock <= 9;
   const limit = product.per_user_limit;
   const inCart = items.find((item) => item.productId === product.id)?.quantity ?? 0;
-  const reached = limit !== null && alreadyBought + inCart >= limit;
+  const purchaseLimitReached = limit !== null && alreadyBought + inCart >= limit;
+  const stockReached = product.stock >= 0 && inCart >= product.stock;
+  const reached = purchaseLimitReached || stockReached;
   const remaining = limit !== null ? Math.max(0, limit - alreadyBought - inCart) : null;
 
   function onAdd() {
+    if (stockReached) {
+      toast({
+        title: '재고가 부족합니다',
+        description: `현재 재고는 ${product.stock}개입니다.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     if (reached) {
       toast({
         title: '구매 한도에 도달했어요',
@@ -52,6 +62,7 @@ export function ProductCard({
       imageUrl: product.image_url,
       perUserLimit: limit,
       alreadyBought,
+      stock: product.stock,
     });
     if (!added) {
       toast({
@@ -87,8 +98,8 @@ export function ProductCard({
         )}
         {limit !== null && !soldOut && (
           <div className="absolute top-2 right-2">
-            <StatusPill tone={reached ? 'danger' : 'info'}>
-              {reached ? '한도 도달' : `1인 ${limit}개`}
+            <StatusPill tone={purchaseLimitReached ? 'danger' : 'info'}>
+              {purchaseLimitReached ? '한도 도달' : `1인 ${limit}개`}
             </StatusPill>
           </div>
         )}
@@ -113,12 +124,14 @@ export function ProductCard({
         <Button
           className="w-full"
           variant={justAdded ? 'secondary' : 'default'}
-          disabled={soldOut || reached}
+          disabled={soldOut || purchaseLimitReached}
           onClick={onAdd}
           aria-label={`${product.name} 장바구니 담기`}
         >
           {soldOut ? (
             '품절'
+          ) : stockReached ? (
+            '재고 부족'
           ) : reached ? (
             '한도 도달'
           ) : justAdded ? (

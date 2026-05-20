@@ -2,11 +2,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-parser';
 import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
-import { matchInventoryRefs } from '@/lib/shipping-match';
+import { matchInventoryRefs, normalizeProductMatchKey } from '@/lib/shipping-match';
 import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 import {
   allocatePurchasedInventoryFifo,
+  detectPurchasedInventoryAmbiguities,
   type PurchasedInventoryLot,
   type PurchasedShippingDemand,
 } from '@/lib/purchased-shipping';
@@ -43,18 +44,51 @@ export async function requestShippingUploadAction(
   // 사입재고 배송대행은 별도 흐름(requestPurchasedShippingUploadAction)에서
   // purchased_inventory_lots 를 매칭하므로 여기에는 포함하지 않는다.
   const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
-  const [{ data: productRows }, { data: customRows }] = await Promise.all([
-    supabase.from('products').select('id, name').in('name', productNames),
+  // 활성+삭제되지 않은 카탈로그 외에, 사용자가 user_inventory 로 이미 보유 중인
+  // 상품도 후보에 포함한다. 관리자가 사후에 비활성화/소프트삭제한 상품이라도
+  // 보유 재고가 있으면 approve_shipping_upload 가 product_id 로 처리할 수 있다.
+  const [
+    { data: productRows, error: productErr },
+    { data: ownedInventoryRows, error: ownedErr },
+    { data: customRows, error: customErr },
+  ] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null),
+    supabase
+      .from('user_inventory')
+      .select('products(id, name)')
+      .eq('user_id', u.user.id),
     supabase
       .from('user_custom_inventory')
       .select('id, name')
-      .eq('user_id', u.user.id)
-      .in('name', productNames),
+      .eq('user_id', u.user.id),
   ]);
+  if (productErr || ownedErr || customErr) {
+    const message =
+      productErr?.message ?? ownedErr?.message ?? customErr?.message ?? 'unknown';
+    return { ok: false, error: `상품 후보 조회에 실패했습니다: ${message}` };
+  }
+
+  const productById = new Map<string, { id: string; name: string }>();
+  for (const row of (productRows ?? []) as Array<{ id: string; name: string }>) {
+    productById.set(row.id, row);
+  }
+  for (const row of (ownedInventoryRows ?? []) as Array<{
+    products: { id: string; name: string } | { id: string; name: string }[] | null;
+  }>) {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products;
+    if (product && !productById.has(product.id)) {
+      productById.set(product.id, { id: product.id, name: product.name });
+    }
+  }
+  const mergedProducts = Array.from(productById.values());
 
   const match = matchInventoryRefs(
     productNames,
-    (productRows ?? []) as Array<{ id: string; name: string }>,
+    mergedProducts,
     (customRows ?? []) as Array<{ id: string; name: string }>,
   );
   if (!match.ok) {
@@ -74,12 +108,24 @@ export async function requestShippingUploadAction(
     };
   }
 
+  const productNameById = new Map(mergedProducts.map((row) => [row.id, row.name]));
+  const customNameById = new Map(
+    ((customRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
+  );
   const itemsWithRef = parsed.items.map((it) => {
     const ref = match.refs.get(it.product_code)!;
     if (ref.kind === 'product') {
-      return { ...it, product_id: ref.id };
+      return {
+        ...it,
+        product_code: productNameById.get(ref.id) ?? it.product_code,
+        product_id: ref.id,
+      };
     }
-    return { ...it, custom_inventory_id: ref.id };
+    return {
+      ...it,
+      product_code: customNameById.get(ref.id) ?? it.product_code,
+      custom_inventory_id: ref.id,
+    };
   });
 
   // Storage 업로드
@@ -141,35 +187,42 @@ type PurchasedAllocationRow = {
   quantity: number;
 };
 
+function purchasedUploadMatchKey(productName: string, optionName: string): string {
+  return `${normalizeProductMatchKey(productName)}\u0000${normalizeProductMatchKey(optionName)}`;
+}
+
 async function fetchPurchasedLotsForUpload(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  productNames: string[],
 ): Promise<PurchasedInventoryLot[]> {
-  const { data: lotData } = await (supabase.from as any)('purchased_inventory_lots')
+  const { data: lotData, error: lotErr } = await (supabase.from as any)('purchased_inventory_lots')
     .select('id, product_name, option_name, remaining_quantity, created_at, inbound_requests!inner(status)')
     .eq('user_id', userId)
     .eq('inbound_requests.status', 'completed')
-    .in('product_name', productNames)
     .order('created_at', { ascending: true });
+  if (lotErr) throw new Error(`사입재고 후보 조회에 실패했습니다: ${lotErr.message}`);
 
   const lots = (lotData ?? []) as PurchasedLotRow[];
   if (lots.length === 0) return [];
 
-  const { data: pendingUploads } = await supabase
+  const { data: pendingUploads, error: pendingErr } = await supabase
     .from('order_uploads')
     .select('id')
     .eq('user_id', userId)
     .eq('status', 'pending')
     .eq('upload_type', 'purchased');
+  if (pendingErr) throw new Error(`대기 중인 배송대행 업로드 조회에 실패했습니다: ${pendingErr.message}`);
 
   const pendingIds = ((pendingUploads ?? []) as Array<{ id: string }>).map((row) => row.id);
   const reservedByLot = new Map<string, number>();
   if (pendingIds.length > 0) {
-    const { data: allocations } = await (supabase.from as any)('purchased_shipping_allocations')
+    const { data: allocations, error: allocationsErr } = await (supabase.from as any)('purchased_shipping_allocations')
       .select('lot_id, quantity')
       .eq('user_id', userId)
       .in('upload_id', pendingIds);
+    if (allocationsErr) {
+      throw new Error(`대기 중인 사입재고 배정 조회에 실패했습니다: ${allocationsErr.message}`);
+    }
     for (const allocation of (allocations ?? []) as PurchasedAllocationRow[]) {
       reservedByLot.set(
         allocation.lot_id,
@@ -217,9 +270,30 @@ export async function requestPurchasedShippingUploadAction(
     option_name: item.product_name ?? '',
     quantity: item.quantity,
   }));
-  const productNames = Array.from(new Set(demands.map((demand) => demand.product_name)));
-  const lots = await fetchPurchasedLotsForUpload(supabase, u.user.id, productNames);
-  const allocation = allocatePurchasedInventoryFifo(lots, demands);
+  let lots: PurchasedInventoryLot[];
+  try {
+    lots = await fetchPurchasedLotsForUpload(supabase, u.user.id);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '사입재고 후보 조회에 실패했습니다.' };
+  }
+
+  const demandKeys = new Set(
+    demands.map((demand) => purchasedUploadMatchKey(demand.product_name, demand.option_name)),
+  );
+  const relevantLots = lots.filter((lot) =>
+    demandKeys.has(purchasedUploadMatchKey(lot.product_name, lot.option_name)),
+  );
+  const ambiguities = detectPurchasedInventoryAmbiguities(relevantLots);
+  if (ambiguities.length > 0) {
+    const shown = ambiguities
+      .slice(0, 3)
+      .map((ambiguity) => ambiguity.labels.join(' / '))
+      .join(', ');
+    const more = ambiguities.length > 3 ? ' 외' : '';
+    return { ok: false, error: `공백 제거 후 같은 사입재고명이 여러 개 있습니다: ${shown}${more}` };
+  }
+
+  const allocation = allocatePurchasedInventoryFifo(relevantLots, demands);
   if (!allocation.ok) {
     const shown = allocation.shortages
       .slice(0, 3)
@@ -230,6 +304,22 @@ export async function requestPurchasedShippingUploadAction(
     const more = allocation.shortages.length > 3 ? ' 외' : '';
     return { ok: false, error: `입고완료 재고가 부족합니다: ${shown}${more}` };
   }
+
+  const lotById = new Map(relevantLots.map((lot) => [lot.id, lot]));
+  // First allocation is safe: ambiguity detection keeps every demand key on one canonical identity.
+  const lotByItemNo = new Map<number, PurchasedInventoryLot>();
+  for (const itemAllocation of allocation.allocations) {
+    if (!lotByItemNo.has(itemAllocation.item_no)) {
+      const lot = lotById.get(itemAllocation.lot_id);
+      if (lot) lotByItemNo.set(itemAllocation.item_no, lot);
+    }
+  }
+  const itemsForRpc = parsed.items.map((item) => {
+    const lot = lotByItemNo.get(item.no);
+    return lot
+      ? { ...item, product_code: lot.product_name, product_name: lot.option_name }
+      : item;
+  });
 
   const safeName = safeStorageName(file.name, { allowKorean: true });
   const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
@@ -252,7 +342,7 @@ export async function requestPurchasedShippingUploadAction(
       p_contact_person: parsed.uploader_company,
       p_buyer_phone: parsed.uploader_phone,
       p_request_memo: parsed.request_memo,
-      p_items: parsed.items as Json,
+      p_items: itemsForRpc as Json,
       p_total_quantity: parsed.total_quantity,
       p_shipping_fee_total: fee,
       p_allocations: allocation.allocations as Json,

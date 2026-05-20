@@ -9,10 +9,7 @@ import { DownloadButton } from './DownloadButton';
 import { AttachTrackingForm } from './AttachTrackingForm';
 import { CompleteButton } from './CompleteButton';
 import { formatShortDateTimeKR } from '@/lib/dates';
-import {
-  fetchAdminShippingUploadDetail,
-  hasInsufficientBalance,
-} from '@/lib/admin/order-details';
+import { fetchAdminShippingUploadDetail } from '@/lib/admin/order-details';
 import { CustomerSummaryCard } from '@/components/admin/DetailPanels';
 
 export const dynamic = 'force-dynamic';
@@ -26,11 +23,6 @@ export default async function AdminShippingUploadDetail({
   if (!upload) notFound();
 
   const balance = Number(upload.profiles?.deposit_balance ?? 0);
-  const insufficient = hasInsufficientBalance(
-    upload.status,
-    balance,
-    Number(upload.shipping_fee_total),
-  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -76,8 +68,12 @@ export default async function AdminShippingUploadDetail({
         email={upload.profiles?.email ?? '-'}
         phone={upload.profiles?.phone ?? '-'}
         balance={formatKRW(balance)}
-        insufficient={insufficient}
+        insufficient={false}
       />
+
+      <section className="rounded-md border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+        배송비는 행 수 기준 안내 금액으로만 표시합니다. 승인 시 예치금은 차감하지 않습니다.
+      </section>
 
       <section className="rounded-lg border bg-card overflow-hidden">
         <table className="w-full text-sm">
@@ -136,11 +132,6 @@ export default async function AdminShippingUploadDetail({
 
       {upload.status === 'pending' && (
         <>
-          {insufficient && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-              가용 예치금이 배송비보다 부족합니다. 승인 시 차감 단계에서 실패할 수 있습니다.
-            </div>
-          )}
           <ReviewActions uploadId={upload.id} />
         </>
       )}

@@ -72,7 +72,7 @@ describe('computeAvailableDeposit', () => {
     });
   });
 
-  it('stock + shipping 예약 모두 차감', () => {
+  it('stock 예약만 가용 예치금에서 차감하고 배송대행 배송비는 안내 금액으로 둔다', () => {
     const stock: PendingStockOrderRow[] = [{ id: 's1', total_amount: 30_000 }];
     const ship: PendingShippingFeeRow[] = [
       { id: 'u1', shipping_fee_total: 9_900 },
@@ -81,8 +81,8 @@ describe('computeAvailableDeposit', () => {
     expect(computeAvailableDeposit(100_000, stock, ship)).toEqual({
       balance: 100_000,
       stockReserved: 30_000,
-      shippingReserved: 16_500,
-      available: 53_500,
+      shippingReserved: 0,
+      available: 70_000,
     });
   });
 

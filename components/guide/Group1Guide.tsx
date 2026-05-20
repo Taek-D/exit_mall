@@ -54,8 +54,8 @@ export function Group1Guide() {
             <li><Link href="/shipping-uploads/exitmall">엑시트몰 배송대행</Link>에서 양식 엑셀을 내려받습니다.</li>
             <li>받는 사람 명단을 적습니다. <strong>한 줄에 한 명씩</strong> 작성해 주세요.</li>
             <li>엑셀을 올리면 행마다 상품이 잘 맞춰졌는지, 오류가 없는지 미리 보여 드립니다.</li>
-            <li>&quot;검토 요청&quot;을 누르면 보낼 상품과 배송비가 승인 전까지 잠시 묶입니다.</li>
-            <li>관리자가 승인하면 내 재고에서 그만큼 빠지고 배송비도 차감됩니다.</li>
+            <li>&quot;검토 요청&quot;을 누르면 보낼 상품이 승인 전까지 잠시 묶이고, 배송비는 안내 금액으로 표시됩니다.</li>
+            <li>관리자가 승인하면 내 재고에서 그만큼 빠지고, 배송비는 안내 금액으로만 표시됩니다.</li>
             <li>관리자가 송장 번호가 적힌 엑셀을 다시 올리면 행마다 송장이 표시되고, CJ 조회 버튼이 생깁니다.</li>
             <li>모든 발송이 끝나면 완료 처리되어 마무리됩니다.</li>
           </ol>
@@ -117,7 +117,7 @@ export function Group1Guide() {
           <p>잔액은 두 가지로 나눠 보여 드립니다.</p>
           <ul>
             <li><strong>가용</strong>: 지금 쓸 수 있는 금액</li>
-            <li><strong>검토대기 예약</strong>: 승인 전인 주문이나 배송 건에 잠시 묶여 있는 금액</li>
+            <li><strong>검토대기 상품 구매 예약</strong>: 승인 전인 상품 구매 주문에 잠시 묶여 있는 금액</li>
           </ul>
           <p>승인이 끝나면 묶여 있던 금액이 실제로 빠져나갑니다.</p>
         </GuideSection>
@@ -136,7 +136,7 @@ export function Group1Guide() {
             <li><strong>배송이 반려됐어요</strong> — <Link href="/shipping-uploads/exitmall">배송대행 목록</Link>에서 사유를 확인하고 엑셀을 고쳐 다시 올려 주세요.</li>
             <li><strong>1인 한도에 걸려요</strong> — 검토대기 중인 주문도 한도에 포함됩니다. 일부 주문을 취소하면 다시 담을 수 있어요.</li>
             <li><strong>엑셀 미리보기에 빨간 줄이 떠요</strong> — 상품명이 정확히 일치하지 않거나 수량이 비어 있을 가능성이 큽니다. 상품명을 그대로 복사해 다시 적어 보세요.</li>
-            <li><strong>예치금이 모자라요</strong> — 검토대기 예약 분이 잔액을 묶고 있을 수 있어요. <Link href="/deposit">예치금</Link>에서 가용 잔액을 확인하고 부족하면 <Link href="/deposit/new">충전 요청</Link>을 등록해 주세요.</li>
+            <li><strong>예치금이 모자라요</strong> — 검토대기 상품 구매 예약 분이 잔액을 묶고 있을 수 있어요. <Link href="/deposit">예치금</Link>에서 가용 잔액을 확인하고 부족하면 <Link href="/deposit/new">충전 요청</Link>을 등록해 주세요.</li>
           </ul>
         </GuideSection>
 

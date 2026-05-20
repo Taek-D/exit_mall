@@ -11,11 +11,15 @@ import Link from 'next/link';
 import { AlertCircle, ArrowLeft, Wallet, ShoppingCart } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { items, total, remove, clear } = useCart();
+  const { items, total, remove, clear, getLimitInfo } = useCart();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const stockShortages = items
+    .map((item) => ({ item, limitInfo: getLimitInfo(item.productId) }))
+    .filter(({ limitInfo }) => limitInfo.stockExceeded && limitInfo.stock !== null);
+  const hasStockShortage = stockShortages.length > 0;
 
   if (items.length === 0) {
     return (
@@ -33,6 +37,10 @@ export default function CheckoutPage() {
 
   function submit() {
     setError(null);
+    if (hasStockShortage) {
+      setError('재고가 부족한 상품의 수량을 줄이면 주문할 수 있습니다.');
+      return;
+    }
     start(async () => {
       const result = await requestStockOrderAction(cartToStockOrderPayload(items));
       if (!result.ok) {
@@ -100,6 +108,14 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground min-w-0">
                     <span className="text-foreground">{i.name}</span>
                     <span className="text-muted-foreground"> × {i.quantity}</span>
+                    {(() => {
+                      const limitInfo = getLimitInfo(i.productId);
+                      return limitInfo.stockExceeded && limitInfo.stock !== null ? (
+                        <span className="block text-xs text-destructive mt-1">
+                          현재 재고 {limitInfo.stock}개라서 {i.quantity}개 주문할 수 없습니다.
+                        </span>
+                      ) : null;
+                    })()}
                   </span>
                   <span className="font-mono tabular text-foreground whitespace-nowrap">
                     {formatKRW(i.price * i.quantity)}
@@ -124,7 +140,18 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          <Button onClick={submit} disabled={pending} className="w-full h-11">
+          {hasStockShortage && !error && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md p-3 animate-slide-up-fade"
+            >
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden />
+              <p>재고가 부족한 상품의 수량을 줄이면 주문할 수 있습니다.</p>
+            </div>
+          )}
+
+          <Button onClick={submit} disabled={pending || hasStockShortage} className="w-full h-11">
             {pending ? '요청 중…' : `${formatKRW(total)} 검토 요청`}
           </Button>
         </aside>

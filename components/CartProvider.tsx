@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type CartLimit = {
   perUserLimit: number | null;
   alreadyBought: number;
+  stock: number;
 };
 
 export type CartItem = {
@@ -14,15 +15,19 @@ export type CartItem = {
   imageUrl?: string | null;
   perUserLimit?: number | null;
   alreadyBought?: number;
+  stock?: number;
 };
 
 export type CartLimitInfo = {
   perUserLimit: number | null;
   alreadyBought: number;
+  purchaseMaxQuantity: number | null;
   maxCartQuantity: number | null;
   remaining: number | null;
   quantity: number;
   reached: boolean;
+  stock: number | null;
+  stockExceeded: boolean;
 };
 
 type CartCtx = {
@@ -62,11 +67,11 @@ export function CartProvider({
 
   useEffect(() => {
     if (!loaded) return;
-    setItems((prev) => applyLimits(prev, limits));
+    setItems((prev) => applyCartLimits(prev, limits));
   }, [loaded, limits]);
 
   const add: CartCtx['add'] = (item) => {
-    const currentLimitInfo = getLimitInfoFrom(item.productId, items, limits, item);
+    const currentLimitInfo = computeCartLimitInfo(item.productId, items, limits, item);
     const current = items.find((p) => p.productId === item.productId);
     if (currentLimitInfo.maxCartQuantity !== null) {
       if (currentLimitInfo.maxCartQuantity <= 0) return false;
@@ -74,7 +79,7 @@ export function CartProvider({
     }
 
     setItems(prev => {
-      const limitInfo = getLimitInfoFrom(item.productId, prev, limits, item);
+      const limitInfo = computeCartLimitInfo(item.productId, prev, limits, item);
       if (limitInfo.maxCartQuantity !== null && limitInfo.maxCartQuantity <= 0) return prev;
 
       const found = prev.find(p => p.productId === item.productId);
@@ -92,7 +97,7 @@ export function CartProvider({
   const updateQty: CartCtx['updateQty'] = (productId, qty) => {
     if (qty <= 0) return setItems(prev => prev.filter(p => p.productId !== productId));
     setItems(prev => {
-      const limitInfo = getLimitInfoFrom(productId, prev, limits);
+      const limitInfo = computeCartLimitInfo(productId, prev, limits);
       const quantity = clampQuantity(qty, limitInfo.maxCartQuantity);
       if (quantity <= 0) return prev.filter(p => p.productId !== productId);
       return prev.map(p => p.productId === productId ? { ...p, quantity } : p);
@@ -100,7 +105,7 @@ export function CartProvider({
   };
   const remove: CartCtx['remove'] = (productId) => setItems(prev => prev.filter(p => p.productId !== productId));
   const clear = () => setItems([]);
-  const getLimitInfo: CartCtx['getLimitInfo'] = (productId) => getLimitInfoFrom(productId, items, limits);
+  const getLimitInfo: CartCtx['getLimitInfo'] = (productId) => computeCartLimitInfo(productId, items, limits);
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return <Ctx.Provider value={{ items, add, updateQty, remove, clear, getLimitInfo, total }}>{children}</Ctx.Provider>;
@@ -112,17 +117,17 @@ export function useCart() {
   return ctx;
 }
 
-function applyLimits(items: CartItem[], limits: Record<string, CartLimit>) {
+export function applyCartLimits(items: CartItem[], limits: Record<string, CartLimit>) {
   return items
     .map((item) => {
-      const limitInfo = getLimitInfoFrom(item.productId, items, limits, item);
-      const quantity = clampQuantity(item.quantity, limitInfo.maxCartQuantity);
+      const limitInfo = computeCartLimitInfo(item.productId, items, limits, item);
+      const quantity = clampQuantity(item.quantity, limitInfo.purchaseMaxQuantity);
       return { ...item, quantity };
     })
     .filter((item) => item.quantity > 0);
 }
 
-function getLimitInfoFrom(
+export function computeCartLimitInfo(
   productId: string,
   items: CartItem[],
   limits: Record<string, CartLimit>,
@@ -132,17 +137,26 @@ function getLimitInfoFrom(
   const serverLimit = limits[productId];
   const perUserLimit = serverLimit?.perUserLimit ?? item?.perUserLimit ?? null;
   const alreadyBought = serverLimit?.alreadyBought ?? item?.alreadyBought ?? 0;
+  const stock = serverLimit?.stock ?? item?.stock ?? fallback?.stock ?? null;
   const quantity = item?.quantity ?? 0;
   const remaining = perUserLimit === null ? null : Math.max(0, perUserLimit - alreadyBought);
-  const maxCartQuantity = remaining;
+  const purchaseMaxQuantity = remaining;
+  const stockLimit = stock === null || stock < 0 ? null : Math.max(0, stock);
+  const maxCartQuantity =
+    purchaseMaxQuantity === null && stockLimit === null
+      ? null
+      : Math.min(purchaseMaxQuantity ?? Number.POSITIVE_INFINITY, stockLimit ?? Number.POSITIVE_INFINITY);
 
   return {
     perUserLimit,
     alreadyBought,
+    stock,
+    purchaseMaxQuantity,
     maxCartQuantity,
     remaining,
     quantity,
     reached: maxCartQuantity !== null && quantity >= maxCartQuantity,
+    stockExceeded: stockLimit !== null && quantity > stockLimit,
   };
 }
 

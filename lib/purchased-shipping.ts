@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { normalizeProductMatchKey } from '@/lib/shipping-match';
 
 export type ParsedInboundInventoryItem = {
   row_number: number;
@@ -61,6 +62,11 @@ export type PurchasedInventorySummaryRow = {
   available_quantity: number;
 };
 
+export type PurchasedInventoryAmbiguity = {
+  key: string;
+  labels: string[];
+};
+
 const INBOUND_HEADERS = [
   '발송일',
   '상품명',
@@ -108,7 +114,11 @@ function normalizeHeader(value: string): string {
 }
 
 function keyOf(productName: string, optionName: string): string {
-  return `${productName}\u0000${optionName}`;
+  return `${normalizeProductMatchKey(productName)}\u0000${normalizeProductMatchKey(optionName)}`;
+}
+
+function labelOf(productName: string, optionName: string): string {
+  return optionName ? `${productName} / ${optionName}` : productName;
 }
 
 export async function parseInboundInventoryExcel(
@@ -175,6 +185,25 @@ export async function parseInboundInventoryExcel(
   return items;
 }
 
+export function detectPurchasedInventoryAmbiguities(
+  lots: PurchasedInventoryLot[],
+): PurchasedInventoryAmbiguity[] {
+  const labelsByKey = new Map<string, Set<string>>();
+  for (const lot of lots) {
+    const key = keyOf(lot.product_name, lot.option_name);
+    const labels = labelsByKey.get(key) ?? new Set<string>();
+    labels.add(labelOf(lot.product_name, lot.option_name));
+    labelsByKey.set(key, labels);
+  }
+
+  return Array.from(labelsByKey.entries())
+    .filter(([, labels]) => labels.size > 1)
+    .map(([key, labels]) => ({
+      key,
+      labels: Array.from(labels).sort((a, b) => a.localeCompare(b, 'ko')),
+    }));
+}
+
 export function allocatePurchasedInventoryFifo(
   lots: PurchasedInventoryLot[],
   demands: PurchasedShippingDemand[],
@@ -194,9 +223,9 @@ export function allocatePurchasedInventoryFifo(
   for (const demand of demands) {
     let need = demand.quantity;
     let availableForDemand = 0;
+    const demandKey = keyOf(demand.product_name, demand.option_name);
     const matchingLots = orderedLots.filter(
-      (lot) =>
-        lot.product_name === demand.product_name && lot.option_name === demand.option_name,
+      (lot) => keyOf(lot.product_name, lot.option_name) === demandKey,
     );
     for (const lot of matchingLots) availableForDemand += remaining.get(lot.id) ?? 0;
 

@@ -54,6 +54,68 @@ describe('matchInventoryRefs', () => {
     expect(r.duplicates).toEqual(['상품A']);
   });
 
+  it('matches product names while ignoring whitespace differences', () => {
+    const r = matchInventoryRefs(
+      ['TobiCom', 'Product  B'],
+      [
+        { id: 'p-a', name: 'Tobi  Com' },
+        { id: 'p-b', name: 'Product B' },
+      ],
+      [],
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.refs.get('TobiCom')).toEqual({ kind: 'product', id: 'p-a' });
+    expect(r.refs.get('Product  B')).toEqual({ kind: 'product', id: 'p-b' });
+  });
+
+  it('reports duplicate product names after whitespace normalization', () => {
+    const r = matchInventoryRefs(
+      ['ABC'],
+      [
+        { id: 'p-1', name: 'A BC' },
+        { id: 'p-2', name: 'AB C' },
+      ],
+      [],
+    );
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.duplicates).toEqual(['ABC']);
+  });
+
+  it('ignores duplicate normalized names that are unrelated to uploaded names', () => {
+    const r = matchInventoryRefs(
+      ['Product C'],
+      [
+        { id: 'p-1', name: 'A BC' },
+        { id: 'p-2', name: 'AB C' },
+        { id: 'p-3', name: 'ProductC' },
+      ],
+      [],
+    );
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.refs.get('Product C')).toEqual({ kind: 'product', id: 'p-3' });
+  });
+
+  it('reports duplicate custom names after whitespace normalization when no product wins', () => {
+    const r = matchInventoryRefs(
+      ['CustomABC'],
+      [],
+      [
+        { id: 'c-1', name: 'Custom AB C' },
+        { id: 'c-2', name: 'CustomA BC' },
+      ],
+    );
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.duplicates).toEqual(['CustomABC']);
+  });
+
   it('handles empty inputs', () => {
     const r = matchInventoryRefs([], products, customs);
     expect(r.ok).toBe(true);

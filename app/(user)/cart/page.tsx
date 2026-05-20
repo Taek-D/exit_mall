@@ -30,6 +30,7 @@ export default function CartPage() {
   }
 
   const itemCount = items.reduce((n, i) => n + i.quantity, 0);
+  const hasStockShortage = items.some((item) => getLimitInfo(item.productId).stockExceeded);
 
   return (
     <div className="space-y-6">
@@ -47,7 +48,11 @@ export default function CartPage() {
             const sub = item.price * item.quantity;
             const limitInfo = getLimitInfo(item.productId);
             const hasLimit = limitInfo.perUserLimit !== null;
-            const plusDisabled = hasLimit && limitInfo.reached;
+            const plusDisabled = limitInfo.reached;
+            const plusDisabledLabel =
+              limitInfo.stock !== null && limitInfo.stock >= 0 && item.quantity >= limitInfo.stock
+                ? '재고가 부족합니다'
+                : '구매 한도에 도달했습니다';
             return (
               <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-4">
                 <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-md bg-surface-muted overflow-hidden">
@@ -78,6 +83,11 @@ export default function CartPage() {
                       )}
                     </p>
                   )}
+                  {limitInfo.stockExceeded && limitInfo.stock !== null && (
+                    <p className="text-xs text-destructive mt-1">
+                      현재 재고 {limitInfo.stock}개라서 {item.quantity}개 주문할 수 없습니다.
+                    </p>
+                  )}
                 </div>
 
                 <div className="inline-flex items-center h-9 rounded-md border">
@@ -101,7 +111,7 @@ export default function CartPage() {
                     onClick={() => updateQty(item.productId, item.quantity + 1)}
                     disabled={plusDisabled}
                     className="h-9 w-9 grid place-items-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:hover:bg-transparent rounded-r-md"
-                    aria-label={plusDisabled ? '구매 한도에 도달했습니다' : '수량 증가'}
+                    aria-label={plusDisabled ? plusDisabledLabel : '수량 증가'}
                   >
                     <Plus className="h-3.5 w-3.5" aria-hidden />
                   </button>
@@ -148,12 +158,24 @@ export default function CartPage() {
             </div>
           </dl>
           <div className="p-5 pt-0">
-            <Button asChild className="w-full h-11">
-              <Link href="/checkout">
+            {hasStockShortage && (
+              <p className="mb-3 text-sm text-destructive">
+                재고가 부족한 상품의 수량을 줄이면 주문할 수 있습니다.
+              </p>
+            )}
+            {hasStockShortage ? (
+              <Button className="w-full h-11" disabled>
                 주문하기
                 <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-            </Button>
+              </Button>
+            ) : (
+              <Button asChild className="w-full h-11">
+                <Link href="/checkout">
+                  주문하기
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </Button>
+            )}
           </div>
         </aside>
       </div>

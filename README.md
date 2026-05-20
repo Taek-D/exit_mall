@@ -9,7 +9,7 @@ Next.js 14 + Supabase 기반입니다.
 ## 두 흐름 개요
 
 - **흐름 1 — 엑시트몰 상품 구매(재고 적립)**: 고객이 결제하면 `stock_orders.pending` 으로 들어가고, 관리자 승인 시 보유 재고에 적립 + 예치금 차감. 이 단계에서는 발송이 일어나지 않습니다.
-- **흐름 2 — 배송대행 업로드(재고 발송)**: 고객이 CJ식 1행 1택배 양식 엑셀로 받는사람 명단을 올리면 `order_uploads.pending` 으로 들어가고, 관리자 승인 시 보유 재고(엑시트몰 상품 + 사용자 수기 재고)에서 차감 + 행수 × ₩3,300 배송비 차감. 관리자가 송장 채운 엑셀을 재업로드하면 행별 송장이 노출됩니다.
+- **흐름 2 — 배송대행 업로드(재고 발송)**: 고객이 CJ식 1행 1택배 양식 엑셀로 받는사람 명단을 올리면 `order_uploads.pending` 으로 들어가고, 관리자 승인 시 보유 재고(엑시트몰 상품 + 사용자 수기 재고)에서 차감 + 행수 × ₩3,300 배송비 안내, 별도 정산. 관리자가 송장 채운 엑셀을 재업로드하면 행별 송장이 노출됩니다.
 - **흐름 3 — 사입재고 배송대행**: 고객이 입고리스트에서 입고완료된 사입재고를 같은 배송대행 양식으로 발송 요청하면 `order_uploads.upload_type = 'purchased'`로 접수됩니다. 관리자 승인 시 입고완료 재고만 차감하고 예치금은 차감하지 않습니다.
 - **부속 흐름 — 입고 요청 게시판**: 고객이 사입 상품 입고를 비공개 게시글로 등록하고 관리자와 댓글로 진행 상황을 주고받습니다. 엑셀 양식 첨부 + 상태(접수/검토/입고완료/취소) 추적, 입고완료 시 사입재고 배송대행 가능 수량에 반영.
 
@@ -25,7 +25,7 @@ Next.js 14 + Supabase 기반입니다.
 - 승인된 회원만 상점/주문/예치금/입고 화면 접근. 거절된 회원도 재신청 가능
 - 상품 목록(재고 ≤ 9 시 "품절 임박" 배지, 수량은 비표시), 장바구니, 검토 요청 (배송정보 입력 없음)
 - 상품별 1인 누적 구매 한도 검사 — 승인 + 검토대기 합산
-- 예치금 잔액 (가용/검토대기 예약 분리), 이체 요청, 이체 요청 내역
+- 예치금 잔액 (가용/검토대기 상품 구매 예약 분리), 이체 요청, 이체 요청 내역
 - 내 주문 내역(엑시트몰 상품 검토대기·승인·반려/취소, Legacy 일반 주문 분리)
 - 보유 재고 화면 (`/inventory`) — 엑시트몰 상품 + 사용자 수기 재고 통합 표시, 항목별 가용/예약/총보유 + 변동 내역 timeline (`/inventory/product/[id]`, `/inventory/custom/[id]`)
 - 배송대행 업로드 — 엑시트몰 배송대행(`/shipping-uploads/exitmall`)으로 양식 다운로드, 엑셀 업로드, 행별 미리보기, 검토 요청, 행별 송장 + CJ 조회 + 송장 포함 엑셀 다운로드. 사입재고 배송대행(`/shipping-uploads/purchased`)은 입고완료 재고의 가용/예약/총입고 수량을 보여주고 같은 양식으로 검토 요청
@@ -51,7 +51,7 @@ Next.js 14 + Supabase 기반입니다.
 ### 보안/안정화
 - Next.js 14.2.35 적용 및 기본 보안 헤더(`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Permissions-Policy`) 설정
 - `stock_orders` / `order_uploads` 직접 삽입 정책 보강: 일반 사용자는 서버 RPC가 검증한 흐름으로만 주문·배송대행 요청 생성
-- 예치금 가용액 계산 시 상품 구매 검토대기 금액과 배송대행 검토대기 배송비를 함께 예약 처리
+- 예치금 가용액 계산 시 상품 구매 검토대기 금액만 예약 처리
 - 배송대행 승인 RPC에서 배송비 변조, legacy items, 상품 ID·상품명 불일치, 동시 승인 재고 경합을 방어. 사용자 수기 재고(`custom_inventory_id`)도 동일 RPC에서 차감
 - 송장 재업로드 RPC는 송장 필드만 갱신하도록 제한해 업로드 원본 데이터 무결성 유지
 - Storage 정책은 관리자가 업로드한 송장 파일을 해당 업로드 소유자와 관리자만 조회하도록 제한
@@ -154,7 +154,7 @@ node scripts/build-shipping-template.cjs
 - `/shipping-uploads/exitmall` 엑시트몰 배송대행 / `/shipping-uploads/exitmall/[id]` 행별 미리보기·송장·다운로드 / `/shipping-uploads/purchased` 사입재고 배송대행 / `/shipping-uploads/purchased/[id]` 행별 미리보기·송장·다운로드
 - `/inbound-requests` 입고리스트 / `/inbound-requests/new` 새 입고 요청 / `/inbound-requests/[id]` 상세·댓글·첨부
 - `/support-requests` 교환/반품 및 CS 문의 / `/support-requests/new` 새 문의 / `/support-requests/[id]` 상세·댓글·첨부
-- `/deposit` 예치금 (가용/검토대기 예약 분리) / `/deposit/new` 이체 요청
+- `/deposit` 예치금 (가용/검토대기 상품 구매 예약 분리) / `/deposit/new` 이체 요청
 - `/account/password` 비밀번호 변경
 - `/find-account`, `/forgot-password` 아이디 찾기·비밀번호 재설정
 - `/orders/upload` → `/shipping-uploads/exitmall` 로 redirect (legacy)
@@ -187,8 +187,8 @@ node scripts/build-shipping-template.cjs
 
 ### 흐름 2: 배송대행 업로드 (재고 발송)
 1. 주문자가 `/shipping-uploads/exitmall`에서 양식 엑셀을 다운로드 → 받는사람 명단 작성 → 업로드.
-2. 미리보기에서 행별 검증·상품명 매칭(엑시트몰 상품 + 본인 수기 재고) 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고와 배송비 모두 예약만 됩니다.
-3. 관리자가 `/admin/shipping-uploads/exitmall`에서 검토 → 승인 시 보유 재고 차감(엑시트몰/수기 항목별 합산) + 배송비 차감 + `inventory_movements` / `custom_inventory_movements` 음수 기록.
+2. 미리보기에서 행별 검증·상품명 매칭(엑시트몰 상품 + 본인 수기 재고) 확인 → "검토 요청" → `order_uploads.pending` 생성. 보유 재고는 예약되고 배송비는 안내 금액으로만 표시됩니다.
+3. 관리자가 `/admin/shipping-uploads/exitmall`에서 검토 → 승인 시 보유 재고 차감(엑시트몰/수기 항목별 합산) + `inventory_movements` / `custom_inventory_movements` 음수 기록. 배송비는 예치금에서 차감하지 않습니다.
 4. 관리자가 송장 채운 엑셀을 같은 업로드에 재업로드 → `attach_tracking` RPC가 행별 `tracking_number` 갱신 + `status=shipped`. 부분 발송도 가능, 멱등 호출 가능.
 5. 주문자 화면에 행별 송장 + CJ 조회 버튼 + 송장 포함 엑셀 다운로드 노출.
 6. 관리자가 완료 처리 → `status=completed`.
