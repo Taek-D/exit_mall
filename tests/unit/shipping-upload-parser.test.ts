@@ -165,6 +165,17 @@ describe('parseShippingExcel - valid', () => {
 });
 
 describe('parseShippingExcel - errors', () => {
+  it('explains when an inbound inventory template is uploaded to shipping upload', async () => {
+    await expect(
+      parseShippingExcel(
+        await workbookBufferFromFirstRow(
+          ['발송일', '상품명', '옵션', '재고수량', '사은품', '택배사', '송장번호', '비고'],
+          [['2026-05-19', '샴푸', '500ml', 12, 'Y', 'CJ', '1234567890', '정상']],
+        ),
+      ),
+    ).rejects.toThrow(/입고리스트 양식이 업로드되었습니다/);
+  });
+
   it('rejects empty templates', async () => {
     await expect(parseShippingExcel(load('shipping-empty.xlsx'))).rejects.toThrow(
       /한 줄도 입력되지 않았/,

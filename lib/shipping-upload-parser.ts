@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { detectKnownExcelTemplateKind } from '@/lib/excel-template-kind';
 
 export const SHIPPING_FEE_PER_ROW = 3_300;
 
@@ -107,6 +108,12 @@ export async function parseShippingExcel(
 
   const ws = wb.worksheets[0];
   if (!ws) throw new Error('시트가 없습니다.');
+
+  if (detectKnownExcelTemplateKind(ws) === 'inbound') {
+    throw new Error(
+      '입고리스트 양식이 업로드되었습니다. 배송대행에서는 배송대행 양식(shipping-template.xlsx)을 내려받아 작성해주세요.',
+    );
+  }
 
   let headerRow = -1;
   const firstColumnHeaderKeys = HEADER_KEYS[0]!.map(normalizeHeader);

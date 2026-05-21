@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { detectKnownExcelTemplateKind } from '@/lib/excel-template-kind';
 import { normalizeProductMatchKey } from '@/lib/shipping-match';
 
 export type ParsedInboundInventoryItem = {
@@ -133,6 +134,12 @@ export async function parseInboundInventoryExcel(
 
   const ws = wb.worksheets[0];
   if (!ws) throw new Error('시트가 없습니다.');
+
+  if (detectKnownExcelTemplateKind(ws) === 'shipping') {
+    throw new Error(
+      '배송대행 양식이 업로드되었습니다. 입고리스트에서는 입고리스트 양식(inbound-template.xlsx)을 내려받아 작성해주세요.',
+    );
+  }
 
   const headerRow = ws.getRow(1);
   for (let i = 0; i < INBOUND_HEADERS.length; i += 1) {

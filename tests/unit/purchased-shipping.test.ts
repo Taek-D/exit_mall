@@ -19,6 +19,27 @@ async function workbookBuffer(rows: unknown[][]): Promise<Buffer> {
   return Buffer.from(buffer as ArrayBuffer);
 }
 
+async function shippingWorkbookBuffer(rows: unknown[][]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet1');
+  ws.addRows([
+    [
+      '고객주문번호',
+      '받는분성명',
+      '받는분전화번호',
+      '받는분주소(전체, 분할)',
+      '품목명',
+      '내품명',
+      '내품수량',
+      '배송메세지1',
+      '송장번호',
+    ],
+    ...rows,
+  ]);
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
+}
+
 describe('parseInboundInventoryExcel', () => {
   it('parses product name, option, and stock quantity from the inbound template', async () => {
     const parsed = await parseInboundInventoryExcel(
@@ -56,6 +77,26 @@ describe('parseInboundInventoryExcel', () => {
     await expect(parseInboundInventoryExcel(await workbookBuffer([]))).rejects.toThrow(
       /입고 품목/,
     );
+  });
+
+  it('explains when a shipping template is uploaded to inbound requests', async () => {
+    await expect(
+      parseInboundInventoryExcel(
+        await shippingWorkbookBuffer([
+          [
+            '20260518-001',
+            '홍길동',
+            '010-1234-5678',
+            '서울시 강남구 1',
+            '샴푸',
+            '500ml',
+            2,
+            '문 앞',
+            '',
+          ],
+        ]),
+      ),
+    ).rejects.toThrow(/배송대행 양식이 업로드되었습니다/);
   });
 
   it('rejects invalid stock quantities', async () => {
