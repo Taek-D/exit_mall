@@ -9,9 +9,18 @@ alter table public.purchased_inventory_lots
 alter table public.purchased_inventory_lots
   add column if not exists source_type text not null default 'inbound_request'
     check (source_type in ('inbound_request','admin_manual')),
-  add column if not exists admin_memo text check (length(admin_memo) <= 200),
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists updated_by uuid references public.profiles(id);
+
+alter table public.purchased_inventory_lots
+  drop constraint if exists purchased_inventory_lots_source_inbound_consistency_check;
+
+alter table public.purchased_inventory_lots
+  add constraint purchased_inventory_lots_source_inbound_consistency_check
+  check (
+    (source_type = 'admin_manual' and inbound_request_id is null)
+    or (source_type = 'inbound_request' and inbound_request_id is not null)
+  );
 
 create index if not exists purchased_inventory_lots_user_source_idx
   on public.purchased_inventory_lots (user_id, source_type, created_at desc, id);
@@ -87,7 +96,6 @@ begin
     initial_quantity,
     remaining_quantity,
     source_type,
-    admin_memo,
     updated_at,
     updated_by
   )
@@ -100,7 +108,6 @@ begin
     v_quantity,
     v_quantity,
     'admin_manual',
-    v_memo,
     now(),
     v_admin
   )
@@ -157,6 +164,7 @@ declare
   v_memo text := nullif(trim(coalesce(memo, '')), '');
   v_lot record;
   v_reserved int := 0;
+  v_before_memo text;
 begin
   if not public.is_admin() then raise exception 'FORBIDDEN'; end if;
 
@@ -174,6 +182,13 @@ begin
     for update;
 
   if v_lot is null then raise exception 'LOT_NOT_FOUND'; end if;
+
+  select pila.after_admin_memo
+    into v_before_memo
+    from public.purchased_inventory_lot_adjustments pila
+    where pila.lot_id = v_lot_id
+    order by pila.created_at desc, pila.id desc
+    limit 1;
 
   select coalesce(sum(psa.quantity), 0)::int
     into v_reserved
@@ -199,7 +214,6 @@ begin
     set product_name = v_product_name,
         option_name = v_option_name,
         remaining_quantity = v_remaining_quantity,
-        admin_memo = v_memo,
         updated_at = now(),
         updated_by = v_admin
     where pil.id = v_lot_id
@@ -226,7 +240,7 @@ begin
     v_lot.product_name,
     v_lot.option_name,
     v_lot.remaining_quantity,
-    v_lot.admin_memo,
+    v_before_memo,
     v_product_name,
     v_option_name,
     v_remaining_quantity,

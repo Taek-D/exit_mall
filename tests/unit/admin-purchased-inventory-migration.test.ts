@@ -47,6 +47,10 @@ describe('admin purchased inventory management migration', () => {
     expect(sql).toMatch(/alter\s+column\s+inbound_request_id\s+drop\s+not\s+null/i);
     expect(sql).toContain("source_type text not null default 'inbound_request'");
     expect(sql).toContain("source_type in ('inbound_request','admin_manual')");
+    expect(sql).not.toMatch(/add\s+column\s+if\s+not\s+exists\s+admin_memo/i);
+    expect(sql).toContain('purchased_inventory_lots_source_inbound_consistency_check');
+    expect(sql).toMatch(/source_type\s*=\s*'admin_manual'\s+and\s+inbound_request_id\s+is\s+null/i);
+    expect(sql).toMatch(/source_type\s*=\s*'inbound_request'\s+and\s+inbound_request_id\s+is\s+not\s+null/i);
   });
 
   it('adds an adjustment audit table with admin-only RLS', () => {
