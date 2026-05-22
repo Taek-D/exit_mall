@@ -10,6 +10,7 @@ type Props = {
   Icon?: LucideIcon;
   tone?: 'default' | 'warning' | 'danger';
   hint?: string;
+  secondaryHint?: string;
 };
 
 const TONE_ICON: Record<NonNullable<Props['tone']>, string> = {
@@ -18,7 +19,15 @@ const TONE_ICON: Record<NonNullable<Props['tone']>, string> = {
   danger: 'bg-destructive/10 text-destructive',
 };
 
-export function StatCard({ label, value, href, Icon, tone = 'default', hint }: Props) {
+export function StatCard({
+  label,
+  value,
+  href,
+  Icon,
+  tone = 'default',
+  hint,
+  secondaryHint,
+}: Props) {
   const content = (
     <div className="relative h-full rounded-lg border bg-card p-5 flex flex-col gap-3 transition-colors duration-150 ease-out-expo group-hover:border-foreground/30">
       <div className="flex items-center justify-between">
@@ -32,7 +41,12 @@ export function StatCard({ label, value, href, Icon, tone = 'default', hint }: P
         )}
       </div>
       <div className="font-mono tabular text-3xl font-semibold leading-none">{value}</div>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <div className="space-y-1">
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        {secondaryHint && (
+          <p className="text-xs font-medium text-warning">{secondaryHint}</p>
+        )}
+      </div>
       {href && (
         <ArrowUpRight
           className="absolute right-3 bottom-3 h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
