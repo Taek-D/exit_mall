@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   mergeUserOrders,
+  summarizePurchasedInventoryReservations,
   sumNonCancelledAmounts,
+  type AdminPurchasedInventoryLotRow,
   type AdminUserStockOrderInput,
   type AdminUserShippingUploadInput,
   type AdminUserLegacyOrderInput,
@@ -137,5 +139,46 @@ describe('sumNonCancelledAmounts', () => {
         { status: 'cancelled', total_amount: 2000 },
       ]),
     ).toBe(0);
+  });
+});
+
+describe('summarizePurchasedInventoryReservations', () => {
+  const lot: AdminPurchasedInventoryLotRow = {
+    id: 'lot-1',
+    product_name: 'Purchased item',
+    option_name: null,
+    initial_quantity: 10,
+    remaining_quantity: 7,
+    source_type: 'admin_manual',
+    created_at: '2026-05-20T10:00:00Z',
+    updated_at: '2026-05-20T10:00:00Z',
+  };
+
+  it('adds pending reservations and the latest non-empty admin memo', () => {
+    const rows = summarizePurchasedInventoryReservations(
+      [lot],
+      [{ lot_id: 'lot-1', quantity: 3 }],
+      [
+        { lot_id: 'lot-1', memo: 'older memo', created_at: '2026-05-20T11:00:00Z' },
+        { lot_id: 'lot-1', memo: 'latest memo', created_at: '2026-05-20T12:00:00Z' },
+      ],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: 'lot-1',
+      option_name: '',
+      reserved_quantity: 3,
+      admin_memo: 'latest memo',
+    });
+  });
+
+  it('sets admin_memo to null when no memo rows are supplied', () => {
+    const rows = summarizePurchasedInventoryReservations([lot], []);
+
+    expect(rows[0]).toMatchObject({
+      reserved_quantity: 0,
+      admin_memo: null,
+    });
   });
 });

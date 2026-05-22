@@ -48,6 +48,34 @@ export type AdminUserCustomInventoryRow = {
   updated_at: string;
 };
 
+export type AdminPurchasedInventoryLotRow = {
+  id: string;
+  product_name: string;
+  option_name: string | null;
+  initial_quantity: number;
+  remaining_quantity: number;
+  source_type: 'inbound_request' | 'admin_manual';
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminPurchasedInventoryReservationRow = {
+  lot_id: string;
+  quantity: number;
+};
+
+export type AdminPurchasedInventoryMemoRow = {
+  lot_id: string;
+  memo: string | null;
+  created_at: string;
+};
+
+export type AdminPurchasedInventoryRow = Omit<AdminPurchasedInventoryLotRow, 'option_name'> & {
+  option_name: string;
+  reserved_quantity: number;
+  admin_memo: string | null;
+};
+
 export type AdminUserDetail = {
   profile: AdminUserProfile;
   orders: AdminUserUnifiedOrder[];
@@ -55,6 +83,7 @@ export type AdminUserDetail = {
   transactions: AdminUserBalanceTx[];
   inventory: AdminUserInventoryRow[];
   customInventory: AdminUserCustomInventoryRow[];
+  purchasedInventory: AdminPurchasedInventoryRow[];
   products: AdminUserProductOption[];
   totalSpent: number;
 };
@@ -155,6 +184,46 @@ export function getInventoryProductName(row: AdminUserInventoryRow): string {
   return row.products?.name ?? '(이름 없음)';
 }
 
+export function summarizePurchasedInventoryReservations(
+  lots: AdminPurchasedInventoryLotRow[],
+  reservations: AdminPurchasedInventoryReservationRow[],
+  memoRows: AdminPurchasedInventoryMemoRow[] = [],
+): AdminPurchasedInventoryRow[] {
+  const reservedByLot = new Map<string, number>();
+  for (const reservation of reservations) {
+    reservedByLot.set(
+      reservation.lot_id,
+      (reservedByLot.get(reservation.lot_id) ?? 0) + Number(reservation.quantity ?? 0),
+    );
+  }
+
+  const latestMemoByLot = new Map<string, AdminPurchasedInventoryMemoRow>();
+  for (const row of memoRows) {
+    if (!row.memo?.trim()) continue;
+    const previous = latestMemoByLot.get(row.lot_id);
+    if (!previous || previous.created_at < row.created_at) {
+      latestMemoByLot.set(row.lot_id, row);
+    }
+  }
+
+  return lots.map((lot) => ({
+    ...lot,
+    option_name: lot.option_name ?? '',
+    reserved_quantity: reservedByLot.get(lot.id) ?? 0,
+    admin_memo: latestMemoByLot.get(lot.id)?.memo ?? null,
+  }));
+}
+
+type AdminPurchasedInventoryLotQueryRow = AdminPurchasedInventoryLotRow & {
+  inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
+};
+
+function getInboundRequestStatus(row: AdminPurchasedInventoryLotQueryRow): string | null {
+  const inbound = row.inbound_requests;
+  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
+  return inbound?.status ?? null;
+}
+
 export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDetail | null> {
   const supabase = createClient();
   const [
@@ -167,6 +236,8 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
     { data: inventory },
     { data: products },
     { data: customInventory },
+    { data: purchasedLots },
+    { data: pendingPurchasedUploads },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).single<AdminUserProfile>(),
     supabase
@@ -210,6 +281,18 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .select('id, name, quantity, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false }),
+    (supabase.from as any)('purchased_inventory_lots')
+      .select(
+        'id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, updated_at, inbound_requests(status)',
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('order_uploads')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .eq('upload_type', 'purchased'),
   ]);
 
   if (!profile) return null;
@@ -217,6 +300,51 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   const stockRows = (stockOrders ?? []) as unknown as AdminUserStockOrderInput[];
   const shippingRows = (shippingUploads ?? []) as unknown as AdminUserShippingUploadInput[];
   const legacyRows = (legacyOrders ?? []) as unknown as AdminUserLegacyOrderInput[];
+  const visiblePurchasedLots = ((purchasedLots ?? []) as AdminPurchasedInventoryLotQueryRow[])
+    .filter((row) => row.source_type === 'admin_manual' || getInboundRequestStatus(row) === 'completed')
+    .map<AdminPurchasedInventoryLotRow>((row) => ({
+      id: row.id,
+      product_name: row.product_name,
+      option_name: row.option_name,
+      initial_quantity: Number(row.initial_quantity),
+      remaining_quantity: Number(row.remaining_quantity),
+      source_type: row.source_type,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+
+  const pendingPurchasedUploadIds = ((pendingPurchasedUploads ?? []) as Array<{ id: string }>).map(
+    (row) => row.id,
+  );
+
+  let purchasedReservations: AdminPurchasedInventoryReservationRow[] = [];
+  if (pendingPurchasedUploadIds.length > 0) {
+    const { data } = await (supabase.from as any)('purchased_shipping_allocations')
+      .select('lot_id, quantity')
+      .eq('user_id', userId)
+      .in('upload_id', pendingPurchasedUploadIds);
+    purchasedReservations = (data ?? []) as AdminPurchasedInventoryReservationRow[];
+  }
+
+  let purchasedMemoRows: AdminPurchasedInventoryMemoRow[] = [];
+  const visiblePurchasedLotIds = visiblePurchasedLots.map((row) => row.id);
+  if (visiblePurchasedLotIds.length > 0) {
+    const { data } = await (supabase.from as any)('purchased_inventory_lot_adjustments')
+      .select('lot_id, after_admin_memo, created_at')
+      .eq('user_id', userId)
+      .in('lot_id', visiblePurchasedLotIds)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    purchasedMemoRows = ((data ?? []) as Array<{
+      lot_id: string;
+      after_admin_memo: string | null;
+      created_at: string;
+    }>).map((row) => ({
+      lot_id: row.lot_id,
+      memo: row.after_admin_memo,
+      created_at: row.created_at,
+    }));
+  }
 
   const merged = mergeUserOrders({
     stock: stockRows,
@@ -234,6 +362,11 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
     transactions: (transactions ?? []) as unknown as AdminUserBalanceTx[],
     inventory: (inventory ?? []) as unknown as AdminUserInventoryRow[],
     customInventory: (customInventory ?? []) as unknown as AdminUserCustomInventoryRow[],
+    purchasedInventory: summarizePurchasedInventoryReservations(
+      visiblePurchasedLots,
+      purchasedReservations,
+      purchasedMemoRows,
+    ),
     products: (products ?? []) as unknown as AdminUserProductOption[],
     totalSpent,
   };
