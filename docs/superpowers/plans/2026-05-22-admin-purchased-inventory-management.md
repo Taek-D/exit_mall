@@ -8,6 +8,8 @@
 
 **Tech Stack:** Next.js App Router, React client components, Supabase Postgres/RLS/RPC, TypeScript, Zod, Vitest.
 
+**Post-review adjustment:** `admin_memo` is not stored on owner-readable `purchased_inventory_lots`. Current admin memo state is derived from admin-only `purchased_inventory_lot_adjustments` rows.
+
 ---
 
 ## File Structure
@@ -107,7 +109,6 @@ alter table public.purchased_inventory_lots
 alter table public.purchased_inventory_lots
   add column if not exists source_type text not null default 'inbound_request'
     check (source_type in ('inbound_request','admin_manual')),
-  add column if not exists admin_memo text check (admin_memo is null or length(admin_memo) <= 200),
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists updated_by uuid references public.profiles(id);
 
@@ -174,7 +175,6 @@ begin
     initial_quantity,
     remaining_quantity,
     source_type,
-    admin_memo,
     updated_by
   )
   values (
@@ -186,7 +186,6 @@ begin
     quantity,
     quantity,
     'admin_manual',
-    nullif(trim(coalesce(memo, '')), ''),
     v_admin
   )
   returning id into v_lot_id;
@@ -258,7 +257,6 @@ begin
     set product_name = v_new_product,
         option_name = v_new_option,
         remaining_quantity = admin_update_purchased_inventory_lot.remaining_quantity,
-        admin_memo = nullif(trim(coalesce(memo, '')), ''),
         updated_at = now(),
         updated_by = v_admin
     where id = lot_id;
@@ -648,9 +646,14 @@ export type AdminPurchasedInventoryLotRow = {
   initial_quantity: number;
   remaining_quantity: number;
   source_type: 'inbound_request' | 'admin_manual';
-  admin_memo: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AdminPurchasedInventoryMemoRow = {
+  lot_id: string;
+  after_admin_memo: string | null;
+  created_at: string;
 };
 
 export type AdminPurchasedInventoryReservationRow = {
@@ -660,6 +663,7 @@ export type AdminPurchasedInventoryReservationRow = {
 
 export type AdminPurchasedInventoryRow = AdminPurchasedInventoryLotRow & {
   reserved_quantity: number;
+  admin_memo: string | null;
 };
 
 export function summarizePurchasedInventoryReservations(
@@ -693,7 +697,7 @@ In `fetchAdminUserDetail`, add two Promise entries:
 
 ```ts
 (supabase.from as any)('purchased_inventory_lots')
-  .select('id, product_name, option_name, initial_quantity, remaining_quantity, source_type, admin_memo, created_at, updated_at, inbound_requests(status)')
+  .select('id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, updated_at, inbound_requests(status)')
   .eq('user_id', userId)
   .or('source_type.eq.admin_manual,inbound_requests.status.eq.completed')
   .order('created_at', { ascending: false }),

@@ -33,7 +33,6 @@
 
 - `inbound_request_id`: nullable로 변경한다.
 - `source_type`: `inbound_request` 또는 `admin_manual`.
-- `admin_memo`: 관리자 수기 추가/수정 메모.
 - `updated_at`: 마지막 수정 시각.
 - `updated_by`: 마지막 수정 관리자.
 
@@ -43,10 +42,10 @@
 
 - `lot_id`, `user_id`, `admin_id`
 - 변경 전후 `product_name`, `option_name`, `remaining_quantity`
-- `memo`
+- 변경 전후 관리자 메모
 - `created_at`
 
-이력 테이블은 관리자만 조회하고 기록할 수 있게 RLS를 설정한다.
+관리자 메모는 owner-readable `purchased_inventory_lots`에 저장하지 않고 이력 테이블에만 저장한다. 이력 테이블은 관리자만 조회하고 기록할 수 있게 RLS를 설정한다.
 
 ## RPC
 

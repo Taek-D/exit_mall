@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -336,6 +336,7 @@ export type Database = {
           excel_storage_path: string
           id: string
           image_paths: string[]
+          inbound_items: Json
           last_comment_at: string | null
           last_comment_by_role: string | null
           reviewed_by: string | null
@@ -353,6 +354,7 @@ export type Database = {
           excel_storage_path: string
           id?: string
           image_paths?: string[]
+          inbound_items?: Json
           last_comment_at?: string | null
           last_comment_by_role?: string | null
           reviewed_by?: string | null
@@ -370,6 +372,7 @@ export type Database = {
           excel_storage_path?: string
           id?: string
           image_paths?: string[]
+          inbound_items?: Json
           last_comment_at?: string | null
           last_comment_by_role?: string | null
           reviewed_by?: string | null
@@ -879,38 +882,120 @@ export type Database = {
         }
         Relationships: []
       }
+      purchased_inventory_lot_adjustments: {
+        Row: {
+          action: string
+          after_admin_memo: string | null
+          after_option_name: string
+          after_product_name: string
+          after_remaining_quantity: number
+          before_admin_memo: string | null
+          before_option_name: string | null
+          before_product_name: string | null
+          before_remaining_quantity: number | null
+          created_at: string
+          created_by: string
+          id: string
+          lot_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          after_admin_memo?: string | null
+          after_option_name?: string
+          after_product_name: string
+          after_remaining_quantity: number
+          before_admin_memo?: string | null
+          before_option_name?: string | null
+          before_product_name?: string | null
+          before_remaining_quantity?: number | null
+          created_at?: string
+          created_by: string
+          id?: string
+          lot_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          after_admin_memo?: string | null
+          after_option_name?: string
+          after_product_name?: string
+          after_remaining_quantity?: number
+          before_admin_memo?: string | null
+          before_option_name?: string | null
+          before_product_name?: string | null
+          before_remaining_quantity?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          lot_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchased_inventory_lot_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_inventory_lot_adjustments_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "purchased_inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_inventory_lot_adjustments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchased_inventory_lots: {
         Row: {
           created_at: string
           id: string
-          inbound_request_id: string
+          inbound_request_id: string | null
           initial_quantity: number
           option_name: string
           product_name: string
           remaining_quantity: number
           row_number: number
+          source_type: string
+          updated_at: string
+          updated_by: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          inbound_request_id: string
+          inbound_request_id?: string | null
           initial_quantity: number
           option_name?: string
           product_name: string
           remaining_quantity: number
           row_number: number
+          source_type?: string
+          updated_at?: string
+          updated_by?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          inbound_request_id?: string
+          inbound_request_id?: string | null
           initial_quantity?: number
           option_name?: string
           product_name?: string
           remaining_quantity?: number
           row_number?: number
+          source_type?: string
+          updated_at?: string
+          updated_by?: string | null
           user_id?: string
         }
         Relationships: [
@@ -919,6 +1004,13 @@ export type Database = {
             columns: ["inbound_request_id"]
             isOneToOne: false
             referencedRelation: "inbound_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchased_inventory_lots_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1362,6 +1454,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_add_purchased_inventory_lot: {
+        Args: {
+          target_user: string
+          product_name: string
+          option_name: string
+          quantity: number
+          memo?: string
+        }
+        Returns: string
+      }
+      admin_update_purchased_inventory_lot: {
+        Args: {
+          target_user: string
+          lot_id: string
+          product_name: string
+          option_name: string
+          remaining_quantity: number
+          memo?: string
+        }
+        Returns: undefined
+      }
       apply_product_import: {
         Args: {
           rows: Json
@@ -1512,6 +1625,12 @@ export type Database = {
         Args: {
           items: Json
           shipping: Json
+        }
+        Returns: string
+      }
+      product_match_key: {
+        Args: {
+          value: string
         }
         Returns: string
       }
@@ -1762,3 +1881,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
