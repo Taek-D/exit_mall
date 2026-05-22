@@ -166,6 +166,15 @@ begin
     end if;
   end loop;
 
+  perform 1
+    from public.purchased_inventory_lots pil
+    where pil.id in (
+      select distinct (a->>'lot_id')::uuid
+      from jsonb_array_elements(p_allocations) a
+    )
+    order by pil.id
+    for update;
+
   for v_check in
     with item_map as (
       select (it->>'no')::int as item_no,
@@ -202,15 +211,6 @@ begin
         v_check.expected_product, v_check.expected_option;
     end if;
   end loop;
-
-  perform 1
-    from public.purchased_inventory_lots pil
-    where pil.id in (
-      select distinct (a->>'lot_id')::uuid
-      from jsonb_array_elements(p_allocations) a
-    )
-    order by pil.id
-    for update;
 
   for v_check in
     with requested as (

@@ -105,4 +105,15 @@ describe('admin purchased inventory management migration', () => {
     );
     expect(uploadBody).not.toMatch(/v_check\.inbound_status\s*<>\s*'completed'/i);
   });
+
+  it('locks allocated lots before validating item identity in purchased shipping', () => {
+    const sql = readMigrationSql();
+    const uploadBody = extractFunctionBody(sql, 'create_purchased_shipping_upload');
+    const lockIndex = uploadBody.indexOf('for update');
+    const identityIndex = uploadBody.indexOf('ALLOCATION_LOT_MISMATCH');
+
+    expect(lockIndex).toBeGreaterThan(-1);
+    expect(identityIndex).toBeGreaterThan(-1);
+    expect(lockIndex).toBeLessThan(identityIndex);
+  });
 });
