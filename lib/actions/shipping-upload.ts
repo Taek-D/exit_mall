@@ -180,6 +180,8 @@ type PurchasedLotRow = {
   option_name: string | null;
   remaining_quantity: number;
   created_at: string;
+  source_type: string;
+  inbound_requests: { status: string | null } | { status: string | null }[] | null;
 };
 
 type PurchasedAllocationRow = {
@@ -196,13 +198,19 @@ async function fetchPurchasedLotsForUpload(
   userId: string,
 ): Promise<PurchasedInventoryLot[]> {
   const { data: lotData, error: lotErr } = await (supabase.from as any)('purchased_inventory_lots')
-    .select('id, product_name, option_name, remaining_quantity, created_at, inbound_requests!inner(status)')
+    .select('id, product_name, option_name, remaining_quantity, created_at, source_type, inbound_requests(status)')
     .eq('user_id', userId)
-    .eq('inbound_requests.status', 'completed')
     .order('created_at', { ascending: true });
   if (lotErr) throw new Error(`사입재고 후보 조회에 실패했습니다: ${lotErr.message}`);
 
-  const lots = (lotData ?? []) as PurchasedLotRow[];
+  const lots = ((lotData ?? []) as PurchasedLotRow[]).filter((lot) => {
+    if (lot.source_type === 'admin_manual') return true;
+
+    const inboundRequest = Array.isArray(lot.inbound_requests)
+      ? lot.inbound_requests[0]
+      : lot.inbound_requests;
+    return lot.source_type === 'inbound_request' && inboundRequest?.status === 'completed';
+  });
   if (lots.length === 0) return [];
 
   const { data: pendingUploads, error: pendingErr } = await supabase

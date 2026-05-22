@@ -6,11 +6,20 @@ const migrationPath = join(
   process.cwd(),
   'supabase/migrations/20260522000001_admin_purchased_inventory_management.sql',
 );
+const shippingUploadActionPath = join(process.cwd(), 'lib/actions/shipping-upload.ts');
 
 function readMigrationSql() {
   expect(existsSync(migrationPath), `${migrationPath} should exist`).toBe(true);
 
   return readFileSync(migrationPath, 'utf8');
+}
+
+function readShippingUploadAction() {
+  expect(existsSync(shippingUploadActionPath), `${shippingUploadActionPath} should exist`).toBe(
+    true,
+  );
+
+  return readFileSync(shippingUploadActionPath, 'utf8');
 }
 
 function extractFunctionBody(sql: string, functionName: string) {
@@ -115,5 +124,16 @@ describe('admin purchased inventory management migration', () => {
     expect(lockIndex).toBeGreaterThan(-1);
     expect(identityIndex).toBeGreaterThan(-1);
     expect(lockIndex).toBeLessThan(identityIndex);
+  });
+
+  it('fetches manual lots and only completed inbound lots for purchased shipping allocation', () => {
+    const action = readShippingUploadAction();
+
+    expect(action).not.toContain('inbound_requests!inner(status)');
+    expect(action).toContain('source_type, inbound_requests(status)');
+    expect(action).toContain("lot.source_type === 'admin_manual'");
+    expect(action).toContain("lot.source_type === 'inbound_request'");
+    expect(action).toContain("inboundRequest?.status === 'completed'");
+    expect(action).not.toContain(".eq('inbound_requests.status', 'completed')");
   });
 });
