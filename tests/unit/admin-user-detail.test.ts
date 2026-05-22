@@ -154,7 +154,7 @@ describe('summarizePurchasedInventoryReservations', () => {
     updated_at: '2026-05-20T10:00:00Z',
   };
 
-  it('adds pending reservations and the latest non-empty admin memo', () => {
+  it('adds pending reservations and the latest admin memo', () => {
     const rows = summarizePurchasedInventoryReservations(
       [lot],
       [{ lot_id: 'lot-1', quantity: 3 }],
@@ -171,6 +171,28 @@ describe('summarizePurchasedInventoryReservations', () => {
       reserved_quantity: 3,
       admin_memo: 'latest memo',
     });
+  });
+
+  it('treats the latest blank or null memo as clearing the previous memo', () => {
+    const blankRows = summarizePurchasedInventoryReservations(
+      [lot],
+      [],
+      [
+        { lot_id: 'lot-1', memo: 'older memo', created_at: '2026-05-20T11:00:00Z' },
+        { lot_id: 'lot-1', memo: '   ', created_at: '2026-05-20T12:00:00Z' },
+      ],
+    );
+    const nullRows = summarizePurchasedInventoryReservations(
+      [lot],
+      [],
+      [
+        { lot_id: 'lot-1', memo: 'older memo', created_at: '2026-05-20T11:00:00Z' },
+        { lot_id: 'lot-1', memo: null, created_at: '2026-05-20T12:00:00Z' },
+      ],
+    );
+
+    expect(blankRows[0]?.admin_memo).toBeNull();
+    expect(nullRows[0]?.admin_memo).toBeNull();
   });
 
   it('sets admin_memo to null when no memo rows are supplied', () => {

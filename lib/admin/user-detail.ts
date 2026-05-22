@@ -199,7 +199,6 @@ export function summarizePurchasedInventoryReservations(
 
   const latestMemoByLot = new Map<string, AdminPurchasedInventoryMemoRow>();
   for (const row of memoRows) {
-    if (!row.memo?.trim()) continue;
     const previous = latestMemoByLot.get(row.lot_id);
     if (!previous || previous.created_at < row.created_at) {
       latestMemoByLot.set(row.lot_id, row);
@@ -210,7 +209,7 @@ export function summarizePurchasedInventoryReservations(
     ...lot,
     option_name: lot.option_name ?? '',
     reserved_quantity: reservedByLot.get(lot.id) ?? 0,
-    admin_memo: latestMemoByLot.get(lot.id)?.memo ?? null,
+    admin_memo: latestMemoByLot.get(lot.id)?.memo?.trim() || null,
   }));
 }
 
@@ -333,8 +332,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .select('lot_id, after_admin_memo, created_at')
       .eq('user_id', userId)
       .in('lot_id', visiblePurchasedLotIds)
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .order('created_at', { ascending: false });
     purchasedMemoRows = ((data ?? []) as Array<{
       lot_id: string;
       after_admin_memo: string | null;
