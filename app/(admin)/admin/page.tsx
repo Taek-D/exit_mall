@@ -9,7 +9,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { OrdersRealtime } from '@/components/OrdersRealtime';
+import { AdminDashboardRealtime } from '@/components/AdminDashboardRealtime';
 import { StatCard } from '@/components/StatCard';
 import {
   fetchAdminDashboardData,
@@ -51,7 +51,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <OrdersRealtime />
+      <AdminDashboardRealtime />
 
       <header className="flex flex-col gap-2 border-b pb-5">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">

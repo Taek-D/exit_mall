@@ -62,7 +62,9 @@ describe('admin dashboard work queues', () => {
     expect(inbound.tone).toBe('warning');
     expect(inbound.secondaryCount).toBe(2);
     expect(inbound.secondaryLabel).toBe('미확인 답변');
+    expect(inbound.href).toBe('/admin/inbound-requests');
     expect(support.tone).toBe('default');
+    expect(support.href).toBe('/admin/support-requests?status=open');
   });
 
   it('sums primary pending and unread attention counts separately', () => {

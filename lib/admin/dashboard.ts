@@ -118,7 +118,10 @@ export function buildWorkQueues(counts: AdminDashboardCounts): AdminWorkQueue[] 
       label: '입고리스트',
       description: '신규 입고요청 접수',
       count: counts.openInboundRequests,
-      href: '/admin/inbound-requests',
+      href:
+        counts.unreadInboundRequests > 0
+          ? '/admin/inbound-requests'
+          : '/admin/inbound-requests?status=open',
       tone: queueTone(counts.openInboundRequests, counts.unreadInboundRequests),
       icon: 'inbox',
       secondaryCount: counts.unreadInboundRequests,
@@ -129,7 +132,10 @@ export function buildWorkQueues(counts: AdminDashboardCounts): AdminWorkQueue[] 
       label: 'CS 문의',
       description: '교환/반품 및 고객 문의',
       count: counts.openSupportRequests,
-      href: '/admin/support-requests',
+      href:
+        counts.unreadSupportRequests > 0
+          ? '/admin/support-requests'
+          : '/admin/support-requests?status=open',
       tone: queueTone(counts.openSupportRequests, counts.unreadSupportRequests),
       icon: 'life-buoy',
       secondaryCount: counts.unreadSupportRequests,
