@@ -7,8 +7,10 @@ import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 import {
   allocatePurchasedInventoryFifo,
+  buildPurchasedLotsForUpload,
   detectPurchasedInventoryAmbiguities,
   type PurchasedInventoryLot,
+  type PurchasedLotForUploadRow,
   type PurchasedShippingDemand,
 } from '@/lib/purchased-shipping';
 
@@ -174,14 +176,6 @@ export async function requestShippingUploadAction(
   return { ok: true, uploadId: row.id };
 }
 
-type PurchasedLotRow = {
-  id: string;
-  product_name: string;
-  option_name: string | null;
-  remaining_quantity: number;
-  created_at: string;
-};
-
 type PurchasedAllocationRow = {
   lot_id: string;
   quantity: number;
@@ -196,14 +190,13 @@ async function fetchPurchasedLotsForUpload(
   userId: string,
 ): Promise<PurchasedInventoryLot[]> {
   const { data: lotData, error: lotErr } = await (supabase.from as any)('purchased_inventory_lots')
-    .select('id, product_name, option_name, remaining_quantity, created_at, inbound_requests!inner(status)')
+    .select('id, product_name, option_name, remaining_quantity, created_at, source_type, inbound_requests(status)')
     .eq('user_id', userId)
-    .eq('inbound_requests.status', 'completed')
     .order('created_at', { ascending: true });
   if (lotErr) throw new Error(`사입재고 후보 조회에 실패했습니다: ${lotErr.message}`);
 
-  const lots = (lotData ?? []) as PurchasedLotRow[];
-  if (lots.length === 0) return [];
+  const lotRows = (lotData ?? []) as PurchasedLotForUploadRow[];
+  if (lotRows.length === 0) return [];
 
   const { data: pendingUploads, error: pendingErr } = await supabase
     .from('order_uploads')
@@ -231,16 +224,7 @@ async function fetchPurchasedLotsForUpload(
     }
   }
 
-  return lots.map((lot) => ({
-    id: lot.id,
-    product_name: lot.product_name,
-    option_name: lot.option_name ?? '',
-    available_quantity: Math.max(
-      0,
-      Number(lot.remaining_quantity) - (reservedByLot.get(lot.id) ?? 0),
-    ),
-    created_at: lot.created_at,
-  }));
+  return buildPurchasedLotsForUpload(lotRows, reservedByLot);
 }
 
 export async function requestPurchasedShippingUploadAction(

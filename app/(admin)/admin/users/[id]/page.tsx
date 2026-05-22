@@ -27,6 +27,7 @@ import type {
 import { ArrowLeft, TrendingDown, TrendingUp, Boxes } from 'lucide-react';
 import { InventoryAdjuster } from './InventoryAdjuster';
 import { CustomInventoryManager } from './CustomInventoryManager';
+import { PurchasedInventoryManager } from './PurchasedInventoryManager';
 import { formatDateTimeKR } from '@/lib/dates';
 import {
   fetchAdminUserDetail,
@@ -59,6 +60,7 @@ export default async function AdminUserDetailPage({
     transactions,
     inventory,
     customInventory,
+    purchasedInventory,
     products,
     totalSpent,
   } = detail;
@@ -149,6 +151,7 @@ export default async function AdminUserDetailPage({
 
       <InventoryAdjuster userId={user.id} products={products} />
       <CustomInventoryManager userId={user.id} rows={customInventory} />
+      <PurchasedInventoryManager userId={user.id} rows={purchasedInventory} />
 
       <Tabs defaultValue="orders" className="space-y-3">
         <TabsList>
