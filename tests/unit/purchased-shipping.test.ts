@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ExcelJS from 'exceljs';
+import {
+  buildPurchasedLotsForUpload,
+  type PurchasedLotForUploadRow,
+} from '@/lib/actions/shipping-upload';
 import {
   allocatePurchasedInventoryFifo,
   detectPurchasedInventoryAmbiguities,
@@ -7,6 +11,17 @@ import {
   summarizePurchasedInventory,
   type PurchasedInventoryLot,
 } from '@/lib/purchased-shipping';
+
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}));
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+  })),
+}));
 
 async function workbookBuffer(rows: unknown[][]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
@@ -39,6 +54,96 @@ async function shippingWorkbookBuffer(rows: unknown[][]): Promise<Buffer> {
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer as ArrayBuffer);
 }
+
+describe('buildPurchasedLotsForUpload', () => {
+  const baseLot = {
+    product_name: 'Tobi Com',
+    option_name: '500ml',
+    remaining_quantity: 10,
+    created_at: '2026-05-01T00:00:00.000Z',
+  };
+
+  it('includes manual and completed inbound lots, excludes incomplete inbound lots, and subtracts reservations', () => {
+    const rows: PurchasedLotForUploadRow[] = [
+      {
+        ...baseLot,
+        id: 'manual',
+        source_type: 'admin_manual',
+        inbound_requests: null,
+      },
+      {
+        ...baseLot,
+        id: 'completed-object',
+        source_type: 'inbound_request',
+        inbound_requests: { status: 'completed' },
+      },
+      {
+        ...baseLot,
+        id: 'completed-array',
+        source_type: 'inbound_request',
+        inbound_requests: [{ status: 'completed' }],
+      },
+      {
+        ...baseLot,
+        id: 'open',
+        source_type: 'inbound_request',
+        inbound_requests: { status: 'open' },
+      },
+      {
+        ...baseLot,
+        id: 'in-progress',
+        source_type: 'inbound_request',
+        inbound_requests: [{ status: 'in_progress' }],
+      },
+      {
+        ...baseLot,
+        id: 'null-status',
+        source_type: 'inbound_request',
+        inbound_requests: { status: null },
+      },
+      {
+        ...baseLot,
+        id: 'missing-inbound',
+        source_type: 'inbound_request',
+        inbound_requests: null,
+      },
+    ];
+
+    const lots = buildPurchasedLotsForUpload(
+      rows,
+      new Map([
+        ['manual', 3],
+        ['completed-object', 50],
+        ['completed-array', 4],
+        ['open', 8],
+      ]),
+    );
+
+    expect(lots).toEqual([
+      {
+        id: 'manual',
+        product_name: 'Tobi Com',
+        option_name: '500ml',
+        available_quantity: 7,
+        created_at: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'completed-object',
+        product_name: 'Tobi Com',
+        option_name: '500ml',
+        available_quantity: 0,
+        created_at: '2026-05-01T00:00:00.000Z',
+      },
+      {
+        id: 'completed-array',
+        product_name: 'Tobi Com',
+        option_name: '500ml',
+        available_quantity: 6,
+        created_at: '2026-05-01T00:00:00.000Z',
+      },
+    ]);
+  });
+});
 
 describe('parseInboundInventoryExcel', () => {
   it('parses product name, option, and stock quantity from the inbound template', async () => {

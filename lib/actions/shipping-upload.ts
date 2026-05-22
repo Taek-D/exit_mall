@@ -174,7 +174,7 @@ export async function requestShippingUploadAction(
   return { ok: true, uploadId: row.id };
 }
 
-type PurchasedLotRow = {
+export type PurchasedLotForUploadRow = {
   id: string;
   product_name: string;
   option_name: string | null;
@@ -193,6 +193,31 @@ function purchasedUploadMatchKey(productName: string, optionName: string): strin
   return `${normalizeProductMatchKey(productName)}\u0000${normalizeProductMatchKey(optionName)}`;
 }
 
+export function buildPurchasedLotsForUpload(
+  lotRows: PurchasedLotForUploadRow[],
+  reservationsByLot: ReadonlyMap<string, number>,
+): PurchasedInventoryLot[] {
+  return lotRows
+    .filter((lot) => {
+      if (lot.source_type === 'admin_manual') return true;
+
+      const inboundRequest = Array.isArray(lot.inbound_requests)
+        ? lot.inbound_requests[0]
+        : lot.inbound_requests;
+      return lot.source_type === 'inbound_request' && inboundRequest?.status === 'completed';
+    })
+    .map((lot) => ({
+      id: lot.id,
+      product_name: lot.product_name,
+      option_name: lot.option_name ?? '',
+      available_quantity: Math.max(
+        0,
+        Number(lot.remaining_quantity) - (reservationsByLot.get(lot.id) ?? 0),
+      ),
+      created_at: lot.created_at,
+    }));
+}
+
 async function fetchPurchasedLotsForUpload(
   supabase: ReturnType<typeof createClient>,
   userId: string,
@@ -203,15 +228,8 @@ async function fetchPurchasedLotsForUpload(
     .order('created_at', { ascending: true });
   if (lotErr) throw new Error(`사입재고 후보 조회에 실패했습니다: ${lotErr.message}`);
 
-  const lots = ((lotData ?? []) as PurchasedLotRow[]).filter((lot) => {
-    if (lot.source_type === 'admin_manual') return true;
-
-    const inboundRequest = Array.isArray(lot.inbound_requests)
-      ? lot.inbound_requests[0]
-      : lot.inbound_requests;
-    return lot.source_type === 'inbound_request' && inboundRequest?.status === 'completed';
-  });
-  if (lots.length === 0) return [];
+  const lotRows = (lotData ?? []) as PurchasedLotForUploadRow[];
+  if (lotRows.length === 0) return [];
 
   const { data: pendingUploads, error: pendingErr } = await supabase
     .from('order_uploads')
@@ -239,16 +257,7 @@ async function fetchPurchasedLotsForUpload(
     }
   }
 
-  return lots.map((lot) => ({
-    id: lot.id,
-    product_name: lot.product_name,
-    option_name: lot.option_name ?? '',
-    available_quantity: Math.max(
-      0,
-      Number(lot.remaining_quantity) - (reservedByLot.get(lot.id) ?? 0),
-    ),
-    created_at: lot.created_at,
-  }));
+  return buildPurchasedLotsForUpload(lotRows, reservedByLot);
 }
 
 export async function requestPurchasedShippingUploadAction(
