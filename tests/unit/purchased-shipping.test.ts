@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import ExcelJS from 'exceljs';
 import {
-  buildPurchasedLotsForUpload,
-  type PurchasedLotForUploadRow,
-} from '@/lib/actions/shipping-upload';
-import {
   allocatePurchasedInventoryFifo,
+  buildPurchasedLotsForUpload,
   detectPurchasedInventoryAmbiguities,
   parseInboundInventoryExcel,
   summarizePurchasedInventory,
   type PurchasedInventoryLot,
+  type PurchasedLotForUploadRow,
 } from '@/lib/purchased-shipping';
 
 vi.mock('next/cache', () => ({

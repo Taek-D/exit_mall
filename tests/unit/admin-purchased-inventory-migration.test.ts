@@ -7,6 +7,7 @@ const migrationPath = join(
   'supabase/migrations/20260522000001_admin_purchased_inventory_management.sql',
 );
 const shippingUploadActionPath = join(process.cwd(), 'lib/actions/shipping-upload.ts');
+const purchasedShippingPath = join(process.cwd(), 'lib/purchased-shipping.ts');
 
 function readMigrationSql() {
   expect(existsSync(migrationPath), `${migrationPath} should exist`).toBe(true);
@@ -20,6 +21,12 @@ function readShippingUploadAction() {
   );
 
   return readFileSync(shippingUploadActionPath, 'utf8');
+}
+
+function readPurchasedShipping() {
+  expect(existsSync(purchasedShippingPath), `${purchasedShippingPath} should exist`).toBe(true);
+
+  return readFileSync(purchasedShippingPath, 'utf8');
 }
 
 function extractFunctionBody(sql: string, functionName: string) {
@@ -128,12 +135,13 @@ describe('admin purchased inventory management migration', () => {
 
   it('fetches manual lots and only completed inbound lots for purchased shipping allocation', () => {
     const action = readShippingUploadAction();
+    const purchasedShipping = readPurchasedShipping();
 
     expect(action).not.toContain('inbound_requests!inner(status)');
     expect(action).toContain('source_type, inbound_requests(status)');
-    expect(action).toContain("lot.source_type === 'admin_manual'");
-    expect(action).toContain("lot.source_type === 'inbound_request'");
-    expect(action).toContain("inboundRequest?.status === 'completed'");
+    expect(purchasedShipping).toContain("lot.source_type === 'admin_manual'");
+    expect(purchasedShipping).toContain("lot.source_type === 'inbound_request'");
+    expect(purchasedShipping).toContain("inboundRequest?.status === 'completed'");
     expect(action).not.toContain(".eq('inbound_requests.status', 'completed')");
   });
 });

@@ -21,10 +21,12 @@ vi.mock('@/lib/actions/_shared', async (importOriginal) => {
 
 import {
   addPurchasedInventoryLotAction,
-  parseAddPurchasedInventoryInput,
-  parseUpdatePurchasedInventoryInput,
   updatePurchasedInventoryLotAction,
 } from '@/lib/actions/admin-purchased-inventory';
+import {
+  parseAddPurchasedInventoryInput,
+  parseUpdatePurchasedInventoryInput,
+} from '@/lib/admin/purchased-inventory-input';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const lotId = '22222222-2222-4222-8222-222222222222';

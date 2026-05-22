@@ -7,8 +7,10 @@ import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 import {
   allocatePurchasedInventoryFifo,
+  buildPurchasedLotsForUpload,
   detectPurchasedInventoryAmbiguities,
   type PurchasedInventoryLot,
+  type PurchasedLotForUploadRow,
   type PurchasedShippingDemand,
 } from '@/lib/purchased-shipping';
 
@@ -174,16 +176,6 @@ export async function requestShippingUploadAction(
   return { ok: true, uploadId: row.id };
 }
 
-export type PurchasedLotForUploadRow = {
-  id: string;
-  product_name: string;
-  option_name: string | null;
-  remaining_quantity: number;
-  created_at: string;
-  source_type: string;
-  inbound_requests: { status: string | null } | { status: string | null }[] | null;
-};
-
 type PurchasedAllocationRow = {
   lot_id: string;
   quantity: number;
@@ -191,31 +183,6 @@ type PurchasedAllocationRow = {
 
 function purchasedUploadMatchKey(productName: string, optionName: string): string {
   return `${normalizeProductMatchKey(productName)}\u0000${normalizeProductMatchKey(optionName)}`;
-}
-
-export function buildPurchasedLotsForUpload(
-  lotRows: PurchasedLotForUploadRow[],
-  reservationsByLot: ReadonlyMap<string, number>,
-): PurchasedInventoryLot[] {
-  return lotRows
-    .filter((lot) => {
-      if (lot.source_type === 'admin_manual') return true;
-
-      const inboundRequest = Array.isArray(lot.inbound_requests)
-        ? lot.inbound_requests[0]
-        : lot.inbound_requests;
-      return lot.source_type === 'inbound_request' && inboundRequest?.status === 'completed';
-    })
-    .map((lot) => ({
-      id: lot.id,
-      product_name: lot.product_name,
-      option_name: lot.option_name ?? '',
-      available_quantity: Math.max(
-        0,
-        Number(lot.remaining_quantity) - (reservationsByLot.get(lot.id) ?? 0),
-      ),
-      created_at: lot.created_at,
-    }));
 }
 
 async function fetchPurchasedLotsForUpload(
