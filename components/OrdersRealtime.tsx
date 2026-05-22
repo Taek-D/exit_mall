@@ -1,8 +1,18 @@
 'use client';
+
 import { useEffect } from 'react';
-import { createClient } from '@/lib/supabase/browser';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/browser';
 import { useToast } from '@/hooks/use-toast';
+
+const DASHBOARD_TABLES = [
+  'stock_orders',
+  'order_uploads',
+  'profiles',
+  'deposit_requests',
+  'inbound_requests',
+  'support_requests',
+] as const;
 
 export function OrdersRealtime() {
   const router = useRouter();
@@ -10,31 +20,33 @@ export function OrdersRealtime() {
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel('admin-new-orders')
-      .on(
+    let channel = supabase.channel('admin-dashboard-events');
+
+    DASHBOARD_TABLES.forEach((table) => {
+      channel = channel.on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'stock_orders' },
-        () => {
-          toast({ title: '새 검토 요청', description: '주문관리에서 확인하세요.' });
+        { event: '*', schema: 'public', table },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            if (table === 'stock_orders') {
+              toast({
+                title: '구매 요청',
+                description: '구매 승인 대기 목록에 새 요청이 추가되었습니다.',
+              });
+            }
+            if (table === 'order_uploads') {
+              toast({
+                title: '배송대행 업로드',
+                description: '검토할 배송대행 업로드가 추가되었습니다.',
+              });
+            }
+          }
           router.refresh();
         },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'order_uploads' },
-        () => {
-          toast({ title: '새 엑시트몰 배송대행 업로드', description: '검토대기 항목이 추가됐습니다.' });
-          router.refresh();
-        },
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stock_orders' }, () => {
-        router.refresh();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'order_uploads' }, () => {
-        router.refresh();
-      })
-      .subscribe();
+      );
+    });
+
+    channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
