@@ -1,158 +1,162 @@
-import { createClient } from '@/lib/supabase/server';
 import Link from 'next/link';
-import { formatKRW } from '@/lib/money';
-import { type OrderStatus } from '@/lib/types';
-import { OrderStatusBadge } from '@/components/StatusBadge';
-import { OrdersRealtime } from '@/components/OrdersRealtime';
-import { StatCard } from '@/components/StatCard';
 import {
+  ArrowRight,
+  FileSpreadsheet,
+  Inbox,
+  LifeBuoy,
   ShoppingCart,
   UserCheck,
   Wallet,
-  AlertTriangle,
-  ArrowRight,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { OrdersRealtime } from '@/components/OrdersRealtime';
+import { StatCard } from '@/components/StatCard';
+import {
+  fetchAdminDashboardData,
+  type AdminDashboardIconKey,
+} from '@/lib/admin/dashboard';
+import { formatShortDateTimeKR } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
 
-type RecentOrder = {
-  id: string;
-  user_id: string;
-  total_amount: number;
-  status: string;
-  created_at: string;
+const ICONS: Record<AdminDashboardIconKey, LucideIcon> = {
+  'user-check': UserCheck,
+  wallet: Wallet,
+  'shopping-cart': ShoppingCart,
+  'file-spreadsheet': FileSpreadsheet,
+  inbox: Inbox,
+  'life-buoy': LifeBuoy,
 };
-type BalanceRow = { deposit_balance: number; low_balance_threshold: number };
+
+const QUICK_LINKS = [
+  { href: '/admin/approvals', label: '가입 승인', Icon: UserCheck },
+  { href: '/admin/deposits', label: '입금 확인', Icon: Wallet },
+  { href: '/admin/orders?status=pending', label: '구매 승인', Icon: ShoppingCart },
+  {
+    href: '/admin/shipping-uploads/exitmall?status=pending',
+    label: '엑시트몰 배송대행',
+    Icon: FileSpreadsheet,
+  },
+  {
+    href: '/admin/shipping-uploads/purchased?status=pending',
+    label: '사입재고 배송대행',
+    Icon: FileSpreadsheet,
+  },
+  { href: '/admin/inbound-requests?status=open', label: '입고리스트', Icon: Inbox },
+  { href: '/admin/support-requests?status=open', label: 'CS 문의', Icon: LifeBuoy },
+];
 
 export default async function AdminDashboard() {
-  const supabase = createClient();
-  const [
-    { count: newOrders },
-    { count: pendingApprovals },
-    { count: pendingDeposits },
-    { data: recentOrders },
-    { data: lbUsers },
-  ] = await Promise.all([
-    supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'placed'),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('deposit_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase
-      .from('orders')
-      .select('id,user_id,total_amount,status,created_at')
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase
-      .from('profiles')
-      .select('deposit_balance,low_balance_threshold')
-      .eq('role', 'user')
-      .eq('status', 'active'),
-  ]);
-
-  const lbList = (lbUsers ?? []) as unknown as BalanceRow[];
-  const lowBalanceCount = lbList.filter(
-    (p) => Number(p.deposit_balance) <= Number(p.low_balance_threshold),
-  ).length;
-  const recent = (recentOrders ?? []) as unknown as RecentOrder[];
+  const dashboard = await fetchAdminDashboardData();
 
   return (
     <div className="space-y-6">
       <OrdersRealtime />
 
-      <section aria-label="핵심 지표" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="신규 주문"
-          value={newOrders ?? 0}
-          href="/admin/orders?status=placed"
-          Icon={ShoppingCart}
-          hint="접수 대기 중"
-        />
-        <StatCard
-          label="승인 대기"
-          value={pendingApprovals ?? 0}
-          href="/admin/approvals"
-          Icon={UserCheck}
-          tone={(pendingApprovals ?? 0) > 0 ? 'warning' : 'default'}
-          hint="신규 가입 신청"
-        />
-        <StatCard
-          label="입금 확인"
-          value={pendingDeposits ?? 0}
-          href="/admin/deposits"
-          Icon={Wallet}
-          tone={(pendingDeposits ?? 0) > 0 ? 'warning' : 'default'}
-          hint="이체 요청"
-        />
-        <StatCard
-          label="잔액 부족 고객"
-          value={lowBalanceCount}
-          href="/admin/low-balance"
-          Icon={AlertTriangle}
-          tone={lowBalanceCount > 0 ? 'danger' : 'default'}
-          hint="임계치 이하"
-        />
+      <header className="flex flex-col gap-2 border-b pb-5">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          관리자 대시보드
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          대기 업무 {dashboard.totalPendingCount.toLocaleString('ko-KR')}건
+          {dashboard.unreadAttentionCount > 0 && (
+            <>
+              {' · '}
+              미확인 답변 {dashboard.unreadAttentionCount.toLocaleString('ko-KR')}건
+            </>
+          )}
+        </p>
+      </header>
+
+      <section aria-label="오늘 처리할 일" className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-heading text-base font-semibold">오늘 처리할 일</h2>
+          <span className="text-xs text-muted-foreground">현재 대기 총량 기준</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {dashboard.workQueues.map((queue) => {
+            const Icon = ICONS[queue.icon];
+            const secondaryHint =
+              queue.secondaryCount && queue.secondaryCount > 0
+                ? `${queue.secondaryLabel} ${queue.secondaryCount.toLocaleString('ko-KR')}건`
+                : undefined;
+            return (
+              <StatCard
+                key={queue.key}
+                label={queue.label}
+                value={queue.count}
+                href={queue.href}
+                Icon={Icon}
+                tone={queue.tone}
+                hint={queue.description}
+                secondaryHint={secondaryHint}
+              />
+            );
+          })}
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2 rounded-lg border bg-card">
-          <header className="flex items-center justify-between px-5 h-14 border-b">
+          <header className="flex h-14 items-center justify-between border-b px-5">
             <div className="flex items-center gap-2.5">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-60 animate-pulse-dot" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+                <span className="absolute inline-flex h-full w-full animate-pulse-dot rounded-full bg-accent opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
               </span>
-              <h2 className="font-heading font-semibold text-[15px]">실시간 주문</h2>
-              <span className="text-[11px] text-muted-foreground">최근 10건</span>
+              <h2 className="font-heading text-[15px] font-semibold">최근 업무 이벤트</h2>
+              <span className="text-[11px] text-muted-foreground">최근 15건</span>
             </div>
-            <Link
-              href="/admin/orders"
-              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-            >
-              전체 보기 <ArrowRight className="h-3 w-3" aria-hidden />
-            </Link>
           </header>
-          {recent.length === 0 ? (
+
+          {dashboard.recentActivities.length === 0 ? (
             <div className="p-10 text-center text-sm text-muted-foreground">
-              아직 주문이 없습니다.
+              최근 업무 이벤트가 없습니다.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-surface-muted">
                   <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="font-medium px-5 h-10">주문 번호</th>
-                    <th className="font-medium px-3">고객</th>
-                    <th className="font-medium px-3 text-right">금액</th>
-                    <th className="font-medium px-3">상태</th>
-                    <th className="font-medium px-3">시간</th>
+                    <th className="h-10 px-5 font-medium">업무</th>
+                    <th className="px-3 font-medium">내용</th>
+                    <th className="px-3 font-medium">고객</th>
+                    <th className="px-3 font-medium">상태</th>
+                    <th className="px-3 font-medium">시간</th>
+                    <th className="w-8 px-3" aria-label="이동" />
                   </tr>
                 </thead>
                 <tbody>
-                  {recent.map((o) => (
-                    <tr key={o.id} className="border-t h-11 hover:bg-surface-muted/50 transition-colors">
-                      <td className="px-5">
-                        <Link
-                          href={`/admin/orders/${o.id}`}
-                          className="font-mono text-xs text-accent hover:underline"
-                        >
-                          {o.id.slice(0, 8)}
+                  {dashboard.recentActivities.map((activity) => (
+                    <tr
+                      key={activity.id}
+                      className="h-11 border-t transition-colors hover:bg-surface-muted/60"
+                    >
+                      <td className="whitespace-nowrap px-5 text-xs font-medium">
+                        {activity.type}
+                      </td>
+                      <td className="max-w-[260px] truncate px-3">
+                        <Link href={activity.href} className="hover:underline">
+                          {activity.title}
                         </Link>
                       </td>
-                      <td className="px-3 font-mono text-xs text-muted-foreground">
-                        {o.user_id.slice(0, 8)}
+                      <td className="whitespace-nowrap px-3 text-muted-foreground">
+                        {activity.customerName ?? '-'}
                       </td>
-                      <td className="px-3 text-right font-mono tabular text-sm">
-                        {formatKRW(Number(o.total_amount))}
+                      <td className="whitespace-nowrap px-3 text-muted-foreground">
+                        {activity.statusLabel}
                       </td>
-                      <td className="px-3">
-                        <OrderStatusBadge status={o.status as OrderStatus} />
+                      <td className="whitespace-nowrap px-3 text-xs text-muted-foreground">
+                        {formatShortDateTimeKR(activity.occurredAt)}
                       </td>
-                      <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(o.created_at).toLocaleString('ko-KR', {
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <td className="px-3 text-right">
+                        <Link
+                          href={activity.href}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          aria-label="상세 보기"
+                        >
+                          <ArrowRight className="h-4 w-4" aria-hidden />
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -163,27 +167,22 @@ export default async function AdminDashboard() {
         </div>
 
         <aside className="rounded-lg border bg-card">
-          <header className="flex items-center justify-between px-5 h-14 border-b">
-            <h2 className="font-heading font-semibold text-[15px]">바로가기</h2>
+          <header className="flex h-14 items-center justify-between border-b px-5">
+            <h2 className="font-heading text-[15px] font-semibold">빠른 이동</h2>
           </header>
           <ul className="p-2">
-            {[
-              { href: '/admin/approvals', label: '가입 승인', Icon: UserCheck },
-              { href: '/admin/deposits', label: '입금 확인', Icon: Wallet },
-              { href: '/admin/orders', label: '주문 관리', Icon: ShoppingCart },
-              { href: '/admin/low-balance', label: '잔액 부족', Icon: AlertTriangle },
-            ].map(({ href, label, Icon }) => (
+            {QUICK_LINKS.map(({ href, label, Icon }) => (
               <li key={href}>
                 <Link
                   href={href}
-                  className="flex items-center justify-between gap-3 px-3 h-11 rounded-md hover:bg-muted transition-colors group"
+                  className="group flex h-11 items-center justify-between gap-3 rounded-md px-3 transition-colors hover:bg-muted"
                 >
                   <span className="flex items-center gap-2.5 text-sm">
                     <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
                     {label}
                   </span>
                   <ArrowRight
-                    className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
                     aria-hidden
                   />
                 </Link>
