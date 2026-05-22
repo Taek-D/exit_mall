@@ -48,6 +48,10 @@ function revalidatePurchasedInventory(userId: string) {
   revalidatePaths([`/admin/users/${userId}`, '/shipping-uploads/purchased']);
 }
 
+function blankToNull(value: string) {
+  return value === '' ? null : value;
+}
+
 export async function addPurchasedInventoryLotAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
@@ -60,9 +64,9 @@ export async function addPurchasedInventoryLotAction(
   const { data, error } = await callRpc(guard.supabase, 'admin_add_purchased_inventory_lot', {
     target_user: parsed.data.userId,
     product_name: parsed.data.productName,
-    option_name: parsed.data.optionName,
+    option_name: blankToNull(parsed.data.optionName),
     quantity: parsed.data.quantity,
-    memo: parsed.data.memo || null,
+    memo: blankToNull(parsed.data.memo),
   });
   if (error) {
     console.error('[admin-purchased-inventory] add', error);
@@ -86,9 +90,9 @@ export async function updatePurchasedInventoryLotAction(
     target_user: parsed.data.userId,
     lot_id: parsed.data.lotId,
     product_name: parsed.data.productName,
-    option_name: parsed.data.optionName,
+    option_name: blankToNull(parsed.data.optionName),
     remaining_quantity: parsed.data.remainingQuantity,
-    memo: parsed.data.memo || null,
+    memo: blankToNull(parsed.data.memo),
   });
   if (error) {
     console.error('[admin-purchased-inventory] update', error);
