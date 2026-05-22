@@ -223,7 +223,6 @@ type InboundActivityRow = {
   id: string;
   title: string;
   status: InboundStatus;
-  last_comment_at: string | null;
   updated_at: string;
   created_at: string;
   profiles: { name: string | null } | null;
@@ -233,7 +232,6 @@ type SupportActivityRow = {
   id: string;
   title: string;
   status: SupportStatus;
-  last_comment_at: string | null;
   updated_at: string;
   created_at: string;
   profiles: { name: string | null } | null;
@@ -340,7 +338,7 @@ function inboundActivities(rows: InboundActivityRow[]): RawDashboardActivity[] {
     title: row.title,
     customerName: displayName(row.profiles?.name),
     statusLabel: INBOUND_STATUS_LABEL[row.status] ?? row.status,
-    occurredAt: occurredAt(row.last_comment_at, row.updated_at, row.created_at),
+    occurredAt: occurredAt(row.updated_at, row.created_at),
     href: `/admin/inbound-requests/${row.id}`,
   }));
 }
@@ -352,7 +350,7 @@ function supportActivities(rows: SupportActivityRow[]): RawDashboardActivity[] {
     title: row.title,
     customerName: displayName(row.profiles?.name),
     statusLabel: SUPPORT_STATUS_LABEL[row.status] ?? row.status,
-    occurredAt: occurredAt(row.last_comment_at, row.updated_at, row.created_at),
+    occurredAt: occurredAt(row.updated_at, row.created_at),
     href: `/admin/support-requests/${row.id}`,
   }));
 }
@@ -476,7 +474,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       'recent inbound requests',
       supabase
         .from('inbound_requests')
-        .select('id,title,status,last_comment_at,updated_at,created_at,profiles!inbound_requests_user_id_fkey(name)')
+        .select('id,title,status,updated_at,created_at,profiles!inbound_requests_user_id_fkey(name)')
         .order('updated_at', { ascending: false })
         .limit(15),
     ),
@@ -484,7 +482,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       'recent support requests',
       supabase
         .from('support_requests')
-        .select('id,title,status,last_comment_at,updated_at,created_at,profiles!support_requests_user_id_fkey(name)')
+        .select('id,title,status,updated_at,created_at,profiles!support_requests_user_id_fkey(name)')
         .order('updated_at', { ascending: false })
         .limit(15),
     ),
