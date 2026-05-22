@@ -56,6 +56,257 @@ create policy purchased_inventory_lot_adjustments_admin_all
 
 grant select on public.purchased_inventory_lot_adjustments to authenticated;
 
+create or replace function public.create_purchased_shipping_upload(
+  p_storage_path text,
+  p_original_name text,
+  p_contact_person text,
+  p_buyer_phone text,
+  p_request_memo text,
+  p_items jsonb,
+  p_total_quantity int,
+  p_shipping_fee_total bigint,
+  p_allocations jsonb
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_upload_id uuid;
+  v_status text;
+  v_expected_fee bigint;
+  v_alloc jsonb;
+  v_check record;
+begin
+  if v_uid is null then raise exception 'UNAUTHENTICATED'; end if;
+  select status into v_status from public.profiles where id = v_uid;
+  if v_status is null then raise exception 'UNAUTHENTICATED'; end if;
+  if v_status <> 'active' then raise exception 'INACTIVE'; end if;
+
+  if p_storage_path is null or length(trim(p_storage_path)) = 0 then
+    raise exception 'MISSING_STORAGE_PATH';
+  end if;
+  if p_storage_path not like (v_uid::text || '/%') then
+    raise exception 'FORBIDDEN_STORAGE_PATH';
+  end if;
+  if p_original_name is null or length(trim(p_original_name)) = 0 then
+    raise exception 'MISSING_ORIGINAL_NAME';
+  end if;
+
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'EMPTY_ITEMS';
+  end if;
+  if p_allocations is null or jsonb_typeof(p_allocations) <> 'array' or jsonb_array_length(p_allocations) = 0 then
+    raise exception 'EMPTY_ALLOCATIONS';
+  end if;
+
+  v_expected_fee := jsonb_array_length(p_items)::bigint * 3300;
+  if p_shipping_fee_total <> v_expected_fee then
+    raise exception 'INVALID_FEE:%:%', p_shipping_fee_total, v_expected_fee;
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_items) it
+    where coalesce((it->>'quantity')::int, 0) < 1
+       or coalesce((it->>'no')::int, 0) < 1
+  ) then
+    raise exception 'INVALID_QUANTITY';
+  end if;
+
+  if (
+    select count(*) from jsonb_array_elements(p_items)
+  ) <> (
+    select count(distinct (it->>'no')::int) from jsonb_array_elements(p_items) it
+  ) then
+    raise exception 'DUPLICATE_ITEM_NO';
+  end if;
+
+  if p_total_quantity <> coalesce(
+    (select sum((it->>'quantity')::int)::int
+     from jsonb_array_elements(p_items) it),
+    0
+  ) then
+    raise exception 'INVALID_TOTAL_QUANTITY:%:%',
+      p_total_quantity,
+      coalesce(
+        (select sum((it->>'quantity')::int)::int
+         from jsonb_array_elements(p_items) it),
+        0
+      );
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_allocations) a
+    where coalesce((a->>'quantity')::int, 0) < 1
+       or coalesce((a->>'item_no')::int, 0) < 1
+       or nullif(a->>'lot_id', '') is null
+  ) then
+    raise exception 'INVALID_ALLOCATION';
+  end if;
+
+  for v_check in
+    with items as (
+      select (it->>'no')::int as item_no,
+             coalesce((it->>'quantity')::int, 0) as item_qty
+      from jsonb_array_elements(p_items) it
+    ),
+    allocs as (
+      select (a->>'item_no')::int as item_no,
+             sum((a->>'quantity')::int)::int as alloc_qty
+      from jsonb_array_elements(p_allocations) a
+      group by (a->>'item_no')::int
+    )
+    select i.item_no, i.item_qty, coalesce(a.alloc_qty, 0) as alloc_qty
+    from items i
+    left join allocs a on a.item_no = i.item_no
+  loop
+    if v_check.item_qty <> v_check.alloc_qty then
+      raise exception 'ALLOCATION_MISMATCH:%:%:%',
+        v_check.item_no, v_check.item_qty, v_check.alloc_qty;
+    end if;
+  end loop;
+
+  for v_check in
+    with item_map as (
+      select (it->>'no')::int as item_no,
+             coalesce(it->>'product_code', '') as expected_product,
+             coalesce(it->>'product_name', '') as expected_option
+      from jsonb_array_elements(p_items) it
+    ),
+    alloc_lots as (
+      select distinct
+             (a->>'item_no')::int as item_no,
+             (a->>'lot_id')::uuid as lot_id
+      from jsonb_array_elements(p_allocations) a
+    )
+    select al.item_no,
+           al.lot_id,
+           im.expected_product,
+           im.expected_option,
+           pil.product_name as lot_product,
+           pil.option_name as lot_option
+    from alloc_lots al
+    left join item_map im on im.item_no = al.item_no
+    left join public.purchased_inventory_lots pil on pil.id = al.lot_id
+  loop
+    if v_check.expected_product is null then
+      raise exception 'ALLOCATION_ITEM_NOT_FOUND:%', v_check.item_no;
+    end if;
+    if v_check.lot_product is null then
+      raise exception 'PURCHASED_LOT_NOT_FOUND:%', v_check.lot_id;
+    end if;
+    if v_check.lot_product <> v_check.expected_product
+       or coalesce(v_check.lot_option, '') <> coalesce(v_check.expected_option, '') then
+      raise exception 'ALLOCATION_LOT_MISMATCH:%:%:%/%',
+        v_check.item_no, v_check.lot_id,
+        v_check.expected_product, v_check.expected_option;
+    end if;
+  end loop;
+
+  perform 1
+    from public.purchased_inventory_lots pil
+    where pil.id in (
+      select distinct (a->>'lot_id')::uuid
+      from jsonb_array_elements(p_allocations) a
+    )
+    order by pil.id
+    for update;
+
+  for v_check in
+    with requested as (
+      select (a->>'lot_id')::uuid as lot_id,
+             sum((a->>'quantity')::int)::int as quantity
+      from jsonb_array_elements(p_allocations) a
+      group by (a->>'lot_id')::uuid
+    ),
+    pending as (
+      select psa.lot_id, sum(psa.quantity)::int as quantity
+      from public.purchased_shipping_allocations psa
+      join public.order_uploads ou on ou.id = psa.upload_id
+      where ou.upload_type = 'purchased'
+        and ou.status = 'pending'
+      group by psa.lot_id
+    )
+    select r.lot_id,
+           r.quantity as requested,
+           pil.remaining_quantity,
+           coalesce(p.quantity, 0) as reserved,
+           pil.source_type,
+           pil.inbound_request_id,
+           ir.status as inbound_status,
+           pil.user_id
+    from requested r
+    left join public.purchased_inventory_lots pil on pil.id = r.lot_id
+    left join public.inbound_requests ir on ir.id = pil.inbound_request_id
+    left join pending p on p.lot_id = r.lot_id
+  loop
+    if v_check.user_id is null then raise exception 'PURCHASED_LOT_NOT_FOUND:%', v_check.lot_id; end if;
+    if v_check.user_id <> v_uid then raise exception 'PURCHASED_LOT_FORBIDDEN:%', v_check.lot_id; end if;
+    if not (
+      (v_check.source_type = 'admin_manual' and v_check.inbound_request_id is null)
+      or (v_check.source_type = 'inbound_request' and v_check.inbound_status = 'completed')
+    ) then
+      raise exception 'PURCHASED_LOT_NOT_COMPLETED:%', v_check.lot_id;
+    end if;
+    if v_check.remaining_quantity - v_check.reserved < v_check.requested then
+      raise exception 'INSUFFICIENT_PURCHASED_INVENTORY:%:%:%',
+        v_check.lot_id, v_check.requested, v_check.remaining_quantity - v_check.reserved;
+    end if;
+  end loop;
+
+  insert into public.order_uploads (
+    user_id,
+    upload_type,
+    storage_path,
+    original_name,
+    contact_person,
+    buyer_phone,
+    request_memo,
+    items,
+    total_quantity,
+    total_amount,
+    shipping_fee_total,
+    status
+  )
+  values (
+    v_uid,
+    'purchased',
+    p_storage_path,
+    p_original_name,
+    p_contact_person,
+    p_buyer_phone,
+    p_request_memo,
+    p_items,
+    p_total_quantity,
+    0,
+    p_shipping_fee_total,
+    'pending'
+  )
+  returning id into v_upload_id;
+
+  for v_alloc in select * from jsonb_array_elements(p_allocations) loop
+    insert into public.purchased_shipping_allocations
+      (upload_id, user_id, lot_id, item_no, quantity)
+    values
+      (
+        v_upload_id,
+        v_uid,
+        (v_alloc->>'lot_id')::uuid,
+        (v_alloc->>'item_no')::int,
+        (v_alloc->>'quantity')::int
+      );
+  end loop;
+
+  return v_upload_id;
+end; $$;
+
+revoke execute on function public.create_purchased_shipping_upload(
+  text, text, text, text, text, jsonb, int, bigint, jsonb
+) from public, anon;
+grant execute on function public.create_purchased_shipping_upload(
+  text, text, text, text, text, jsonb, int, bigint, jsonb
+) to authenticated;
+
 create or replace function public.admin_add_purchased_inventory_lot(
   target_user uuid,
   product_name text,

@@ -90,4 +90,19 @@ describe('admin purchased inventory management migration', () => {
     expect(sql).toContain("ou.status = 'pending'");
     expect(sql).toContain("ou.upload_type = 'purchased'");
   });
+
+  it('allows admin manual lots while preserving completed inbound validation for purchased shipping', () => {
+    const sql = readMigrationSql();
+    const uploadBody = extractFunctionBody(sql, 'create_purchased_shipping_upload');
+
+    expect(uploadBody).toContain('pil.source_type');
+    expect(uploadBody).toContain('pil.inbound_request_id');
+    expect(uploadBody).toMatch(
+      /source_type\s*=\s*'admin_manual'\s+and\s+v_check\.inbound_request_id\s+is\s+null/i,
+    );
+    expect(uploadBody).toMatch(
+      /source_type\s*=\s*'inbound_request'\s+and\s+v_check\.inbound_status\s*=\s*'completed'/i,
+    );
+    expect(uploadBody).not.toMatch(/v_check\.inbound_status\s*<>\s*'completed'/i);
+  });
 });
