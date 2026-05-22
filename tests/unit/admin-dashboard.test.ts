@@ -35,8 +35,8 @@ describe('admin dashboard work queues', () => {
       '/admin/orders?status=pending',
       '/admin/shipping-uploads/exitmall?status=pending',
       '/admin/shipping-uploads/purchased?status=pending',
-      '/admin/inbound-requests?status=open',
-      '/admin/support-requests?status=open',
+      '/admin/inbound-requests',
+      '/admin/support-requests',
     ]);
   });
 

@@ -118,7 +118,7 @@ export function buildWorkQueues(counts: AdminDashboardCounts): AdminWorkQueue[] 
       label: '입고리스트',
       description: '신규 입고요청 접수',
       count: counts.openInboundRequests,
-      href: '/admin/inbound-requests?status=open',
+      href: '/admin/inbound-requests',
       tone: queueTone(counts.openInboundRequests, counts.unreadInboundRequests),
       icon: 'inbox',
       secondaryCount: counts.unreadInboundRequests,
@@ -129,7 +129,7 @@ export function buildWorkQueues(counts: AdminDashboardCounts): AdminWorkQueue[] 
       label: 'CS 문의',
       description: '교환/반품 및 고객 문의',
       count: counts.openSupportRequests,
-      href: '/admin/support-requests?status=open',
+      href: '/admin/support-requests',
       tone: queueTone(counts.openSupportRequests, counts.unreadSupportRequests),
       icon: 'life-buoy',
       secondaryCount: counts.unreadSupportRequests,
@@ -434,7 +434,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         .select('id,name,email,status,created_at')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(15),
     ),
     safeRows<DepositActivityRow>(
       'recent pending deposits',
@@ -445,7 +445,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         )
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(15),
     ),
     safeRows<StockOrderActivityRow>(
       'recent stock orders',
@@ -453,7 +453,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         .from('stock_orders')
         .select('id,status,total_amount,created_at,profiles!stock_orders_user_id_fkey(name)')
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(15),
     ),
     safeRows<UploadActivityRow>(
       'recent shipping uploads',
@@ -464,7 +464,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         )
         .in('upload_type', ['exitmall', 'purchased'])
         .order('created_at', { ascending: false })
-        .limit(10),
+        .limit(15),
     ),
     safeRows<InboundActivityRow>(
       'recent inbound requests',
@@ -472,7 +472,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         .from('inbound_requests')
         .select('id,title,status,last_comment_at,updated_at,created_at,profiles!inbound_requests_user_id_fkey(name)')
         .order('updated_at', { ascending: false })
-        .limit(5),
+        .limit(15),
     ),
     safeRows<SupportActivityRow>(
       'recent support requests',
@@ -480,7 +480,7 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
         .from('support_requests')
         .select('id,title,status,last_comment_at,updated_at,created_at,profiles!support_requests_user_id_fkey(name)')
         .order('updated_at', { ascending: false })
-        .limit(5),
+        .limit(15),
     ),
   ]);
 
