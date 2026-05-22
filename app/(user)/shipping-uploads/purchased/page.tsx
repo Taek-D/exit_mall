@@ -17,12 +17,31 @@ import { Boxes, Download, FileSpreadsheet, Inbox } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
+type PurchasedInventorySummaryQueryLot = PurchasedInventorySummaryLot & {
+  source_type: 'inbound_request' | 'admin_manual';
+  inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
+};
+
+function getInboundRequestStatus(row: PurchasedInventorySummaryQueryLot): string | null {
+  const inbound = row.inbound_requests;
+  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
+  return inbound?.status ?? null;
+}
+
+function isVisiblePurchasedInventoryLot(row: PurchasedInventorySummaryQueryLot): boolean {
+  return (
+    row.source_type === 'admin_manual' ||
+    (row.source_type === 'inbound_request' && getInboundRequestStatus(row) === 'completed')
+  );
+}
+
 async function fetchPurchasedInventoryRows(userId: string) {
   const supabase = createClient();
   const { data: lotsData } = await (supabase.from as any)('purchased_inventory_lots')
-    .select('id, product_name, option_name, initial_quantity, remaining_quantity, created_at, inbound_requests!inner(status)')
+    .select(
+      'id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, inbound_requests(status)',
+    )
     .eq('user_id', userId)
-    .eq('inbound_requests.status', 'completed')
     .order('created_at', { ascending: true });
 
   const { data: pendingUploads } = await supabase
@@ -42,10 +61,18 @@ async function fetchPurchasedInventoryRows(userId: string) {
     reservations = (reservationData ?? []) as PurchasedInventoryReservation[];
   }
 
-  return summarizePurchasedInventory(
-    (lotsData ?? []) as PurchasedInventorySummaryLot[],
-    reservations,
-  );
+  const visibleLots = ((lotsData ?? []) as PurchasedInventorySummaryQueryLot[])
+    .filter(isVisiblePurchasedInventoryLot)
+    .map<PurchasedInventorySummaryLot>((row) => ({
+      id: row.id,
+      product_name: row.product_name,
+      option_name: row.option_name,
+      initial_quantity: Number(row.initial_quantity),
+      remaining_quantity: Number(row.remaining_quantity),
+      created_at: row.created_at,
+    }));
+
+  return summarizePurchasedInventory(visibleLots, reservations);
 }
 
 export default async function PurchasedShippingPage() {

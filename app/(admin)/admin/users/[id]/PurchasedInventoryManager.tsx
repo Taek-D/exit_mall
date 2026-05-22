@@ -103,6 +103,11 @@ export function PurchasedInventoryManager({
       }
 
       toast({ title: '사입재고 수정 완료' });
+      setEditing((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       router.refresh();
     });
 
