@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import {
   fileToBuffer,
+  loadExcelWorkbookFromBuffer,
   safeStorageName,
   validateExcelUpload,
 } from '@/lib/files/excel';
@@ -12,6 +15,68 @@ function file(name: string, bytes: Uint8Array): File {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
+
+async function basicWorkbookBuffer(): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet1');
+  ws.addRow(['name', 'quantity']);
+  ws.addRow(['sample', 3]);
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer as ArrayBuffer);
+}
+
+function hancellAppPropertiesXml(sheetName = 'Sheet1'): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>',
+    '<ep:Properties',
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+    ' xmlns:ep="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"',
+    ' xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">',
+    '<ep:Application>Cell</ep:Application>',
+    `<ep:TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>${sheetName}</vt:lpstr></vt:vector></ep:TitlesOfParts>`,
+    '<ep:TotalTime>6</ep:TotalTime>',
+    '<ep:AppVersion>12.0300</ep:AppVersion>',
+    '</ep:Properties>',
+  ].join('');
+}
+
+async function withHancellAppProperties(
+  buffer: Buffer,
+  sheetName = 'Sheet1',
+): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  zip.file('docProps/app.xml', hancellAppPropertiesXml(sheetName));
+  const rewritten = await zip.generateAsync({ type: 'nodebuffer' });
+  return Buffer.from(rewritten);
+}
+
+describe('loadExcelWorkbookFromBuffer', () => {
+  it('loads normal ExcelJS workbooks without sanitization', async () => {
+    const workbook = await loadExcelWorkbookFromBuffer(await basicWorkbookBuffer());
+
+    expect(workbook.worksheets).toHaveLength(1);
+    expect(workbook.worksheets[0]!.getCell('A2').value).toBe('sample');
+    expect(workbook.worksheets[0]!.getCell('B2').value).toBe(3);
+  });
+
+  it('loads Hancell-style app properties that raw exceljs rejects', async () => {
+    const hancellBuffer = await withHancellAppProperties(await basicWorkbookBuffer());
+    const rawWorkbook = new ExcelJS.Workbook();
+
+    await expect(rawWorkbook.xlsx.load(hancellBuffer as any)).rejects.toThrow(/company/);
+
+    const workbook = await loadExcelWorkbookFromBuffer(hancellBuffer);
+
+    expect(workbook.worksheets).toHaveLength(1);
+    expect(workbook.worksheets[0]!.name).toBe('Sheet1');
+    expect(workbook.worksheets[0]!.getCell('A2').value).toBe('sample');
+    expect(workbook.worksheets[0]!.getCell('B2').value).toBe(3);
+  });
+
+  it('rejects corrupt buffers after the sanitized retry fails', async () => {
+    await expect(loadExcelWorkbookFromBuffer(Buffer.from('not a zip'))).rejects.toThrow();
+  });
+});
 
 describe('validateExcelUpload', () => {
   it('rejects missing or empty files', async () => {
