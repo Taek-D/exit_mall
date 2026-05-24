@@ -34,10 +34,14 @@ const koreanNameCollator = new Intl.Collator('ko-KR', {
   sensitivity: 'base',
 });
 
+function getFirstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; q?: string };
+  searchParams: { filter?: string | string[]; q?: string | string[] };
 }) {
   const supabase = createClient();
   const { data: users } = await supabase
@@ -45,8 +49,8 @@ export default async function AdminUsersPage({
     .select('*')
     .order('created_at', { ascending: false });
   const list = (users ?? []) as unknown as UserRow[];
-  const filter = searchParams.filter;
-  const q = searchParams.q?.trim() ?? '';
+  const filter = getFirstSearchParam(searchParams.filter);
+  const q = getFirstSearchParam(searchParams.q)?.trim() ?? '';
 
   const filtered = list
     .filter((u) => {
