@@ -1,6 +1,6 @@
 # Hancell XLSX Upload Compatibility Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make every user-facing `.xlsx` upload path accept Hancell-saved workbooks whose document property XML breaks `exceljs@4.4.0`.
 
@@ -30,7 +30,7 @@
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
 
-- [ ] **Step 1: Add dependency**
+- [x] **Step 1: Add dependency**
 
 Run:
 
@@ -40,7 +40,7 @@ pnpm add jszip
 
 Expected: `package.json` includes `jszip` under `dependencies`, and `pnpm-lock.yaml` updates. Keep the installed version selected by pnpm.
 
-- [ ] **Step 2: Verify dependency is visible**
+- [x] **Step 2: Verify dependency is visible**
 
 Run:
 
@@ -50,7 +50,7 @@ pnpm list jszip --depth 0
 
 Expected: output includes a top-level `jszip` entry.
 
-- [ ] **Step 3: Commit dependency change**
+- [x] **Step 3: Commit dependency change**
 
 Run:
 
@@ -68,7 +68,7 @@ Expected: commit succeeds with only dependency files staged.
 **Files:**
 - Modify: `tests/unit/excel-upload.test.ts`
 
-- [ ] **Step 1: Add imports**
+- [x] **Step 1: Add imports**
 
 At the top of `tests/unit/excel-upload.test.ts`, change the imports to:
 
@@ -84,7 +84,7 @@ import {
 } from '@/lib/files/excel';
 ```
 
-- [ ] **Step 2: Add workbook fixture helpers**
+- [x] **Step 2: Add workbook fixture helpers**
 
 After the existing `file(...)` helper, add:
 
@@ -124,7 +124,7 @@ async function withHancellAppProperties(
 }
 ```
 
-- [ ] **Step 3: Add loader tests**
+- [x] **Step 3: Add loader tests**
 
 Before `describe('validateExcelUpload', ...)`, add:
 
@@ -158,7 +158,7 @@ describe('loadExcelWorkbookFromBuffer', () => {
 });
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [x] **Step 4: Run test to verify it fails**
 
 Run:
 
@@ -168,7 +168,7 @@ pnpm vitest run tests/unit/excel-upload.test.ts
 
 Expected: FAIL because `loadExcelWorkbookFromBuffer` is not exported from `@/lib/files/excel`.
 
-- [ ] **Step 5: Commit failing tests**
+- [x] **Step 5: Commit failing tests**
 
 Run:
 
@@ -186,7 +186,7 @@ Expected: commit succeeds with only the test file staged.
 **Files:**
 - Modify: `lib/files/excel.ts`
 
-- [ ] **Step 1: Add imports**
+- [x] **Step 1: Add imports**
 
 At the top of `lib/files/excel.ts`, before constants, add:
 
@@ -195,7 +195,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 ```
 
-- [ ] **Step 2: Add helper functions and loader**
+- [x] **Step 2: Add helper functions and loader**
 
 After `fileToBuffer(...)`, add:
 
@@ -274,7 +274,7 @@ export async function loadExcelWorkbookFromBuffer(
 }
 ```
 
-- [ ] **Step 3: Run loader tests**
+- [x] **Step 3: Run loader tests**
 
 Run:
 
@@ -284,7 +284,7 @@ pnpm vitest run tests/unit/excel-upload.test.ts
 
 Expected: PASS. The raw ExcelJS assertion still rejects with `company`, while `loadExcelWorkbookFromBuffer` loads the workbook.
 
-- [ ] **Step 4: Run typecheck for the new imports**
+- [x] **Step 4: Run typecheck for the new imports**
 
 Run:
 
@@ -294,7 +294,7 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit loader implementation**
+- [x] **Step 5: Commit loader implementation**
 
 Run:
 
@@ -315,7 +315,7 @@ Expected: commit succeeds with loader implementation and now-passing loader test
 - Modify: `lib/product-import-parser.ts`
 - Modify: `lib/order-upload-parser.ts`
 
-- [ ] **Step 1: Update parser imports**
+- [x] **Step 1: Update parser imports**
 
 Add this import to each parser file:
 
@@ -325,7 +325,7 @@ import { loadExcelWorkbookFromBuffer } from '@/lib/files/excel';
 
 Keep existing `ExcelJS` imports where the file still uses ExcelJS types such as `ExcelJS.Workbook`, `ExcelJS.Worksheet`, or `ExcelJS.CellValue`.
 
-- [ ] **Step 2: Update shipping parser load block**
+- [x] **Step 2: Update shipping parser load block**
 
 In `lib/shipping-upload-parser.ts`, replace the opening part of the workbook load block:
 
@@ -347,7 +347,7 @@ with:
 
 Leave the existing `throw new Error(...)` line inside the catch block unchanged. Remove the local `toNodeBuffer(...)` helper if `rg -n "toNodeBuffer" lib/shipping-upload-parser.ts` shows no remaining usages.
 
-- [ ] **Step 3: Update inbound parser load block**
+- [x] **Step 3: Update inbound parser load block**
 
 In `lib/purchased-shipping.ts`, replace the opening part of the workbook load block:
 
@@ -369,7 +369,7 @@ with:
 
 Leave the existing `throw new Error(...)` line inside the catch block unchanged. Remove the local `toNodeBuffer(...)` helper if `rg -n "toNodeBuffer" lib/purchased-shipping.ts` shows no remaining usages.
 
-- [ ] **Step 4: Update product import parser load block**
+- [x] **Step 4: Update product import parser load block**
 
 In `lib/product-import-parser.ts`, replace the opening part of the workbook load block:
 
@@ -391,7 +391,7 @@ with:
 
 Leave the existing `throw new Error(...)` line inside the catch block unchanged. Keep the local `toNodeBuffer(...)` helper because `collectRowImages(...)` uses it to normalize media buffers.
 
-- [ ] **Step 5: Update legacy order parser load block**
+- [x] **Step 5: Update legacy order parser load block**
 
 In `lib/order-upload-parser.ts`, replace the opening part of the workbook load block:
 
@@ -413,7 +413,7 @@ with:
 
 Leave the existing `throw new Error(...)` line inside the catch block unchanged. Remove the local `toNodeBuffer(...)` helper if `rg -n "toNodeBuffer" lib/order-upload-parser.ts` shows no remaining usages.
 
-- [ ] **Step 6: Verify no upload parser still directly loads workbooks**
+- [x] **Step 6: Verify no upload parser still directly loads workbooks**
 
 Run:
 
@@ -423,7 +423,7 @@ rg -n "xlsx\\.load\\(|new ExcelJS\\.Workbook\\(" lib
 
 Expected: no user-upload parser calls remain. `app/(admin)/admin/orders/export/route.ts` may still create a workbook because it writes exports rather than reading user-uploaded files.
 
-- [ ] **Step 7: Run parser-related tests**
+- [x] **Step 7: Run parser-related tests**
 
 Run:
 
@@ -433,7 +433,7 @@ pnpm vitest run tests/unit/shipping-upload-parser.test.ts tests/unit/purchased-s
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit parser integration**
+- [x] **Step 8: Commit parser integration**
 
 Run:
 
@@ -452,7 +452,7 @@ Expected: commit succeeds with only parser files staged.
 - Modify: `tests/unit/shipping-upload-parser.test.ts`
 - Modify: `tests/unit/product-import-parser.test.ts`
 
-- [ ] **Step 1: Add JSZip import to shipping parser test**
+- [x] **Step 1: Add JSZip import to shipping parser test**
 
 At the top of `tests/unit/shipping-upload-parser.test.ts`, add:
 
@@ -460,7 +460,7 @@ At the top of `tests/unit/shipping-upload-parser.test.ts`, add:
 import JSZip from 'jszip';
 ```
 
-- [ ] **Step 2: Add Hancell helper to shipping parser test**
+- [x] **Step 2: Add Hancell helper to shipping parser test**
 
 After `workbookBufferFromFirstRow(...)`, add:
 
@@ -491,7 +491,7 @@ async function withHancellAppProperties(
 }
 ```
 
-- [ ] **Step 3: Add shipping parser compatibility test**
+- [x] **Step 3: Add shipping parser compatibility test**
 
 Inside `describe('parseShippingExcel - valid', ...)`, add:
 
@@ -509,7 +509,7 @@ Inside `describe('parseShippingExcel - valid', ...)`, add:
   });
 ```
 
-- [ ] **Step 4: Add JSZip import to product import parser test**
+- [x] **Step 4: Add JSZip import to product import parser test**
 
 At the top of `tests/unit/product-import-parser.test.ts`, add:
 
@@ -517,7 +517,7 @@ At the top of `tests/unit/product-import-parser.test.ts`, add:
 import JSZip from 'jszip';
 ```
 
-- [ ] **Step 5: Add Hancell helper to product import parser test**
+- [x] **Step 5: Add Hancell helper to product import parser test**
 
 After `workbookBuffer(...)`, add:
 
@@ -548,7 +548,7 @@ async function withHancellAppProperties(
 }
 ```
 
-- [ ] **Step 6: Add product image preservation test**
+- [x] **Step 6: Add product image preservation test**
 
 Inside `describe('parseProductImportExcel', ...)`, add:
 
@@ -570,7 +570,7 @@ Inside `describe('parseProductImportExcel', ...)`, add:
   });
 ```
 
-- [ ] **Step 7: Run parser compatibility tests**
+- [x] **Step 7: Run parser compatibility tests**
 
 Run:
 
@@ -580,7 +580,7 @@ pnpm vitest run tests/unit/shipping-upload-parser.test.ts tests/unit/product-imp
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit parser compatibility tests**
+- [x] **Step 8: Commit parser compatibility tests**
 
 Run:
 
@@ -598,7 +598,7 @@ Expected: commit succeeds with only parser test files staged.
 **Files:**
 - No code edits expected.
 
-- [ ] **Step 1: Run targeted upload tests**
+- [x] **Step 1: Run targeted upload tests**
 
 Run:
 
@@ -608,7 +608,7 @@ pnpm vitest run tests/unit/excel-upload.test.ts tests/unit/shipping-upload-parse
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full unit test suite**
+- [x] **Step 2: Run full unit test suite**
 
 Run:
 
@@ -618,7 +618,7 @@ pnpm test
 
 Expected: PASS.
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run:
 
@@ -628,7 +628,7 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: Verify workbook load call sites**
+- [x] **Step 4: Verify workbook load call sites**
 
 Run:
 
@@ -638,7 +638,7 @@ rg -n "xlsx\\.load\\(" lib
 
 Expected: no user-upload parser calls remain. If a non-upload export helper appears, confirm it is not reading user-uploaded `.xlsx` files.
 
-- [ ] **Step 5: Review changed files**
+- [x] **Step 5: Review changed files**
 
 Run:
 
