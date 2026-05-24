@@ -4,6 +4,7 @@
  * 이 파일은 legacy 데이터 호환성 검증을 위해 보존한다.
  */
 import ExcelJS from 'exceljs';
+import { loadExcelWorkbookFromBuffer } from '@/lib/files/excel';
 
 export type ParsedOrderItem = {
   no: number;
@@ -35,12 +36,6 @@ export type ParsedOrderUpload = {
 const ITEMS_START_ROW = 12;
 const ITEMS_END_ROW = 41;
 
-function toNodeBuffer(buffer: Buffer | ArrayBuffer | Uint8Array): Buffer {
-  if (Buffer.isBuffer(buffer)) return buffer;
-  if (buffer instanceof ArrayBuffer) return Buffer.from(new Uint8Array(buffer));
-  return Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-}
-
 function cellValue(cell: ExcelJS.Cell): unknown {
   const value = cell.value;
   if (value && typeof value === 'object') {
@@ -70,9 +65,9 @@ function readCellNumber(ws: ExcelJS.Worksheet, addr: string): number | null {
 export async function parseOrderExcel(
   buffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<ParsedOrderUpload> {
-  const wb = new ExcelJS.Workbook();
+  let wb: ExcelJS.Workbook;
   try {
-    await wb.xlsx.load(toNodeBuffer(buffer) as any);
+    wb = await loadExcelWorkbookFromBuffer(buffer);
   } catch {
     throw new Error('엑셀 파일을 읽을 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식입니다.');
   }

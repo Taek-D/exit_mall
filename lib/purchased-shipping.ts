@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { detectKnownExcelTemplateKind } from '@/lib/excel-template-kind';
+import { loadExcelWorkbookFromBuffer } from '@/lib/files/excel';
 import { normalizeProductMatchKey } from '@/lib/shipping-match';
 
 export type ParsedInboundInventoryItem = {
@@ -89,12 +90,6 @@ const INBOUND_HEADERS = [
   '비고',
 ] as const;
 
-function toNodeBuffer(buffer: Buffer | ArrayBuffer | Uint8Array): Buffer {
-  if (Buffer.isBuffer(buffer)) return buffer;
-  if (buffer instanceof ArrayBuffer) return Buffer.from(new Uint8Array(buffer));
-  return Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-}
-
 function rawCellValue(value: ExcelJS.CellValue): unknown {
   if (value && typeof value === 'object') {
     if ('text' in value) return value.text;
@@ -135,9 +130,9 @@ function labelOf(productName: string, optionName: string): string {
 export async function parseInboundInventoryExcel(
   buffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<ParsedInboundInventoryItem[]> {
-  const wb = new ExcelJS.Workbook();
+  let wb: ExcelJS.Workbook;
   try {
-    await wb.xlsx.load(toNodeBuffer(buffer) as any);
+    wb = await loadExcelWorkbookFromBuffer(buffer);
   } catch {
     throw new Error('입고 엑셀 파일을 읽을 수 없습니다.');
   }

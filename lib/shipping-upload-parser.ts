@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { detectKnownExcelTemplateKind } from '@/lib/excel-template-kind';
+import { loadExcelWorkbookFromBuffer } from '@/lib/files/excel';
 
 export const SHIPPING_FEE_PER_ROW = 3_300;
 
@@ -39,12 +40,6 @@ const HEADER_KEYS = [
 
 export function computeShippingFee(rows: number): number {
   return Math.max(0, rows) * SHIPPING_FEE_PER_ROW;
-}
-
-function toNodeBuffer(buffer: Buffer | ArrayBuffer | Uint8Array): Buffer {
-  if (Buffer.isBuffer(buffer)) return buffer;
-  if (buffer instanceof ArrayBuffer) return Buffer.from(new Uint8Array(buffer));
-  return Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 }
 
 function rawCellValue(value: ExcelJS.CellValue): unknown {
@@ -99,9 +94,9 @@ function rowValues(ws: ExcelJS.Worksheet, rowNumber: number, maxCols: number): u
 export async function parseShippingExcel(
   buffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<ParsedShippingUpload> {
-  const wb = new ExcelJS.Workbook();
+  let wb: ExcelJS.Workbook;
   try {
-    await wb.xlsx.load(toNodeBuffer(buffer) as any);
+    wb = await loadExcelWorkbookFromBuffer(buffer);
   } catch {
     throw new Error('엑셀 파일을 읽을 수 없습니다.');
   }
