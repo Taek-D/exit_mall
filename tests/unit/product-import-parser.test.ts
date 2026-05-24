@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
 import {
   parseProductImportExcel,
@@ -50,6 +51,31 @@ async function workbookBuffer({
   return Buffer.from(buffer as ArrayBuffer);
 }
 
+function hancellAppPropertiesXml(sheetName = 'ProductImport'): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>',
+    '<ep:Properties',
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+    ' xmlns:ep="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"',
+    ' xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">',
+    '<ep:Application>Cell</ep:Application>',
+    `<ep:TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>${sheetName}</vt:lpstr></vt:vector></ep:TitlesOfParts>`,
+    '<ep:TotalTime>6</ep:TotalTime>',
+    '<ep:AppVersion>12.0300</ep:AppVersion>',
+    '</ep:Properties>',
+  ].join('');
+}
+
+async function withHancellAppProperties(
+  buffer: Buffer,
+  sheetName = 'ProductImport',
+): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  zip.file('docProps/app.xml', hancellAppPropertiesXml(sheetName));
+  const rewritten = await zip.generateAsync({ type: 'nodebuffer' });
+  return Buffer.from(rewritten);
+}
+
 describe('parseProductImportExcel', () => {
   it('parses valid product rows and maps row images', async () => {
     const parsed = await parseProductImportExcel(
@@ -81,6 +107,22 @@ describe('parseProductImportExcel', () => {
     expect(parsed.rows[0]!.image?.buffer.length).toBeGreaterThan(0);
     expect(parsed.rows[1]!.price).toBe(24400);
     expect(parsed.rows[1]!.warnings).toContain('제품 이미지가 없습니다.');
+  });
+
+  it('preserves row images when loading Hancell-style document properties', async () => {
+    const parsed = await parseProductImportExcel(
+      await withHancellAppProperties(
+        await workbookBuffer({
+          rows: [['', 'Brand', 'Product', 'Option', 1000, 'PRD-1', 'Category', 'BAR-1', '']],
+          images: [{ rowNumber: 2, width: 32, height: 24 }],
+        }),
+      ),
+    );
+
+    expect(parsed.rows[0]!.hasImage).toBe(true);
+    expect(parsed.rows[0]!.image?.buffer.length).toBeGreaterThan(0);
+    expect(parsed.rows[0]!.image?.width).toBe(32);
+    expect(parsed.rows[0]!.image?.height).toBe(24);
   });
 
   it('rejects missing headers', async () => {
