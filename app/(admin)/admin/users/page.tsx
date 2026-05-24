@@ -6,6 +6,8 @@ import { UserStatusBadge, StatusPill } from '@/components/StatusBadge';
 import type { UserStatus } from '@/lib/types';
 import { USER_GROUP_SHORT_LABEL, isUserGroup } from '@/lib/auth/user-groups';
 import { Users, ChevronRight } from 'lucide-react';
+import { AdminUserSearchInput } from '@/components/admin/AdminUserSearchInput';
+import { matchesAdminUserNameQuery } from '@/lib/admin/user-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +34,14 @@ const koreanNameCollator = new Intl.Collator('ko-KR', {
   sensitivity: 'base',
 });
 
+function getFirstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: { filter?: string };
+  searchParams: { filter?: string | string[]; q?: string | string[] };
 }) {
   const supabase = createClient();
   const { data: users } = await supabase
@@ -43,7 +49,8 @@ export default async function AdminUsersPage({
     .select('*')
     .order('created_at', { ascending: false });
   const list = (users ?? []) as unknown as UserRow[];
-  const filter = searchParams.filter;
+  const filter = getFirstSearchParam(searchParams.filter);
+  const q = getFirstSearchParam(searchParams.q)?.trim() ?? '';
 
   const filtered = list
     .filter((u) => {
@@ -52,6 +59,7 @@ export default async function AdminUsersPage({
       if (filter === 'rejected') return u.status === 'rejected';
       return true;
     })
+    .filter((u) => matchesAdminUserNameQuery(u.name || '', q))
     .sort((a, b) => koreanNameCollator.compare(a.name || '', b.name || ''));
 
   const counts = {
@@ -75,7 +83,11 @@ export default async function AdminUsersPage({
           <div className="flex min-w-max">
             {TABS.map((t) => {
               const active = filter === t.key;
-              const href = t.key ? `/admin/users?filter=${t.key}` : '/admin/users';
+              const params = new URLSearchParams();
+              if (t.key) params.set('filter', t.key);
+              if (q) params.set('q', q);
+              const query = params.toString();
+              const href = query ? `/admin/users?${query}` : '/admin/users';
               const count =
                 t.key === 'low'
                   ? counts.low
@@ -110,12 +122,18 @@ export default async function AdminUsersPage({
           </div>
         </div>
 
+        <div className="border-b px-4 py-3">
+          <AdminUserSearchInput initialQuery={q} />
+        </div>
+
         {filtered.length === 0 ? (
           <div className="p-12 flex flex-col items-center gap-3 text-center">
             <div className="h-11 w-11 rounded-full bg-muted grid place-items-center">
               <Users className="h-5 w-5 text-muted-foreground" aria-hidden />
             </div>
-            <p className="text-sm text-muted-foreground">해당 사용자가 없습니다.</p>
+            <p className="text-sm text-muted-foreground">
+              {q ? '검색 결과가 없습니다.' : '해당 사용자가 없습니다.'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
