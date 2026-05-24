@@ -50,6 +50,37 @@ async function withHancellAppProperties(
   return Buffer.from(rewritten);
 }
 
+function prefixSpreadsheetElements(xml: string): string {
+  if (!xml.includes('http://schemas.openxmlformats.org/spreadsheetml/2006/main')) {
+    return xml;
+  }
+
+  const withPrefixedNamespace = xml.replace(
+    'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+    'xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+  );
+
+  return withPrefixedNamespace.replace(/<(\/?)([A-Za-z][\w.-]*)(?=[\s/>])/g, (match, slash, name) => {
+    if (name.includes(':')) return match;
+    return `<${slash}x:${name}`;
+  });
+}
+
+async function withHancellSpreadsheetPrefixes(buffer: Buffer): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  await Promise.all(
+    Object.keys(zip.files).map(async (path) => {
+      const file = zip.file(path);
+      if (!file || !path.startsWith('xl/') || !path.endsWith('.xml')) return;
+
+      const xml = await file.async('string');
+      zip.file(path, prefixSpreadsheetElements(xml));
+    }),
+  );
+  const rewritten = await zip.generateAsync({ type: 'nodebuffer' });
+  return Buffer.from(rewritten);
+}
+
 describe('loadExcelWorkbookFromBuffer', () => {
   it('loads normal ExcelJS workbooks without sanitization', async () => {
     const workbook = await loadExcelWorkbookFromBuffer(await basicWorkbookBuffer());
@@ -69,6 +100,21 @@ describe('loadExcelWorkbookFromBuffer', () => {
 
     expect(workbook.worksheets).toHaveLength(1);
     expect(workbook.worksheets[0]!.name).toBe('Sheet1');
+    expect(workbook.worksheets[0]!.getCell('A2').value).toBe('sample');
+    expect(workbook.worksheets[0]!.getCell('B2').value).toBe(3);
+  });
+
+  it('loads Hancell-style spreadsheet namespace prefixes after app properties are sanitized', async () => {
+    const hancellBuffer = await withHancellSpreadsheetPrefixes(
+      await withHancellAppProperties(await basicWorkbookBuffer()),
+    );
+    const rawWorkbook = new ExcelJS.Workbook();
+
+    await expect(rawWorkbook.xlsx.load(hancellBuffer as any)).rejects.toThrow();
+
+    const workbook = await loadExcelWorkbookFromBuffer(hancellBuffer);
+
+    expect(workbook.worksheets).toHaveLength(1);
     expect(workbook.worksheets[0]!.getCell('A2').value).toBe('sample');
     expect(workbook.worksheets[0]!.getCell('B2').value).toBe(3);
   });

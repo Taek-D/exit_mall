@@ -65,10 +65,31 @@ function sanitizedCorePropertiesXml(): string {
   ].join('');
 }
 
-async function sanitizeDocumentProperties(buffer: Buffer): Promise<Buffer> {
+function normalizeSpreadsheetElementPrefixes(xml: string): string {
+  return xml.replace(/<(\/?)x:/g, '<$1');
+}
+
+function shouldNormalizeSpreadsheetXmlEntry(path: string): boolean {
+  return path.startsWith('xl/') && path.endsWith('.xml');
+}
+
+async function sanitizeWorkbookCompatibility(buffer: Buffer): Promise<Buffer> {
   const zip = await JSZip.loadAsync(buffer);
   zip.file('docProps/app.xml', sanitizedAppPropertiesXml());
   zip.file('docProps/core.xml', sanitizedCorePropertiesXml());
+
+  await Promise.all(
+    Object.keys(zip.files).map(async (path) => {
+      const file = zip.file(path);
+      if (!file || !shouldNormalizeSpreadsheetXmlEntry(path)) return;
+
+      const xml = await file.async('string');
+      if (!xml.includes('<x:') && !xml.includes('</x:')) return;
+
+      zip.file(path, normalizeSpreadsheetElementPrefixes(xml));
+    }),
+  );
+
   const sanitized = await zip.generateAsync({ type: 'nodebuffer' });
   return Buffer.from(sanitized);
 }
@@ -88,7 +109,7 @@ export async function loadExcelWorkbookFromBuffer(
     return await loadWorkbook(nodeBuffer);
   } catch (error) {
     try {
-      return await loadWorkbook(await sanitizeDocumentProperties(nodeBuffer));
+      return await loadWorkbook(await sanitizeWorkbookCompatibility(nodeBuffer));
     } catch {
       throw error;
     }
