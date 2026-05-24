@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import JSZip from 'jszip';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ExcelJS from 'exceljs';
@@ -38,6 +39,31 @@ async function workbookBufferFromFirstRow(header: string[], rows: unknown[][]): 
   return Buffer.from(buffer as ArrayBuffer);
 }
 
+function hancellAppPropertiesXml(sheetName = 'Sheet1'): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>',
+    '<ep:Properties',
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+    ' xmlns:ep="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"',
+    ' xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">',
+    '<ep:Application>Cell</ep:Application>',
+    `<ep:TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>${sheetName}</vt:lpstr></vt:vector></ep:TitlesOfParts>`,
+    '<ep:TotalTime>6</ep:TotalTime>',
+    '<ep:AppVersion>12.0300</ep:AppVersion>',
+    '</ep:Properties>',
+  ].join('');
+}
+
+async function withHancellAppProperties(
+  buffer: Buffer,
+  sheetName = 'Sheet1',
+): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  zip.file('docProps/app.xml', hancellAppPropertiesXml(sheetName));
+  const rewritten = await zip.generateAsync({ type: 'nodebuffer' });
+  return Buffer.from(rewritten);
+}
+
 describe('parseShippingExcel - valid', () => {
   it('parses a valid 3-row template', async () => {
     const r = await parseShippingExcel(load('shipping-valid.xlsx'));
@@ -57,6 +83,18 @@ describe('parseShippingExcel - valid', () => {
     expect(r.shipping_fee_total).toBe(3 * 3_300);
     expect(r.uploader_company).toBe('예시상사');
     expect(r.uploader_phone).toBe('010-1111-1111');
+  });
+
+  it('parses Hancell-saved workbooks whose document properties break raw exceljs', async () => {
+    const buffer = await withHancellAppProperties(load('shipping-valid.xlsx'));
+
+    const parsed = await parseShippingExcel(buffer);
+
+    expect(parsed.items).toHaveLength(3);
+    expect(parsed.items[0]).toMatchObject({
+      phone: '010-1234-5678',
+      quantity: 1,
+    });
   });
 
   it('accepts required-marker stars in headers', async () => {

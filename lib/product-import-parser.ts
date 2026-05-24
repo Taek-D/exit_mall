@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { loadExcelWorkbookFromBuffer } from '@/lib/files/excel';
 
 export const PRODUCT_IMPORT_HEADERS = [
   '제품이미지',
@@ -194,9 +195,9 @@ function collectRowImages(workbook: ExcelJS.Workbook, worksheet: ExcelJS.Workshe
 export async function parseProductImportExcel(
   buffer: Buffer | ArrayBuffer | Uint8Array,
 ): Promise<ParsedProductImport> {
-  const workbook = new ExcelJS.Workbook();
+  let workbook: ExcelJS.Workbook;
   try {
-    await workbook.xlsx.load(toNodeBuffer(buffer) as any);
+    workbook = await loadExcelWorkbookFromBuffer(buffer);
   } catch {
     throw new Error('엑셀 파일을 읽을 수 없습니다. .xlsx 파일인지 확인해주세요.');
   }
