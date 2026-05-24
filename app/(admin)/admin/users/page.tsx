@@ -27,6 +27,11 @@ const TABS = [
   { key: 'rejected', label: '반려' },
 ] as const;
 
+const koreanNameCollator = new Intl.Collator('ko-KR', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -40,12 +45,14 @@ export default async function AdminUsersPage({
   const list = (users ?? []) as unknown as UserRow[];
   const filter = searchParams.filter;
 
-  const filtered = list.filter((u) => {
-    if (filter === 'low') return Number(u.deposit_balance) <= Number(u.low_balance_threshold);
-    if (filter === 'pending') return u.status === 'pending';
-    if (filter === 'rejected') return u.status === 'rejected';
-    return true;
-  });
+  const filtered = list
+    .filter((u) => {
+      if (filter === 'low') return Number(u.deposit_balance) <= Number(u.low_balance_threshold);
+      if (filter === 'pending') return u.status === 'pending';
+      if (filter === 'rejected') return u.status === 'rejected';
+      return true;
+    })
+    .sort((a, b) => koreanNameCollator.compare(a.name || '', b.name || ''));
 
   const counts = {
     all: list.length,
