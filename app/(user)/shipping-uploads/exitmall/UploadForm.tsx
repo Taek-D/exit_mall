@@ -17,7 +17,6 @@ export function UploadForm() {
       <h3 className="font-medium">배송대행 양식 업로드(파일명을 바꾸지 마세요)</h3>
       <input
         type="file"
-        accept=".xlsx"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         className="block w-full text-sm border rounded-md p-2"
       />

@@ -44,7 +44,6 @@ export function ImportUploadForm() {
         <Input
           type="file"
           name="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           disabled={pending}
         />

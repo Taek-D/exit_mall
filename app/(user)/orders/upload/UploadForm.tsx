@@ -7,7 +7,6 @@ import { AlertCircle, FileSpreadsheet, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const ACCEPT = '.xlsx';
 
 export function UploadForm() {
   const router = useRouter();
@@ -82,7 +81,6 @@ export function UploadForm() {
           id="excel-file"
           ref={inputRef}
           type="file"
-          accept={ACCEPT}
           className="sr-only"
           onChange={handleSelect}
           disabled={pending}

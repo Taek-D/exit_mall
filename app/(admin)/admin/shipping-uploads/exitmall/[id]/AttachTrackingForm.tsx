@@ -21,7 +21,6 @@ export function AttachTrackingForm({ uploadId }: { uploadId: string }) {
       </p>
       <input
         type="file"
-        accept=".xlsx"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         className="block w-full text-sm border rounded-md p-2"
       />

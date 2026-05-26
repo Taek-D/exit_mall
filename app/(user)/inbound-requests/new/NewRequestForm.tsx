@@ -71,7 +71,6 @@ export function NewRequestForm() {
           id="excel"
           name="excel"
           type="file"
-          accept=".xlsx"
           className="block w-full text-sm border rounded-md p-2"
           required
         />
