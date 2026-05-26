@@ -204,7 +204,7 @@ Expected: image/support attachment filters can remain, and no affected business 
 Run:
 
 ```powershell
-git add app/(user)/inbound-requests/new/NewRequestForm.tsx app/(user)/shipping-uploads/exitmall/UploadForm.tsx app/(user)/shipping-uploads/purchased/UploadForm.tsx app/(user)/orders/upload/UploadForm.tsx app/(admin)/admin/shipping-uploads/exitmall/[id]/AttachTrackingForm.tsx app/(admin)/admin/products/import/ImportUploadForm.tsx
+git add 'app/(user)/inbound-requests/new/NewRequestForm.tsx' 'app/(user)/shipping-uploads/exitmall/UploadForm.tsx' 'app/(user)/shipping-uploads/purchased/UploadForm.tsx' 'app/(user)/orders/upload/UploadForm.tsx' 'app/(admin)/admin/shipping-uploads/exitmall/[id]/AttachTrackingForm.tsx' 'app/(admin)/admin/products/import/ImportUploadForm.tsx'
 git commit -m "fix: allow mobile excel file selection"
 ```
 
