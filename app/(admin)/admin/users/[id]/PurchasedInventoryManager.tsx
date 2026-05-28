@@ -155,14 +155,14 @@ export function PurchasedInventoryManager({
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[980px] table-fixed text-sm">
               <colgroup>
-                <col className="w-[34%]" />
-                <col className="w-[11%]" />
-                <col className="w-[6%]" />
+                <col className="w-[36%]" />
+                <col className="w-[18%]" />
+                <col className="w-[5%]" />
                 <col className="w-[7%]" />
                 <col className="w-[6%]" />
                 <col className="w-[9%]" />
-                <col className="w-[16%]" />
-                <col className="w-[11%]" />
+                <col className="w-[13%]" />
+                <col className="w-[6%]" />
               </colgroup>
               <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr className="border-b">
