@@ -9,6 +9,8 @@ import {
   revalidatePaths,
   type ActionResult,
 } from '@/lib/actions/_shared';
+import { supportDetailPaths } from '@/lib/actions/_revalidate-paths';
+import { requireSignedIn, type SignedInContext } from '@/lib/actions/_guards';
 import { fileToBuffer } from '@/lib/files/excel';
 import { supportCommentSchema, supportRequestCreateSchema } from '@/lib/schemas';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
@@ -128,22 +130,110 @@ async function collectAttachments(fd: FormData): Promise<PreparedAttachment[] | 
   return prepared;
 }
 
-function supportDetailPaths(requestId: string): string[] {
-  return [
-    '/support-requests',
-    `/support-requests/${requestId}`,
-    '/admin/support-requests',
-    `/admin/support-requests/${requestId}`,
-  ];
+type SupportUploadProgress = { uploadedPaths: string[]; insertedAttachmentIds: string[] };
+type SupportUploadError = Error & { partial?: SupportUploadProgress };
+
+/**
+ * Phase 2.4 분할: 첨부파일 업로드 + metadata insert.
+ * 실패 시 throw하되, 이미 진행된 부분(uploadedPaths/insertedAttachmentIds)을
+ * error.partial에 실어 호출자가 정확히 storage/메타데이터 cleanup을 수행하도록 한다.
+ */
+async function uploadSupportAttachments(
+  supabase: SignedInContext['supabase'],
+  userId: string,
+  requestId: string,
+  attachments: PreparedAttachment[],
+): Promise<SupportUploadProgress> {
+  const uploadedPaths: string[] = [];
+  const insertedAttachmentIds: string[] = [];
+
+  try {
+    for (const attachment of attachments) {
+      const attachmentId = randomUUID();
+      const storagePath = supportAttachmentPath({
+        userId,
+        requestId,
+        attachmentId,
+        originalName: attachment.file.name,
+      });
+      const { error: uploadErr } = await supabase.storage
+        .from('support-requests')
+        .upload(storagePath, attachment.buffer, {
+          contentType: attachment.contentType,
+          upsert: false,
+        });
+      if (uploadErr) throw uploadErr;
+      uploadedPaths.push(storagePath);
+
+      const { error: metaErr } = await mutationTable(supabase, 'support_request_attachments').insert({
+        id: attachmentId,
+        request_id: requestId,
+        user_id: userId,
+        storage_path: storagePath,
+        original_name: attachment.file.name,
+        content_type: attachment.contentType,
+        size_bytes: attachment.file.size,
+      });
+      if (metaErr) throw metaErr;
+      insertedAttachmentIds.push(attachmentId);
+    }
+
+    return { uploadedPaths, insertedAttachmentIds };
+  } catch (error) {
+    const err: SupportUploadError =
+      error instanceof Error ? error : new Error(String(error));
+    err.partial = { uploadedPaths, insertedAttachmentIds };
+    throw err;
+  }
+}
+
+async function cleanupFailedSupportRequest({
+  supabase,
+  requestId,
+  insertedAttachmentIds,
+}: {
+  supabase: ReturnType<typeof createClient>;
+  requestId: string;
+  insertedAttachmentIds: string[];
+}): Promise<void> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const cleanupSupabase = createServiceRoleClient() as unknown as ReturnType<typeof createClient>;
+    if (insertedAttachmentIds.length > 0) {
+      const { error: metadataCleanupError } = await mutationTable(
+        cleanupSupabase,
+        'support_request_attachments',
+      )
+        .delete()
+        .in('id', insertedAttachmentIds);
+      if (metadataCleanupError) {
+        console.error('[support] rollback attachment metadata failed', metadataCleanupError);
+      }
+    }
+
+    const { error: requestCleanupError } = await mutationTable(cleanupSupabase, 'support_requests')
+      .delete()
+      .eq('id', requestId);
+    if (requestCleanupError) {
+      console.error('[support] rollback request cleanup failed', requestCleanupError);
+    }
+    return;
+  }
+
+  const { error: requestCleanupError } = await callRpc(supabase, 'cleanup_failed_support_request', {
+    p_request_id: requestId,
+  });
+  if (requestCleanupError) {
+    console.error('[support] rollback request cleanup failed', requestCleanupError);
+  }
 }
 
 export async function submitSupportRequestAction(
   _prevState: SubmitSupportResult | null,
   fd: FormData,
 ): Promise<SubmitSupportResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user } = guard;
 
   const parsed = supportRequestCreateSchema.safeParse({
     category: String(fd.get('category') ?? ''),
@@ -183,46 +273,22 @@ export async function submitSupportRequestAction(
   }
 
   const requestId = String(requestIdData);
-  const uploadedPaths: string[] = [];
-  const insertedAttachmentIds: string[] = [];
 
   try {
-    for (const attachment of attachments) {
-      const attachmentId = randomUUID();
-      const storagePath = supportAttachmentPath({
-        userId: u.user.id,
-        requestId,
-        attachmentId,
-        originalName: attachment.file.name,
-      });
-      const { error: uploadErr } = await supabase.storage
-        .from('support-requests')
-        .upload(storagePath, attachment.buffer, {
-          contentType: attachment.contentType,
-          upsert: false,
-        });
-      if (uploadErr) throw uploadErr;
-      uploadedPaths.push(storagePath);
-
-      const { error: metaErr } = await mutationTable(supabase, 'support_request_attachments').insert({
-        id: attachmentId,
-        request_id: requestId,
-        user_id: u.user.id,
-        storage_path: storagePath,
-        original_name: attachment.file.name,
-        content_type: attachment.contentType,
-        size_bytes: attachment.file.size,
-      });
-      if (metaErr) throw metaErr;
-      insertedAttachmentIds.push(attachmentId);
-    }
+    await uploadSupportAttachments(supabase, user.id, requestId, attachments);
   } catch (error) {
+    // 부분 진행 상태를 받아 정확히 cleanup. (분할 전 동일 함수에서 보장하던 동작 복구)
+    const partial = (error as SupportUploadError).partial ?? {
+      uploadedPaths: [],
+      insertedAttachmentIds: [],
+    };
     await cleanupFailedSupportRequest({
       supabase,
       requestId,
-      insertedAttachmentIds,
+      insertedAttachmentIds: partial.insertedAttachmentIds,
     });
-    const cleanupPaths = supportCleanupPaths(uploadedPaths);
+    // 업로드된 storage 객체 cleanup은 트랜잭션 외부이므로 best-effort.
+    const cleanupPaths = supportCleanupPaths(partial.uploadedPaths);
     if (cleanupPaths.length > 0) {
       const cleanupSupabase = (
         process.env.SUPABASE_SERVICE_ROLE_KEY ? createServiceRoleClient() : supabase
@@ -240,44 +306,9 @@ export async function submitSupportRequestAction(
   }
 
   revalidatePaths(['/support-requests', '/admin/support-requests']);
+  // NOTE: NewSupportRequestForm의 useEffect router.push와 이중 navigate 문제는
+  // 안전망 테스트(S-12)에서 계약으로 고정되어 있으며, Phase 3에서 한쪽을 제거한다.
   redirect(`/support-requests/${requestId}`);
-}
-
-async function cleanupFailedSupportRequest({
-  supabase,
-  requestId,
-  insertedAttachmentIds,
-}: {
-  supabase: ReturnType<typeof createClient>;
-  requestId: string;
-  insertedAttachmentIds: string[];
-}): Promise<void> {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const cleanupSupabase = createServiceRoleClient() as unknown as ReturnType<typeof createClient>;
-    if (insertedAttachmentIds.length > 0) {
-      const { error: metadataCleanupError } = await mutationTable(cleanupSupabase, 'support_request_attachments')
-        .delete()
-        .in('id', insertedAttachmentIds);
-      if (metadataCleanupError) {
-        console.error('[support] rollback attachment metadata failed', metadataCleanupError);
-      }
-    }
-
-    const { error: requestCleanupError } = await mutationTable(cleanupSupabase, 'support_requests')
-      .delete()
-      .eq('id', requestId);
-    if (requestCleanupError) {
-      console.error('[support] rollback request cleanup failed', requestCleanupError);
-    }
-    return;
-  }
-
-  const { error: requestCleanupError } = await callRpc(supabase, 'cleanup_failed_support_request', {
-    p_request_id: requestId,
-  });
-  if (requestCleanupError) {
-    console.error('[support] rollback request cleanup failed', requestCleanupError);
-  }
 }
 
 export async function cancelSupportRequestAction(requestId: string): Promise<ActionResult> {
@@ -335,6 +366,8 @@ export async function addSupportCommentAction(
   requestId: string,
   body: string,
 ): Promise<ActionResult<{ id: string }>> {
+  // 권한은 add_support_comment RPC + RLS가 검증한다(작성자/관리자/활성 계정).
+  // user.id가 직접 필요 없어 requireSignedIn 가드를 생략한다(update/delete는 가드 사용).
   const supabase = createClient();
   const parsed = supportCommentSchema.safeParse({ body });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
@@ -385,9 +418,9 @@ export async function updateSupportCommentAction(
   commentId: string,
   body: string,
 ): Promise<ActionResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user, profile } = guard;
 
   const parsed = supportCommentSchema.safeParse({ body });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
@@ -399,16 +432,11 @@ export async function updateSupportCommentAction(
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
 
-  const { data: prof } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', u.user.id)
-    .single<{ role: 'user' | 'admin' }>();
   const accessError = getSupportCommentAccessError({
     authorId: row.author_id,
-    currentUserId: u.user.id,
+    currentUserId: user.id,
     createdAt: row.created_at,
-    isAdmin: prof?.role === 'admin',
+    isAdmin: profile.role === 'admin',
     action: '수정',
   });
   if (accessError) return { ok: false, error: accessError };
@@ -428,9 +456,9 @@ export async function updateSupportCommentAction(
 }
 
 export async function deleteSupportCommentAction(commentId: string): Promise<ActionResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user, profile } = guard;
 
   const { data: row } = (await supabase
     .from('support_request_comments')
@@ -439,16 +467,11 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
 
-  const { data: prof } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', u.user.id)
-    .single<{ role: 'user' | 'admin' }>();
   const accessError = getSupportCommentAccessError({
     authorId: row.author_id,
-    currentUserId: u.user.id,
+    currentUserId: user.id,
     createdAt: row.created_at,
-    isAdmin: prof?.role === 'admin',
+    isAdmin: profile.role === 'admin',
     action: '삭제',
   });
   if (accessError) return { ok: false, error: accessError };
@@ -488,8 +511,6 @@ export async function getSupportAttachmentUrlAction(
 
   const { data, error } = await supabase.storage
     .from('support-requests')
-    // Server-rendered links/previews stay visible on detail pages; keep URLs bounded
-    // but long enough for users to open or download attachments without immediate expiry.
     .createSignedUrl(attachment.storage_path, SUPPORT_ATTACHMENT_SIGNED_URL_SECONDS);
   if (error || !data?.signedUrl) {
     return { ok: false, error: error?.message ?? '서명 URL 생성 실패' };

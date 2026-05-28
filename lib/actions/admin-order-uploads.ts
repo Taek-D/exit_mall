@@ -1,6 +1,7 @@
 'use server';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { mapOrderUploadError } from '@/lib/errors/order-upload';
 
 export type ApproveResult =
   | { ok: true; orderId: string }
@@ -13,17 +14,8 @@ export async function approveOrderUploadAction(uploadId: string): Promise<Approv
     upload_id: uploadId,
   });
   if (error) {
-    const msg = error.message;
-    if (msg.includes('FORBIDDEN')) return { ok: false, error: '관리자만 승인할 수 있습니다.' };
-    if (msg.includes('NOT_FOUND')) return { ok: false, error: '업로드를 찾을 수 없습니다.' };
-    if (msg.includes('ALREADY_PROCESSED')) return { ok: false, error: '이미 처리된 업로드입니다.' };
-    if (msg.includes('MISSING_SHIPPING')) return { ok: false, error: '배송 정보(받는 사람·연락처·주소)가 비어있습니다.' };
-    if (msg.includes('USER_NOT_ACTIVE')) return { ok: false, error: '고객 계정이 활성 상태가 아닙니다.' };
-    if (msg.includes('INSUFFICIENT_BALANCE')) return { ok: false, error: '고객의 예치금이 부족합니다.' };
-    if (msg.includes('EMPTY_ITEMS')) return { ok: false, error: '주문 항목이 없습니다.' };
-    if (msg.includes('INVALID_QUANTITY')) return { ok: false, error: '수량 값이 올바르지 않은 항목이 있습니다.' };
-    if (msg.includes('INVALID_PRICE')) return { ok: false, error: '단가 값이 올바르지 않은 항목이 있습니다.' };
-    return { ok: false, error: msg };
+    const mapped = mapOrderUploadError(error.message);
+    return { ok: false, error: mapped ?? error.message };
   }
   revalidatePaths(['/admin/order-uploads', '/admin/orders']);
   return { ok: true, orderId: data as string };
@@ -41,8 +33,8 @@ export async function rejectOrderUploadAction(
     memo: memo.trim(),
   });
   if (error) {
-    if (error.message.includes('ALREADY_PROCESSED')) return { ok: false, error: '이미 처리된 업로드입니다.' };
-    return { ok: false, error: error.message };
+    const mapped = mapOrderUploadError(error.message);
+    return { ok: false, error: mapped ?? error.message };
   }
   revalidatePaths(['/admin/order-uploads']);
   return { ok: true };

@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-parser';
 import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { requireSignedIn, type SignedInContext } from '@/lib/actions/_guards';
 import { matchInventoryRefs, normalizeProductMatchKey } from '@/lib/shipping-match';
 import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
@@ -20,12 +21,135 @@ export type RequestShippingUploadResult =
   | { ok: true; uploadId: string }
   | { ok: false; error: string };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Exitmall shipping upload — Phase 2.4 분할 (4단)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ProductCandidate = { id: string; name: string };
+
+/** ① 활성 카탈로그 + 사용자 보유 재고 + 커스텀 인벤토리 3-way 후보 조회. */
+async function fetchProductCandidates(
+  supabase: SignedInContext['supabase'],
+  userId: string,
+): Promise<
+  | { ok: true; mergedProducts: ProductCandidate[]; customRows: Array<{ id: string; name: string }> }
+  | { ok: false; error: string }
+> {
+  const [
+    { data: productRows, error: productErr },
+    { data: ownedInventoryRows, error: ownedErr },
+    { data: customRows, error: customErr },
+  ] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null),
+    supabase
+      .from('user_inventory')
+      .select('products(id, name)')
+      .eq('user_id', userId),
+    supabase
+      .from('user_custom_inventory')
+      .select('id, name')
+      .eq('user_id', userId),
+  ]);
+  if (productErr || ownedErr || customErr) {
+    const message = productErr?.message ?? ownedErr?.message ?? customErr?.message ?? 'unknown';
+    return { ok: false, error: `상품 후보 조회에 실패했습니다: ${message}` };
+  }
+
+  // 활성+삭제되지 않은 카탈로그 외에, 사용자가 user_inventory 로 이미 보유 중인
+  // 상품도 후보에 포함한다 (사후 비활성화된 상품도 보유 시 처리 가능).
+  const productById = new Map<string, ProductCandidate>();
+  for (const row of (productRows ?? []) as ProductCandidate[]) {
+    productById.set(row.id, row);
+  }
+  for (const row of (ownedInventoryRows ?? []) as Array<{
+    products: ProductCandidate | ProductCandidate[] | null;
+  }>) {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products;
+    if (product && !productById.has(product.id)) {
+      productById.set(product.id, { id: product.id, name: product.name });
+    }
+  }
+  return {
+    ok: true,
+    mergedProducts: Array.from(productById.values()),
+    customRows: (customRows ?? []) as Array<{ id: string; name: string }>,
+  };
+}
+
+/** ② 파싱된 행을 product/custom inventory 참조로 해석한다. */
+function resolveInventoryReferences(
+  parsedItems: Awaited<ReturnType<typeof parseShippingExcel>>['items'],
+  mergedProducts: ProductCandidate[],
+  customRows: Array<{ id: string; name: string }>,
+):
+  | { ok: true; itemsWithRef: Array<Record<string, unknown>> }
+  | { ok: false; error: string } {
+  const productNames = Array.from(new Set(parsedItems.map((it) => it.product_code)));
+  const match = matchInventoryRefs(productNames, mergedProducts, customRows);
+  if (!match.ok) {
+    if (match.duplicates.length > 0) {
+      const shown = match.duplicates.slice(0, 3).join(', ');
+      const more = match.duplicates.length > 3 ? ' …' : '';
+      return {
+        ok: false,
+        error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${shown}${more}`,
+      };
+    }
+    const shown = match.unknown.slice(0, 3).join(', ');
+    const more = match.unknown.length > 3 ? ' …' : '';
+    return { ok: false, error: `존재하지 않는 상품명이 있습니다: ${shown}${more}` };
+  }
+
+  const productNameById = new Map(mergedProducts.map((row) => [row.id, row.name]));
+  const customNameById = new Map(customRows.map((row) => [row.id, row.name]));
+  const itemsWithRef = parsedItems.map((it) => {
+    const ref = match.refs.get(it.product_code)!;
+    if (ref.kind === 'product') {
+      return {
+        ...it,
+        product_code: productNameById.get(ref.id) ?? it.product_code,
+        product_id: ref.id,
+      };
+    }
+    return {
+      ...it,
+      product_code: customNameById.get(ref.id) ?? it.product_code,
+      custom_inventory_id: ref.id,
+    };
+  });
+  return { ok: true, itemsWithRef };
+}
+
+/** ③ 엑셀 storage 업로드 (실패 시 에러 반환). */
+async function uploadShippingExcel(
+  supabase: SignedInContext['supabase'],
+  userId: string,
+  file: File,
+  buffer: Buffer,
+): Promise<{ ok: true; storagePath: string } | { ok: false; error: string }> {
+  const safeName = safeStorageName(file.name, { allowKorean: true });
+  const storagePath = `${userId}/${Date.now()}-${safeName}`;
+  const { error: upErr } = await supabase.storage
+    .from('order-uploads')
+    .upload(storagePath, buffer, {
+      contentType:
+        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      upsert: false,
+    });
+  if (upErr) return { ok: false, error: `파일 업로드 실패: ${upErr.message}` };
+  return { ok: true, storagePath };
+}
+
 export async function requestShippingUploadAction(
   fd: FormData,
 ): Promise<RequestShippingUploadResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user } = guard;
 
   const upload = await validateExcelUpload(fd.get('file'), {
     maxBytes: MAX_BYTES,
@@ -41,119 +165,31 @@ export async function requestShippingUploadAction(
     return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
   }
 
-  // 2단계 매칭: products.name 우선 → user_custom_inventory.name fallback.
-  // products 우선 정책 — 같은 이름이 양쪽에 있으면 항상 products 가 이긴다.
-  // 사입재고 배송대행은 별도 흐름(requestPurchasedShippingUploadAction)에서
-  // purchased_inventory_lots 를 매칭하므로 여기에는 포함하지 않는다.
-  const productNames = Array.from(new Set(parsed.items.map((it) => it.product_code)));
-  // 활성+삭제되지 않은 카탈로그 외에, 사용자가 user_inventory 로 이미 보유 중인
-  // 상품도 후보에 포함한다. 관리자가 사후에 비활성화/소프트삭제한 상품이라도
-  // 보유 재고가 있으면 approve_shipping_upload 가 product_id 로 처리할 수 있다.
-  const [
-    { data: productRows, error: productErr },
-    { data: ownedInventoryRows, error: ownedErr },
-    { data: customRows, error: customErr },
-  ] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name')
-      .eq('is_active', true)
-      .is('deleted_at', null),
-    supabase
-      .from('user_inventory')
-      .select('products(id, name)')
-      .eq('user_id', u.user.id),
-    supabase
-      .from('user_custom_inventory')
-      .select('id, name')
-      .eq('user_id', u.user.id),
-  ]);
-  if (productErr || ownedErr || customErr) {
-    const message =
-      productErr?.message ?? ownedErr?.message ?? customErr?.message ?? 'unknown';
-    return { ok: false, error: `상품 후보 조회에 실패했습니다: ${message}` };
-  }
+  const candidates = await fetchProductCandidates(supabase, user.id);
+  if (!candidates.ok) return candidates;
 
-  const productById = new Map<string, { id: string; name: string }>();
-  for (const row of (productRows ?? []) as Array<{ id: string; name: string }>) {
-    productById.set(row.id, row);
-  }
-  for (const row of (ownedInventoryRows ?? []) as Array<{
-    products: { id: string; name: string } | { id: string; name: string }[] | null;
-  }>) {
-    const product = Array.isArray(row.products) ? row.products[0] : row.products;
-    if (product && !productById.has(product.id)) {
-      productById.set(product.id, { id: product.id, name: product.name });
-    }
-  }
-  const mergedProducts = Array.from(productById.values());
-
-  const match = matchInventoryRefs(
-    productNames,
-    mergedProducts,
-    (customRows ?? []) as Array<{ id: string; name: string }>,
+  const resolved = resolveInventoryReferences(
+    parsed.items,
+    candidates.mergedProducts,
+    candidates.customRows,
   );
-  if (!match.ok) {
-    if (match.duplicates.length > 0) {
-      const shown = match.duplicates.slice(0, 3).join(', ');
-      const more = match.duplicates.length > 3 ? ' …' : '';
-      return {
-        ok: false,
-        error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${shown}${more}`,
-      };
-    }
-    const shown = match.unknown.slice(0, 3).join(', ');
-    const more = match.unknown.length > 3 ? ' …' : '';
-    return {
-      ok: false,
-      error: `존재하지 않는 상품명이 있습니다: ${shown}${more}`,
-    };
-  }
+  if (!resolved.ok) return resolved;
 
-  const productNameById = new Map(mergedProducts.map((row) => [row.id, row.name]));
-  const customNameById = new Map(
-    ((customRows ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]),
-  );
-  const itemsWithRef = parsed.items.map((it) => {
-    const ref = match.refs.get(it.product_code)!;
-    if (ref.kind === 'product') {
-      return {
-        ...it,
-        product_code: productNameById.get(ref.id) ?? it.product_code,
-        product_id: ref.id,
-      };
-    }
-    return {
-      ...it,
-      product_code: customNameById.get(ref.id) ?? it.product_code,
-      custom_inventory_id: ref.id,
-    };
-  });
-
-  // Storage 업로드
-  const safeName = safeStorageName(file.name, { allowKorean: true });
-  const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
-  const { error: upErr } = await supabase.storage
-    .from('order-uploads')
-    .upload(storagePath, buffer, {
-      contentType:
-        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      upsert: false,
-    });
-  if (upErr) return { ok: false, error: `파일 업로드 실패: ${upErr.message}` };
+  const uploaded = await uploadShippingExcel(supabase, user.id, file, buffer);
+  if (!uploaded.ok) return uploaded;
+  const { storagePath } = uploaded;
 
   const fee = computeShippingFee(parsed.items.length);
-
   const { data: row, error: insErr } = await mutationTable(supabase, 'order_uploads')
     .insert({
-      user_id: u.user.id,
+      user_id: user.id,
       upload_type: 'exitmall',
       storage_path: storagePath,
       original_name: file.name,
       contact_person: parsed.uploader_company,
       buyer_phone: parsed.uploader_phone,
       request_memo: parsed.request_memo,
-      items: itemsWithRef as Json,
+      items: resolved.itemsWithRef as Json,
       total_quantity: parsed.total_quantity,
       total_amount: 0,
       shipping_fee_total: fee,
@@ -176,12 +212,19 @@ export async function requestShippingUploadAction(
   return { ok: true, uploadId: row.id };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchased shipping upload — Phase 2.4 분할 (3단)
+// ─────────────────────────────────────────────────────────────────────────────
+
 type PurchasedAllocationRow = {
   lot_id: string;
   quantity: number;
 };
 
-function purchasedUploadMatchKey(productName: string, optionName: string): string {
+// purchased-shipping.ts의 keyOf와 동일한 NULL 바이트(\u0000) 구분자 정책을 따른다.
+// 정규화(normalizeProductMatchKey) 결과에는 NULL 바이트가 등장하지 않으므로 충돌 없는 구분자다.
+// 두 정의가 동일 정책을 공유함을 명시 — 한쪽을 변경하면 반드시 다른 쪽도 함께 변경할 것.
+function purchasedMatchKey(productName: string, optionName: string): string {
   return `${normalizeProductMatchKey(productName)}\u0000${normalizeProductMatchKey(optionName)}`;
 }
 
@@ -227,45 +270,34 @@ async function fetchPurchasedLotsForUpload(
   return buildPurchasedLotsForUpload(lotRows, reservedByLot);
 }
 
-export async function requestPurchasedShippingUploadAction(
-  fd: FormData,
-): Promise<RequestShippingUploadResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+type SuccessfulFifoAllocation = Extract<
+  ReturnType<typeof allocatePurchasedInventoryFifo>,
+  { ok: true }
+>;
 
-  const upload = await validateExcelUpload(fd.get('file'), {
-    maxBytes: MAX_BYTES,
-    sizeLabel: '5MB',
-  });
-  if (!upload.ok) return upload;
-  const { file, buffer } = upload;
-
-  let parsed;
-  try {
-    parsed = await parseShippingExcel(buffer);
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
-  }
-
-  const demands: PurchasedShippingDemand[] = parsed.items.map((item) => ({
+/** Demand 구성 + ambiguity/FIFO 배정 + lotByItemNo 매핑까지 한 번에 처리. */
+function allocatePurchasedShippingDemands(
+  parsedItems: Awaited<ReturnType<typeof parseShippingExcel>>['items'],
+  lots: PurchasedInventoryLot[],
+):
+  | {
+      ok: true;
+      itemsForRpc: Array<Record<string, unknown>>;
+      allocations: SuccessfulFifoAllocation['allocations'];
+    }
+  | { ok: false; error: string } {
+  const demands: PurchasedShippingDemand[] = parsedItems.map((item) => ({
     item_no: item.no,
     product_name: item.product_code,
     option_name: item.product_name ?? '',
     quantity: item.quantity,
   }));
-  let lots: PurchasedInventoryLot[];
-  try {
-    lots = await fetchPurchasedLotsForUpload(supabase, u.user.id);
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '사입재고 후보 조회에 실패했습니다.' };
-  }
 
   const demandKeys = new Set(
-    demands.map((demand) => purchasedUploadMatchKey(demand.product_name, demand.option_name)),
+    demands.map((demand) => purchasedMatchKey(demand.product_name, demand.option_name)),
   );
   const relevantLots = lots.filter((lot) =>
-    demandKeys.has(purchasedUploadMatchKey(lot.product_name, lot.option_name)),
+    demandKeys.has(purchasedMatchKey(lot.product_name, lot.option_name)),
   );
   const ambiguities = detectPurchasedInventoryAmbiguities(relevantLots);
   if (ambiguities.length > 0) {
@@ -290,7 +322,6 @@ export async function requestPurchasedShippingUploadAction(
   }
 
   const lotById = new Map(relevantLots.map((lot) => [lot.id, lot]));
-  // First allocation is safe: ambiguity detection keeps every demand key on one canonical identity.
   const lotByItemNo = new Map<number, PurchasedInventoryLot>();
   for (const itemAllocation of allocation.allocations) {
     if (!lotByItemNo.has(itemAllocation.item_no)) {
@@ -298,23 +329,51 @@ export async function requestPurchasedShippingUploadAction(
       if (lot) lotByItemNo.set(itemAllocation.item_no, lot);
     }
   }
-  const itemsForRpc = parsed.items.map((item) => {
+  const itemsForRpc = parsedItems.map((item) => {
     const lot = lotByItemNo.get(item.no);
     return lot
       ? { ...item, product_code: lot.product_name, product_name: lot.option_name }
       : item;
   });
 
-  const safeName = safeStorageName(file.name, { allowKorean: true });
-  const storagePath = `${u.user.id}/${Date.now()}-${safeName}`;
-  const { error: upErr } = await supabase.storage
-    .from('order-uploads')
-    .upload(storagePath, buffer, {
-      contentType:
-        file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      upsert: false,
-    });
-  if (upErr) return { ok: false, error: `파일 업로드 실패: ${upErr.message}` };
+  return { ok: true, itemsForRpc, allocations: allocation.allocations };
+}
+
+export async function requestPurchasedShippingUploadAction(
+  fd: FormData,
+): Promise<RequestShippingUploadResult> {
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user } = guard;
+
+  const upload = await validateExcelUpload(fd.get('file'), {
+    maxBytes: MAX_BYTES,
+    sizeLabel: '5MB',
+  });
+  if (!upload.ok) return upload;
+  const { file, buffer } = upload;
+
+  let parsed;
+  try {
+    parsed = await parseShippingExcel(buffer);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '엑셀 파싱 실패' };
+  }
+
+  let lots: PurchasedInventoryLot[];
+  try {
+    lots = await fetchPurchasedLotsForUpload(supabase, user.id);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '사입재고 후보 조회에 실패했습니다.' };
+  }
+
+  const allocated = allocatePurchasedShippingDemands(parsed.items, lots);
+  if (!allocated.ok) return allocated;
+  const { itemsForRpc, allocations } = allocated;
+
+  const uploaded = await uploadShippingExcel(supabase, user.id, file, buffer);
+  if (!uploaded.ok) return uploaded;
+  const { storagePath } = uploaded;
 
   const fee = computeShippingFee(parsed.items.length);
   const { data: uploadId, error: rpcErr } = await callRpc(
@@ -329,7 +388,7 @@ export async function requestPurchasedShippingUploadAction(
       p_items: itemsForRpc as Json,
       p_total_quantity: parsed.total_quantity,
       p_shipping_fee_total: fee,
-      p_allocations: allocation.allocations as Json,
+      p_allocations: allocations as Json,
     },
   );
   if (rpcErr || !uploadId) {

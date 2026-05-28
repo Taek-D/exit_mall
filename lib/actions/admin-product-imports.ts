@@ -7,7 +7,7 @@ import {
   type ProductImportPreview,
   type PlannedProductImportRow,
 } from '@/lib/product-import-planner';
-import { requireAdmin } from '@/lib/actions/_guards';
+import { requireAdmin, type AdminContext } from '@/lib/actions/_guards';
 import { callRpc, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
@@ -144,12 +144,21 @@ export async function createProductImportPreviewAction(
   return { ok: true, importId };
 }
 
-export async function confirmProductImportAction(
-  importId: string,
-): Promise<ConfirmProductImportResult> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return { ok: false, error: guard.error };
+// ─────────────────────────────────────────────────────────────────────────────
+// confirmProductImportAction — Phase 2.4 분할 (5단)
+// 시멘틱 보존 안전망: confirm-product-import-action.test.ts
+// ─────────────────────────────────────────────────────────────────────────────
 
+type LoadedImport = {
+  importRow: ProductImportRecord;
+  preview: ProductImportPreview;
+};
+
+/** ① import 행 조회 + status 검증 + preview JSON 파싱. */
+async function loadAndValidateImport(
+  guard: AdminContext,
+  importId: string,
+): Promise<{ ok: true; loaded: LoadedImport } | { ok: false; error: string }> {
   const { data: importRow, error: importError } = await guard.supabase
     .from('product_imports')
     .select('id,status,storage_path,original_name,preview')
@@ -170,26 +179,48 @@ export async function confirmProductImportAction(
     return { ok: false, error: '오류가 있는 행이 있어 적용할 수 없습니다.' };
   }
 
+  return { ok: true, loaded: { importRow, preview } };
+}
+
+/** ② 원본 엑셀 storage 다운로드 + 재파싱. */
+async function parseOriginalImport(
+  guard: AdminContext,
+  importRow: ProductImportRecord,
+): Promise<
+  | { ok: true; parsed: Awaited<ReturnType<typeof parseProductImportExcel>> }
+  | { ok: false; error: string }
+> {
   const { data: blob, error: downloadError } = await guard.supabase.storage
     .from('product-imports')
     .download(importRow.storage_path);
   if (downloadError || !blob) {
-    console.error('[admin-product-imports] original download', { importId, downloadError });
+    console.error('[admin-product-imports] original download', {
+      importId: importRow.id,
+      downloadError,
+    });
     return { ok: false, error: '원본 엑셀 파일을 다시 읽을 수 없습니다.' };
   }
 
-  let parsed;
   try {
-    parsed = await parseProductImportExcel(Buffer.from(await blob.arrayBuffer()));
+    const parsed = await parseProductImportExcel(Buffer.from(await blob.arrayBuffer()));
+    return { ok: true, parsed };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : '원본 엑셀 파일을 다시 파싱할 수 없습니다.',
     };
   }
+}
 
-  const imageByRow = new Map(parsed.rows.map((row) => [row.rowNumber, row.image]));
-  const warnings = rowWarnings(preview.rows);
+/** ③ 행별 이미지 업로드 + applyRows 빌드. 업로드 실패는 warnings에 누적. */
+async function uploadImportImages(
+  guard: AdminContext,
+  importId: string,
+  preview: ProductImportPreview,
+  parsedRows: Awaited<ReturnType<typeof parseProductImportExcel>>['rows'],
+  warnings: string[],
+): Promise<{ applyRows: ApplyProductImportRow[]; uploadedImagePaths: string[] }> {
+  const imageByRow = new Map(parsedRows.map((row) => [row.rowNumber, row.image]));
   const uploadedImagePaths: string[] = [];
   const applyRows: ApplyProductImportRow[] = [];
 
@@ -232,6 +263,23 @@ export async function confirmProductImportAction(
     });
   }
 
+  return { applyRows, uploadedImagePaths };
+}
+
+/** ④ apply_product_import RPC 호출. 실패 시 업로드된 이미지 cleanup + status='failed' 업데이트. */
+async function applyProductImport(
+  guard: AdminContext,
+  importId: string,
+  applyRows: ApplyProductImportRow[],
+  uploadedImagePaths: string[],
+  warnings: string[],
+): Promise<
+  | {
+      ok: true;
+      result: { created: number; updated: number; restored: number };
+    }
+  | { ok: false; error: string }
+> {
   const { data: resultData, error: applyError } = await callRpc(
     guard.supabase,
     'apply_product_import',
@@ -254,11 +302,27 @@ export async function confirmProductImportAction(
   }
 
   const result = (resultData ?? {}) as { created?: number; updated?: number; restored?: number };
-  const created = Number(result.created ?? 0);
-  const updated = Number(result.updated ?? 0);
-  const restored = Number(result.restored ?? 0);
-  const finalResult = { created, updated, restored, warnings };
+  return {
+    ok: true,
+    result: {
+      created: Number(result.created ?? 0),
+      updated: Number(result.updated ?? 0),
+      restored: Number(result.restored ?? 0),
+    },
+  };
+}
 
+/** ⑤ 최종 import 행 상태를 'imported'로 업데이트. */
+async function updateImportResult(
+  guard: AdminContext,
+  importId: string,
+  finalResult: {
+    created: number;
+    updated: number;
+    restored: number;
+    warnings: string[];
+  },
+): Promise<void> {
   const { error: updateError } = await mutationTable(guard.supabase, 'product_imports')
     .update({
       status: 'imported',
@@ -270,9 +334,43 @@ export async function confirmProductImportAction(
 
   if (updateError) {
     console.error('[admin-product-imports] result update', { importId, updateError });
-    warnings.push('상품은 적용되었지만 import 결과 기록 업데이트에 실패했습니다.');
+    finalResult.warnings.push('상품은 적용되었지만 import 결과 기록 업데이트에 실패했습니다.');
   }
+}
+
+export async function confirmProductImportAction(
+  importId: string,
+): Promise<ConfirmProductImportResult> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { ok: false, error: guard.error };
+
+  // ① import 행 조회 + status/preview 검증
+  const loaded = await loadAndValidateImport(guard, importId);
+  if (!loaded.ok) return loaded;
+  const { importRow, preview } = loaded.loaded;
+
+  // ② 원본 재파싱
+  const parsed = await parseOriginalImport(guard, importRow);
+  if (!parsed.ok) return parsed;
+
+  // ③ 이미지 업로드 + applyRows 빌드
+  const warnings = rowWarnings(preview.rows);
+  const { applyRows, uploadedImagePaths } = await uploadImportImages(
+    guard,
+    importId,
+    preview,
+    parsed.parsed.rows,
+    warnings,
+  );
+
+  // ④ apply RPC (실패 시 cleanup + failed 업데이트는 내부 처리)
+  const applied = await applyProductImport(guard, importId, applyRows, uploadedImagePaths, warnings);
+  if (!applied.ok) return applied;
+
+  // ⑤ result 업데이트
+  const finalResult = { ...applied.result, warnings };
+  await updateImportResult(guard, importId, finalResult);
 
   revalidatePaths(['/admin/products', '/admin/products/import', '/shop']);
-  return { ok: true, created, updated, restored, warnings };
+  return { ok: true, ...finalResult };
 }

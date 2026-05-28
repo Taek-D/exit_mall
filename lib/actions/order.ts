@@ -2,6 +2,7 @@
 import { checkoutSchema } from '@/lib/schemas';
 import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 import { requireUserGroup1 } from '@/lib/actions/_guards';
+import { mapPlaceOrderError } from '@/lib/errors/place-order';
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string }
@@ -28,14 +29,10 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
 
   if (error) {
     const msg = error.message;
-    if (msg.includes('INSUFFICIENT_BALANCE')) return { ok: false, error: '예치금이 부족합니다' };
-    if (msg.includes('OUT_OF_STOCK')) {
+    // productId 부가 정보가 필요한 케이스는 매퍼로부터 기본 메시지를 받아 productId와 합친다.
+    if (msg.includes('OUT_OF_STOCK') || msg.includes('PRODUCT_INACTIVE')) {
       const productId = msg.split(':')[1]?.trim();
-      return { ok: false, error: '재고가 부족합니다', productId };
-    }
-    if (msg.includes('PRODUCT_INACTIVE')) {
-      const productId = msg.split(':')[1]?.trim();
-      return { ok: false, error: '판매 중지된 상품이 있습니다', productId };
+      return { ok: false, error: mapPlaceOrderError(msg) ?? '주문 항목 오류', productId };
     }
     if (msg.includes('PER_USER_LIMIT_EXCEEDED')) {
       const parts = msg.split(':');
@@ -48,7 +45,8 @@ export async function placeOrderAction(input: unknown): Promise<PlaceOrderResult
         productId,
       };
     }
-    if (msg.includes('NOT_ACTIVE')) return { ok: false, error: '계정이 활성 상태가 아닙니다' };
+    const mapped = mapPlaceOrderError(msg);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[order] place', error);
     return { ok: false, error: '주문을 처리하지 못했습니다.' };
   }

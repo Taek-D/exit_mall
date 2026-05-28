@@ -1,6 +1,7 @@
 'use server';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, revalidatePaths } from '@/lib/actions/_shared';
+import { adminTrackingPaths } from '@/lib/actions/_revalidate-paths';
 import { parseShippingExcel } from '@/lib/shipping-upload-parser';
 import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
@@ -83,20 +84,7 @@ export async function attachTrackingAction(
     return { ok: false, error: mapShippingUploadError(rpcErr.message) };
   }
 
-  revalidatePaths([
-    `/admin/shipping-uploads/exitmall/${uploadId}`,
-    `/admin/shipping-uploads/purchased/${uploadId}`,
-    `/admin/shipping-uploads/${uploadId}`,
-    `/shipping-uploads/exitmall/${uploadId}`,
-    `/shipping-uploads/purchased/${uploadId}`,
-    `/shipping-uploads/${uploadId}`,
-    '/admin/shipping-uploads',
-    '/admin/shipping-uploads/exitmall',
-    '/admin/shipping-uploads/purchased',
-    '/shipping-uploads',
-    '/shipping-uploads/exitmall',
-    '/shipping-uploads/purchased',
-  ]);
+  revalidatePaths(adminTrackingPaths(uploadId));
   return { ok: true };
 }
 

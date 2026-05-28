@@ -32,6 +32,39 @@ export async function requireAdmin(): Promise<AdminContext | GuardError> {
   return { ok: true, supabase, user, profile };
 }
 
+export type SignedInContext = {
+  ok: true;
+  supabase: SupabaseServerClient;
+  user: User;
+  profile: { role: string; status: string };
+};
+
+/**
+ * 로그인 + status='active'만 검증한다 (role/user_group 검사 없음).
+ *
+ * support-request, inbound-request 등 모든 활성 사용자가 접근해야 하는 액션에
+ * 사용한다. group2 제한이 필요한 액션은 requireUserGroup1을, 관리자 전용은
+ * requireAdmin을 사용할 것.
+ */
+export async function requireSignedIn(): Promise<SignedInContext | GuardError> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: '로그인이 필요합니다.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role,status')
+    .eq('id', user.id)
+    .single<{ role: string; status: string }>();
+
+  if (!profile || profile.status !== 'active') {
+    return { ok: false, error: '계정이 활성 상태가 아닙니다.' };
+  }
+  return { ok: true, supabase, user, profile };
+}
+
 export type UserGroup1Context = {
   ok: true;
   supabase: SupabaseServerClient;

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, formatZodError, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { mapInventoryAdjustError } from '@/lib/errors/inventory';
 
 const adjustSchema = z.object({
   userId: z.string().uuid(),
@@ -27,16 +28,8 @@ export async function adjustUserInventoryAction(
     memo: parsed.data.memo ?? null,
   });
   if (error) {
-    if (error.message.startsWith('FORBIDDEN')) return { ok: false, error: '권한이 없습니다.' };
-    if (error.message.startsWith('ZERO_DELTA'))
-      return { ok: false, error: '0이 아닌 값을 입력해주세요.' };
-    if (error.message.startsWith('NEGATIVE_INVENTORY')) {
-      const parts = error.message.split(':');
-      return {
-        ok: false,
-        error: `잔여 재고가 부족합니다 (현재 ${parts[1]}, 적용하려는 변화 ${parts[2]}).`,
-      };
-    }
+    const mapped = mapInventoryAdjustError(error.message);
+    if (mapped) return { ok: false, error: mapped };
     console.error('[admin-inventory] adjust', error);
     return { ok: false, error: '처리 중 오류가 발생했습니다.' };
   }

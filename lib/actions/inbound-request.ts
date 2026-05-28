@@ -1,20 +1,26 @@
 'use server';
+
 import { randomBytes } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import {
   callRpc,
+  formatZodError,
   mutationTable,
   revalidatePaths,
-  formatZodError,
   type ActionResult,
 } from '@/lib/actions/_shared';
+import { inboundDetailPaths, inboundListPaths } from '@/lib/actions/_revalidate-paths';
+import { requireSignedIn, type SignedInContext } from '@/lib/actions/_guards';
 import {
   inboundRequestCreateSchema,
   inboundCommentSchema,
 } from '@/lib/schemas';
 import { safeFilename } from '@/lib/inbound/storage';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
-import { parseInboundInventoryExcel } from '@/lib/purchased-shipping';
+import {
+  parseInboundInventoryExcel,
+  type ParsedInboundInventoryItem,
+} from '@/lib/purchased-shipping';
 import {
   applyInboundMoveOutcomes,
   chaseInboundPathsAfterRollback,
@@ -46,20 +52,26 @@ export type SubmitResult =
   | { ok: true; requestId: string }
   | { ok: false; error: string };
 
-export async function submitInboundRequestAction(
-  _prevState: SubmitResult | null,
+// ─────────────────────────────────────────────────────────────────────────────
+// Submit flow helpers (Phase 2.4 split — 시멘틱 보존 안전망: submit-inbound-request-action.test.ts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type PreparedInboundUploads =
+  | {
+      ok: true;
+      excelFile: File;
+      excelPath: string;
+      imagePaths: string[];
+      inboundItems: ParsedInboundInventoryItem[];
+    }
+  | { ok: false; error: string };
+
+/** ① 입력 검증 + 임시 경로 storage 업로드. 부분 실패 시 자체 cleanup 후 에러 반환. */
+async function prepareInboundUploads(
+  supabase: SignedInContext['supabase'],
+  userId: string,
   fd: FormData,
-): Promise<SubmitResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
-
-  const parsed = inboundRequestCreateSchema.safeParse({
-    title: String(fd.get('title') ?? ''),
-    body: String(fd.get('body') ?? ''),
-  });
-  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
-
+): Promise<PreparedInboundUploads> {
   const excelUpload = await validateExcelUpload(fd.get('excel'), {
     maxBytes: MAX_EXCEL_BYTES,
     sizeLabel: '5MB',
@@ -69,9 +81,9 @@ export async function submitInboundRequestAction(
     invalidTypeMessage: '엑셀(.xlsx) 형식이 아닙니다.',
   });
   if (!excelUpload.ok) return excelUpload;
-  const { file: excel, buffer: excelBuf } = excelUpload;
+  const { file: excelFile, buffer: excelBuf } = excelUpload;
 
-  let inboundItems;
+  let inboundItems: ParsedInboundInventoryItem[];
   try {
     inboundItems = await parseInboundInventoryExcel(excelBuf);
   } catch (e) {
@@ -81,15 +93,15 @@ export async function submitInboundRequestAction(
     };
   }
 
-  const images: File[] = [];
+  const imageFiles: File[] = [];
   for (let i = 0; i < MAX_IMAGES; i++) {
     const f = fd.get(`image${i}`);
-    if (f instanceof File && f.size > 0) images.push(f);
+    if (f instanceof File && f.size > 0) imageFiles.push(f);
   }
-  if (images.length > MAX_IMAGES) {
+  if (imageFiles.length > MAX_IMAGES) {
     return { ok: false, error: `이미지는 최대 ${MAX_IMAGES}장까지 첨부할 수 있습니다.` };
   }
-  for (const img of images) {
+  for (const img of imageFiles) {
     if (img.size > MAX_IMAGE_BYTES) {
       return { ok: false, error: '이미지는 장당 5MB 이하여야 합니다.' };
     }
@@ -98,67 +110,88 @@ export async function submitInboundRequestAction(
     }
   }
 
-  // Upload files under temporary folder, then we rename after row insert.
   const tmp = `_pending_${nanoid()}`;
-  const excelPath = `${u.user.id}/${tmp}/excel/${safeStorageName(excel.name, { allowKorean: true })}`;
+  const excelPath = `${userId}/${tmp}/excel/${safeStorageName(excelFile.name, { allowKorean: true })}`;
   const { error: exUpErr } = await supabase.storage
     .from('inbound-requests')
-    .upload(excelPath, excelBuf, { contentType: excel.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: false });
+    .upload(excelPath, excelBuf, {
+      contentType:
+        excelFile.type ||
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      upsert: false,
+    });
   if (exUpErr) return { ok: false, error: `엑셀 업로드 실패: ${exUpErr.message}` };
 
   const imagePaths: string[] = [];
-  for (const img of images) {
-    const imgPath = `${u.user.id}/${tmp}/images/${nanoid()}-${safeFilename(img.name)}`;
+  for (const img of imageFiles) {
+    const imgPath = `${userId}/${tmp}/images/${nanoid()}-${safeFilename(img.name)}`;
     const buf = Buffer.from(await img.arrayBuffer());
     const { error: imgErr } = await supabase.storage
       .from('inbound-requests')
       .upload(imgPath, buf, { contentType: img.type || 'image/jpeg', upsert: false });
     if (imgErr) {
-      // partial-upload cleanup attempt (best effort)
-      await supabase.storage.from('inbound-requests').remove(inboundCleanupPaths(excelPath, imagePaths));
+      // 부분 업로드 cleanup (best-effort)
+      await supabase.storage
+        .from('inbound-requests')
+        .remove(inboundCleanupPaths(excelPath, imagePaths));
       return { ok: false, error: `이미지 업로드 실패: ${imgErr.message}` };
     }
     imagePaths.push(imgPath);
   }
 
-  // Insert via RPC for atomic rate-limit + RLS chokepoint.
-  // Direct `.from(...).insert(...)` is blocked by RLS (requires app.inbound_rpc=true).
-  const { data: newId, error: rpcErr } = await callRpc(supabase, 'submit_inbound_request_rpc', {
-    p_title: parsed.data.title,
-    p_body: parsed.data.body,
-    p_excel_path: excelPath,
-    p_excel_name: excel.name,
-    p_image_paths: imagePaths,
-    p_items: inboundItems,
-  });
+  return { ok: true, excelFile, excelPath, imagePaths, inboundItems };
+}
+
+/** ② 원자성 RPC 호출. 실패 시 에러 매핑된 결과 반환 (cleanup은 호출자 책임). */
+async function submitInboundRequestRpc(
+  supabase: SignedInContext['supabase'],
+  input: { title: string; body: string },
+  excelPath: string,
+  excelName: string,
+  imagePaths: string[],
+  inboundItems: ParsedInboundInventoryItem[],
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string }> {
+  const { data: newId, error: rpcErr } = await callRpc(
+    supabase,
+    'submit_inbound_request_rpc',
+    {
+      p_title: input.title,
+      p_body: input.body,
+      p_excel_path: excelPath,
+      p_excel_name: excelName,
+      p_image_paths: imagePaths,
+      p_items: inboundItems,
+    },
+  );
   if (rpcErr || !newId) {
-    await supabase.storage.from('inbound-requests').remove(inboundCleanupPaths(excelPath, imagePaths));
     const mapped = mapSubmitInboundRequestError(rpcErr?.message ?? '', MAX_IMAGES);
     if (mapped) return { ok: false, error: mapped };
     console.error('[inbound] submit_inbound_request_rpc', rpcErr);
     return { ok: false, error: `저장 실패: ${rpcErr?.message ?? 'unknown'}` };
   }
+  return { ok: true, requestId: newId as string };
+}
 
-  // Best-effort rename: move files from _pending_* to canonical {request_id} path.
-  // If a move succeeds but the subsequent DB update fails, attempt rollback so the
-  // row's stored path stays valid. Cascade failure leaves the row in a mixed
-  // state — chase-update DB to point at where files actually are.
-  const requestId = newId as string;
-  const originalExcelPath = excelPath;
-  const originalImagePaths = [...imagePaths];
-
-  const renamedExcel = `${u.user.id}/${requestId}/excel/${safeStorageName(excel.name, { allowKorean: true })}`;
+/** ③ _pending_* → {request_id}/* rename + DB update + rollback + chase-update 오케스트레이션. */
+async function renameInboundUploadsToCanonical(
+  supabase: SignedInContext['supabase'],
+  userId: string,
+  requestId: string,
+  excelName: string,
+  originalExcelPath: string,
+  originalImagePaths: string[],
+): Promise<void> {
+  const renamedExcel = `${userId}/${requestId}/excel/${safeStorageName(excelName, { allowKorean: true })}`;
   const { error: mvExcelErr } = await supabase.storage
     .from('inbound-requests')
     .move(originalExcelPath, renamedExcel);
 
   const imageMoves: InboundMoveOutcome[] = [];
-
   for (let i = 0; i < originalImagePaths.length; i++) {
     const old = originalImagePaths[i];
     const baseName = old.split('/').pop();
     if (!baseName) continue;
-    const newName = `${u.user.id}/${requestId}/images/${baseName}`;
+    const newName = `${userId}/${requestId}/images/${baseName}`;
     const { error } = await supabase.storage.from('inbound-requests').move(old, newName);
     imageMoves.push({ ok: !error, from: old, to: newName });
   }
@@ -170,62 +203,107 @@ export async function submitInboundRequestAction(
     imageMoves,
   });
 
-  if (renameHappened) {
-    const { error: upErr } = await mutationTable(supabase, 'inbound_requests')
-      .update({ excel_storage_path: finalExcelPath, image_paths: finalImagePaths })
-      .eq('id', requestId);
+  if (!renameHappened) return;
 
-    if (upErr) {
-      // Rollback attempt: move files back to _pending_* paths.
-      console.error('[inbound] post-rename DB update failed; rolling back rename', upErr);
-      const rollbackResults: InboundMoveOutcome[] = [];
-      if (finalExcelPath !== originalExcelPath) {
-        const { error } = await supabase.storage
-          .from('inbound-requests')
-          .move(finalExcelPath, originalExcelPath);
-        rollbackResults.push({ ok: !error, from: finalExcelPath, to: originalExcelPath });
-        if (error) console.error('[inbound] excel rename rollback failed', error);
-      }
-      for (let i = 0; i < finalImagePaths.length; i++) {
-        if (finalImagePaths[i] !== originalImagePaths[i]) {
-          const { error } = await supabase.storage
-            .from('inbound-requests')
-            .move(finalImagePaths[i], originalImagePaths[i]);
-          rollbackResults.push({ ok: !error, from: finalImagePaths[i], to: originalImagePaths[i] });
-          if (error) console.error('[inbound] image rename rollback failed', error);
-        }
-      }
-      // Cascade failure: at least one rollback `move` also failed. We end up in a
-      // mixed state where some files are at canonical {request_id}/... paths
-      // (rollback failed) and others are back at _pending_* (rollback succeeded).
-      // For each path, point the DB at where the file actually IS now:
-      //   - rollback succeeded → use original _pending_* path
-      //   - rollback failed    → use canonical path (file is still there)
-      // The orphan cleanup function reclaims any abandoned _pending_* files.
-      if (rollbackResults.some((r) => !r.ok)) {
-        const { excelPath: chaseExcel, imagePaths: chaseImages } = chaseInboundPathsAfterRollback({
-          originalExcelPath,
-          originalImagePaths,
-          finalExcelPath,
-          finalImagePaths,
-          rollbackResults,
-        });
-        const { error: chaseErr } = await mutationTable(supabase, 'inbound_requests')
-          .update({ excel_storage_path: chaseExcel, image_paths: chaseImages })
-          .eq('id', requestId);
-        if (chaseErr) console.error('[inbound] chase-update also failed; orphan possible', chaseErr);
-      }
+  const { error: upErr } = await mutationTable(supabase, 'inbound_requests')
+    .update({ excel_storage_path: finalExcelPath, image_paths: finalImagePaths })
+    .eq('id', requestId);
+
+  if (!upErr) return;
+
+  // Rollback: move 파일들을 _pending_* 위치로 되돌린다.
+  console.error('[inbound] post-rename DB update failed; rolling back rename', upErr);
+  const rollbackResults: InboundMoveOutcome[] = [];
+  if (finalExcelPath !== originalExcelPath) {
+    const { error } = await supabase.storage
+      .from('inbound-requests')
+      .move(finalExcelPath, originalExcelPath);
+    rollbackResults.push({ ok: !error, from: finalExcelPath, to: originalExcelPath });
+    if (error) console.error('[inbound] excel rename rollback failed', error);
+  }
+  for (let i = 0; i < finalImagePaths.length; i++) {
+    if (finalImagePaths[i] !== originalImagePaths[i]) {
+      const { error } = await supabase.storage
+        .from('inbound-requests')
+        .move(finalImagePaths[i], originalImagePaths[i]);
+      rollbackResults.push({ ok: !error, from: finalImagePaths[i], to: originalImagePaths[i] });
+      if (error) console.error('[inbound] image rename rollback failed', error);
     }
   }
 
-  revalidatePaths([
-    '/inbound-requests',
-    '/admin/inbound-requests',
-  ]);
-  return { ok: true, requestId };
+  // chase-update: rollback 일부 실패 시 DB가 실제 파일 위치를 가리키도록 갱신.
+  if (rollbackResults.some((r) => !r.ok)) {
+    const { excelPath: chaseExcel, imagePaths: chaseImages } =
+      chaseInboundPathsAfterRollback({
+        originalExcelPath,
+        originalImagePaths,
+        finalExcelPath,
+        finalImagePaths,
+        rollbackResults,
+      });
+    const { error: chaseErr } = await mutationTable(supabase, 'inbound_requests')
+      .update({ excel_storage_path: chaseExcel, image_paths: chaseImages })
+      .eq('id', requestId);
+    if (chaseErr)
+      console.error('[inbound] chase-update also failed; orphan possible', chaseErr);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function submitInboundRequestAction(
+  _prevState: SubmitResult | null,
+  fd: FormData,
+): Promise<SubmitResult> {
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user } = guard;
+
+  const parsed = inboundRequestCreateSchema.safeParse({
+    title: String(fd.get('title') ?? ''),
+    body: String(fd.get('body') ?? ''),
+  });
+  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
+
+  // ① prepare uploads
+  const prepared = await prepareInboundUploads(supabase, user.id, fd);
+  if (!prepared.ok) return prepared;
+  const { excelFile, excelPath, imagePaths, inboundItems } = prepared;
+
+  // ② submit RPC
+  const submitted = await submitInboundRequestRpc(
+    supabase,
+    parsed.data,
+    excelPath,
+    excelFile.name,
+    imagePaths,
+    inboundItems,
+  );
+  if (!submitted.ok) {
+    await supabase.storage
+      .from('inbound-requests')
+      .remove(inboundCleanupPaths(excelPath, imagePaths));
+    return submitted;
+  }
+
+  // ③ rename to canonical (DB update / rollback / chase-update 모두 내부 처리)
+  await renameInboundUploadsToCanonical(
+    supabase,
+    user.id,
+    submitted.requestId,
+    excelFile.name,
+    excelPath,
+    imagePaths,
+  );
+
+  revalidatePaths(inboundListPaths());
+  return { ok: true, requestId: submitted.requestId };
 }
 
 export async function cancelInboundRequestAction(requestId: string): Promise<ActionResult> {
+  // RLS가 권한을 검증하므로 user.id가 필요 없는 액션은 createClient만으로 충분.
   const supabase = createClient();
   const { error } = await callRpc(supabase, 'cancel_inbound_request', { request_id: requestId });
   if (error) {
@@ -234,7 +312,7 @@ export async function cancelInboundRequestAction(requestId: string): Promise<Act
     console.error('[inbound] cancel', { requestId, error });
     return { ok: false, error: '취소 처리에 실패했습니다.' };
   }
-  revalidatePaths(['/inbound-requests', `/inbound-requests/${requestId}`, '/admin/inbound-requests', `/admin/inbound-requests/${requestId}`]);
+  revalidatePaths(inboundDetailPaths(requestId));
   return { ok: true };
 }
 
@@ -253,12 +331,7 @@ export async function setInboundStatusAction(
     console.error('[inbound] setStatus', { requestId, newStatus, error });
     return { ok: false, error: '상태 변경에 실패했습니다.' };
   }
-  revalidatePaths([
-    `/admin/inbound-requests/${requestId}`,
-    `/inbound-requests/${requestId}`,
-    '/admin/inbound-requests',
-    '/inbound-requests',
-  ]);
+  revalidatePaths(inboundDetailPaths(requestId));
   return { ok: true };
 }
 
@@ -276,6 +349,8 @@ export async function addInboundCommentAction(
   requestId: string,
   body: string,
 ): Promise<ActionResult<{ id: string }>> {
+  // 권한은 add_inbound_comment RPC + RLS가 검증한다(작성자/관리자/활성 계정).
+  // user.id가 직접 필요 없어 requireSignedIn 가드를 생략한다(update/delete는 가드 사용).
   const supabase = createClient();
   const parsed = inboundCommentSchema.safeParse({ body });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
@@ -303,30 +378,25 @@ export async function updateInboundCommentAction(
   commentId: string,
   body: string,
 ): Promise<ActionResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user, profile } = guard;
 
   const parsed = inboundCommentSchema.safeParse({ body });
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
 
-  // Fetch current comment to enforce 10-min edit window for non-admin authors.
-  const { data: row } = (await supabase.from('inbound_request_comments')
+  const { data: row } = (await supabase
+    .from('inbound_request_comments')
     .select('author_id, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
 
-  const { data: prof } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', u.user.id)
-    .single<{ role: 'user' | 'admin' }>();
   const accessError = getInboundCommentAccessError({
     authorId: row.author_id,
-    currentUserId: u.user.id,
+    currentUserId: user.id,
     createdAt: row.created_at,
-    isAdmin: prof?.role === 'admin',
+    isAdmin: profile.role === 'admin',
     action: '수정',
   });
   if (accessError) return { ok: false, error: accessError };
@@ -338,31 +408,30 @@ export async function updateInboundCommentAction(
     console.error('[inbound] updateComment', { commentId, error });
     return { ok: false, error: '댓글 수정에 실패했습니다.' };
   }
-  revalidatePaths([`/inbound-requests/${row.request_id}`, `/admin/inbound-requests/${row.request_id}`]);
+  revalidatePaths([
+    `/inbound-requests/${row.request_id}`,
+    `/admin/inbound-requests/${row.request_id}`,
+  ]);
   return { ok: true };
 }
 
 export async function deleteInboundCommentAction(commentId: string): Promise<ActionResult> {
-  const supabase = createClient();
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, error: '로그인이 필요합니다.' };
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user, profile } = guard;
 
-  const { data: row } = (await supabase.from('inbound_request_comments')
+  const { data: row } = (await supabase
+    .from('inbound_request_comments')
     .select('author_id, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
 
-  const { data: prof } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', u.user.id)
-    .single<{ role: 'user' | 'admin' }>();
   const accessError = getInboundCommentAccessError({
     authorId: row.author_id,
-    currentUserId: u.user.id,
+    currentUserId: user.id,
     createdAt: row.created_at,
-    isAdmin: prof?.role === 'admin',
+    isAdmin: profile.role === 'admin',
     action: '삭제',
   });
   if (accessError) return { ok: false, error: accessError };
@@ -374,7 +443,10 @@ export async function deleteInboundCommentAction(commentId: string): Promise<Act
     console.error('[inbound] deleteComment', { commentId, error });
     return { ok: false, error: '댓글 삭제에 실패했습니다.' };
   }
-  revalidatePaths([`/inbound-requests/${row.request_id}`, `/admin/inbound-requests/${row.request_id}`]);
+  revalidatePaths([
+    `/inbound-requests/${row.request_id}`,
+    `/admin/inbound-requests/${row.request_id}`,
+  ]);
   return { ok: true };
 }
 
@@ -385,9 +457,13 @@ export async function getInboundAttachmentUrlAction(
   path: string,
 ): Promise<AttachmentUrlResult> {
   const supabase = createClient();
-  // Authorize: verify the path is referenced by a request the caller can read (RLS handles this).
-  type InboundReqRow = { id: string; excel_storage_path: string; image_paths: string[] | null };
-  const { data: req } = (await supabase.from('inbound_requests')
+  type InboundReqRow = {
+    id: string;
+    excel_storage_path: string;
+    image_paths: string[] | null;
+  };
+  const { data: req } = (await supabase
+    .from('inbound_requests')
     .select('id, excel_storage_path, image_paths')
     .eq('id', requestId)
     .maybeSingle()) as { data: InboundReqRow | null; error: unknown };
@@ -408,9 +484,9 @@ export async function getInboundAttachmentUrlAction(
 
 export async function deleteInboundRequestAction(requestId: string): Promise<ActionResult> {
   const supabase = createClient();
-  // Fetch storage paths before delete so we can clean up after.
   type InboundStorageRow = { excel_storage_path: string; image_paths: string[] | null };
-  const { data: row } = (await supabase.from('inbound_requests')
+  const { data: row } = (await supabase
+    .from('inbound_requests')
     .select('excel_storage_path, image_paths')
     .eq('id', requestId)
     .maybeSingle()) as { data: InboundStorageRow | null; error: unknown };
@@ -432,6 +508,6 @@ export async function deleteInboundRequestAction(requestId: string): Promise<Act
       await supabase.storage.from('inbound-requests').remove(paths);
     }
   }
-  revalidatePaths(['/inbound-requests', '/admin/inbound-requests']);
+  revalidatePaths(inboundListPaths());
   return { ok: true };
 }

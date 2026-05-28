@@ -1,6 +1,7 @@
 'use server';
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
+import { shippingUploadAllPaths } from '@/lib/actions/_revalidate-paths';
 import { mapShippingUploadError } from '@/lib/errors/shipping-upload';
 
 export async function approveShippingUploadAction(
@@ -15,14 +16,7 @@ export async function approveShippingUploadAction(
     console.error('[admin-shipping-uploads] approve', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths([
-    '/admin/shipping-uploads',
-    '/admin/shipping-uploads/exitmall',
-    '/admin/shipping-uploads/purchased',
-    '/shipping-uploads',
-    '/shipping-uploads/exitmall',
-    '/shipping-uploads/purchased',
-  ]);
+  revalidatePaths(shippingUploadAllPaths());
   return { ok: true };
 }
 
@@ -41,14 +35,7 @@ export async function rejectShippingUploadAction(
     console.error('[admin-shipping-uploads] reject', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths([
-    '/admin/shipping-uploads',
-    '/admin/shipping-uploads/exitmall',
-    '/admin/shipping-uploads/purchased',
-    '/shipping-uploads',
-    '/shipping-uploads/exitmall',
-    '/shipping-uploads/purchased',
-  ]);
+  revalidatePaths(shippingUploadAllPaths());
   return { ok: true };
 }
 
@@ -64,13 +51,6 @@ export async function completeShippingUploadAction(
     console.error('[admin-shipping-uploads] complete', { uploadId, error });
     return { ok: false, error: mapShippingUploadError(error.message) };
   }
-  revalidatePaths([
-    '/admin/shipping-uploads',
-    '/admin/shipping-uploads/exitmall',
-    '/admin/shipping-uploads/purchased',
-    '/shipping-uploads',
-    '/shipping-uploads/exitmall',
-    '/shipping-uploads/purchased',
-  ]);
+  revalidatePaths(shippingUploadAllPaths());
   return { ok: true };
 }

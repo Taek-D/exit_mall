@@ -1,7 +1,14 @@
 /**
- * @deprecated 2026-05-08 부터 사용하지 않음.
- * 새 흐름은 lib/actions/shipping-upload.ts 를 사용한다.
- * 이 파일은 legacy 데이터 호환성 검토를 위해 보존 중이며, 어느 코드에서도 import 하지 않는다.
+ * @deprecated 2026-05-08 부터 신규 흐름(lib/actions/shipping-upload.ts)으로 이전 중.
+ *
+ * 현재 사용처(2026-05-27 기준):
+ *   - app/(user)/orders/upload/UploadForm.tsx — uploadOrderExcelAction 호출
+ *
+ * 위 사용처를 shipping-upload.ts의 requestShippingUploadAction 또는
+ * requestPurchasedShippingUploadAction으로 마이그레이션한 후 본 파일을 삭제해야 한다.
+ * 마이그레이션은 UI 흐름 변경(검증·매칭 단계 추가)을 동반하므로 별도 PR로 처리한다.
+ *
+ * 신규 코드에서는 절대 import 하지 말 것.
  */
 'use server';
 import { createClient } from '@/lib/supabase/server';

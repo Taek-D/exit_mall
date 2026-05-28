@@ -3,6 +3,7 @@ import { adjustBalanceSchema, adminUserContactSchema, thresholdSchema } from '@/
 import { requireAdmin } from '@/lib/actions/_guards';
 import { callRpc, formatZodError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
 import { isSelfUserGroupChange, isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
+import { mapAdjustBalanceError } from '@/lib/errors/balance';
 
 export async function adjustBalanceAction(userId: string, fd: FormData) {
   const guard = await requireAdmin();
@@ -13,7 +14,8 @@ export async function adjustBalanceAction(userId: string, fd: FormData) {
     target_user: userId, delta: parsed.data.delta, memo: parsed.data.memo,
   });
   if (error) {
-    if (error.message.includes('NEGATIVE_BALANCE')) return { error: '잔액이 음수가 됩니다' };
+    const mapped = mapAdjustBalanceError(error.message);
+    if (mapped) return { error: mapped };
     console.error('[admin-users] adjustBalance', { userId, error });
     return { error: '예치금 조정에 실패했습니다.' };
   }

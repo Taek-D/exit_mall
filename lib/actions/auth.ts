@@ -11,6 +11,7 @@ import {
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
+import { mapAuthLoginError } from '@/lib/errors/auth';
 import { submitSignupApplication } from '@/lib/auth/signup-application';
 import { GROUP2_HOME } from '@/lib/auth/user-groups';
 import {
@@ -48,7 +49,7 @@ export async function loginAction(formData: FormData) {
 
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: '로그인 실패: 이메일 또는 비밀번호가 틀립니다' };
+  if (error) return { error: mapAuthLoginError(error.message) };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: '세션 오류' };
