@@ -56,11 +56,11 @@ function FindIdForm() {
     setAccounts(null);
     start(async () => {
       const result = await findAccountAction(fd);
-      if (result?.error) {
+      if (!result.ok) {
         setError(result.error);
         return;
       }
-      setAccounts(result?.accounts ?? []);
+      setAccounts(result.accounts);
     });
   }
 
@@ -133,11 +133,11 @@ function DirectPasswordResetForm() {
     setError(null);
     start(async () => {
       const result = await startDirectPasswordResetAction(fd);
-      if (result?.error) {
+      if (!result.ok) {
         setError(result.error);
         return;
       }
-      setResetToken(result?.resetToken ?? null);
+      setResetToken(result.resetToken);
     });
   }
 
@@ -147,7 +147,7 @@ function DirectPasswordResetForm() {
     setError(null);
     start(async () => {
       const result = await completeDirectPasswordResetAction(fd);
-      if (result?.error) {
+      if (!result.ok) {
         setError(result.error);
         return;
       }

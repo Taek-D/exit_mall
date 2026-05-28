@@ -1,11 +1,11 @@
 'use server';
 import { depositRequestSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
-import { formatZodError } from '@/lib/actions/_shared';
+import { formatZodError, type RedirectAction } from '@/lib/actions/_shared';
 import { requireUserGroup1 } from '@/lib/actions/_guards';
 import { redirect } from 'next/navigation';
 
-export async function createDepositRequestAction(formData: FormData) {
+export async function createDepositRequestAction(formData: FormData): RedirectAction {
   const parsed = depositRequestSchema.safeParse({
     amount: Number(formData.get('amount')),
     depositorName: String(formData.get('depositorName') ?? ''),

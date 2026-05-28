@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { formatZodError, formatZodPathError } from '@/lib/actions/_shared';
+import { formatZodError, formatZodPathError, type ActionResult, type RedirectAction } from '@/lib/actions/_shared';
 import { mapAuthLoginError } from '@/lib/errors/auth';
 import { submitSignupApplication } from '@/lib/auth/signup-application';
 import { GROUP2_HOME } from '@/lib/auth/user-groups';
@@ -20,7 +20,7 @@ import {
   startDirectPasswordReset,
 } from '@/lib/auth/direct-password-reset';
 
-export async function signupAction(formData: FormData) {
+export async function signupAction(formData: FormData): RedirectAction {
   const parsed = signupSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -40,7 +40,7 @@ export async function signupAction(formData: FormData) {
   redirect('/pending?status=pending&from=signup');
 }
 
-export async function loginAction(formData: FormData) {
+export async function loginAction(formData: FormData): RedirectAction {
   const parsed = loginSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
@@ -82,14 +82,14 @@ export async function logoutToSignupAction() {
   redirect('/signup');
 }
 
-export async function changePasswordAction(formData: FormData) {
+export async function changePasswordAction(formData: FormData): Promise<ActionResult> {
   const parsed = passwordChangeSchema.safeParse({
     currentPassword: formData.get('currentPassword'),
     newPassword: formData.get('newPassword'),
     confirmPassword: formData.get('confirmPassword'),
   });
   if (!parsed.success) {
-    return { error: formatZodError(parsed.error) };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
 
   const supabase = createClient();
@@ -97,19 +97,19 @@ export async function changePasswordAction(formData: FormData) {
     data: { user },
     error: userError,
   } = await supabase.auth.getUser();
-  if (userError || !user) return { error: '로그인이 필요합니다' };
-  if (!user.email) return { error: '이메일 로그인 계정에서만 비밀번호를 변경할 수 있습니다' };
+  if (userError || !user) return { ok: false, error: '로그인이 필요합니다' };
+  if (!user.email) return { ok: false, error: '이메일 로그인 계정에서만 비밀번호를 변경할 수 있습니다' };
 
   const { error: verifyError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: parsed.data.currentPassword,
   });
-  if (verifyError) return { error: '현재 비밀번호가 올바르지 않습니다' };
+  if (verifyError) return { ok: false, error: '현재 비밀번호가 올바르지 않습니다' };
 
   const { error: updateError } = await supabase.auth.updateUser({
     password: parsed.data.newPassword,
   });
-  if (updateError) return { error: updateError.message };
+  if (updateError) return { ok: false, error: updateError.message };
 
   return { ok: true };
 }
@@ -132,17 +132,19 @@ function maskEmail(email: string) {
   return `${maskedLocal}@${maskedDomain}`;
 }
 
-export async function findAccountAction(formData: FormData) {
+export async function findAccountAction(
+  formData: FormData,
+): Promise<ActionResult<{ accounts: { email: string; status: string }[] }>> {
   const parsed = findAccountSchema.safeParse({
     name: formData.get('name'),
     phone: formData.get('phone'),
   });
   if (!parsed.success) {
-    return { error: formatZodError(parsed.error) };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { error: '계정 찾기 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
+    return { ok: false, error: '계정 찾기 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
   }
 
   const supabase = createServiceRoleClient();
@@ -151,7 +153,7 @@ export async function findAccountAction(formData: FormData) {
     .select('email,phone,status')
     .eq('name', parsed.data.name);
 
-  if (error) return { error: error.message };
+  if (error) return { ok: false, error: error.message };
 
   const targetPhone = normalizePhone(parsed.data.phone);
   const matched = (data ?? []).filter((p) => normalizePhone(p.phone ?? '') === targetPhone);
@@ -179,18 +181,20 @@ function getRequestIp() {
   );
 }
 
-export async function startDirectPasswordResetAction(formData: FormData) {
+export async function startDirectPasswordResetAction(
+  formData: FormData,
+): Promise<ActionResult<{ resetToken: string }>> {
   const parsed = directPasswordResetStartSchema.safeParse({
     name: formData.get('name'),
     phone: formData.get('phone'),
     email: formData.get('email'),
   });
   if (!parsed.success) {
-    return { error: formatZodError(parsed.error) };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
+    return { ok: false, error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
   }
 
   try {
@@ -202,26 +206,28 @@ export async function startDirectPasswordResetAction(formData: FormData) {
         secret: getDirectPasswordResetSecret(),
       },
     );
-    if (!result.ok) return { error: result.error };
+    if (!result.ok) return { ok: false, error: result.error };
     return { ok: true, resetToken: result.resetToken };
   } catch (error) {
     console.error('[auth] direct password reset start', error);
-    return { error: '비밀번호 재설정을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.' };
+    return { ok: false, error: '비밀번호 재설정을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.' };
   }
 }
 
-export async function completeDirectPasswordResetAction(formData: FormData) {
+export async function completeDirectPasswordResetAction(
+  formData: FormData,
+): Promise<ActionResult> {
   const parsed = directPasswordResetCompleteSchema.safeParse({
     resetToken: formData.get('resetToken'),
     newPassword: formData.get('newPassword'),
     confirmPassword: formData.get('confirmPassword'),
   });
   if (!parsed.success) {
-    return { error: formatZodError(parsed.error) };
+    return { ok: false, error: formatZodError(parsed.error) };
   }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return { error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
+    return { ok: false, error: '비밀번호 재설정 기능을 사용하려면 SUPABASE_SERVICE_ROLE_KEY가 필요합니다' };
   }
 
   try {
@@ -233,10 +239,10 @@ export async function completeDirectPasswordResetAction(formData: FormData) {
       createServiceRoleClient(),
       { secret: getDirectPasswordResetSecret() },
     );
-    if (!result.ok) return { error: result.error };
+    if (!result.ok) return { ok: false, error: result.error };
     return { ok: true };
   } catch (error) {
     console.error('[auth] direct password reset complete', error);
-    return { error: '비밀번호를 재설정하지 못했습니다. 처음부터 다시 시도해주세요.' };
+    return { ok: false, error: '비밀번호를 재설정하지 못했습니다. 처음부터 다시 시도해주세요.' };
   }
 }

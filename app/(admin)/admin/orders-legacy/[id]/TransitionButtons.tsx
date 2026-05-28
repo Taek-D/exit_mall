@@ -9,6 +9,7 @@ import {
   markDeliveredAction,
   adminCancelOrderAction,
 } from '@/lib/actions/admin-orders';
+import type { ActionResult } from '@/lib/actions/_shared';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import type { OrderStatus } from '@/lib/types';
@@ -29,10 +30,10 @@ export function TransitionButtons({
   const [carrier, setCarrier] = useState('');
   const { confirm, element: confirmElement } = useConfirm();
 
-  function run(fn: () => Promise<{ error?: string }>, success: string) {
+  function run(fn: () => Promise<ActionResult>, success: string) {
     start(async () => {
       const r = await fn();
-      if (r.error) toast({ title: '실패', description: r.error, variant: 'destructive' });
+      if (!r.ok) toast({ title: '실패', description: r.error, variant: 'destructive' });
       else {
         toast({ title: success });
         router.refresh();

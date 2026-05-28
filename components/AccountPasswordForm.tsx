@@ -38,7 +38,7 @@ export function AccountPasswordForm() {
 
     start(async () => {
       const result = await changePasswordAction(fd);
-      if (result?.error) {
+      if (!result.ok) {
         setError(result.error);
         return;
       }

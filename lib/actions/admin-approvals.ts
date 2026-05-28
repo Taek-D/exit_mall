@@ -1,14 +1,14 @@
 'use server';
 import { requireAdmin } from '@/lib/actions/_guards';
-import { mutationTable, revalidatePaths } from '@/lib/actions/_shared';
+import { mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 import { isUserGroup, type UserGroup } from '@/lib/auth/user-groups';
 
-export async function approveUserAction(userId: string, group: UserGroup) {
+export async function approveUserAction(userId: string, group: UserGroup): Promise<ActionResult> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  if (!guard.ok) return { ok: false, error: guard.error };
 
   if (!isUserGroup(group)) {
-    return { error: '그룹이 올바르지 않습니다.' };
+    return { ok: false, error: '그룹이 올바르지 않습니다.' };
   }
 
   const { error } = await mutationTable(guard.supabase, 'profiles')
@@ -20,7 +20,7 @@ export async function approveUserAction(userId: string, group: UserGroup) {
     .eq('id', userId);
   if (error) {
     console.error('[admin-approvals] approve', { userId, group, error });
-    return { error: '가입을 승인하지 못했습니다.' };
+    return { ok: false, error: '가입을 승인하지 못했습니다.' };
   }
   console.info('[admin-approvals] approved', {
     userId,
@@ -31,15 +31,15 @@ export async function approveUserAction(userId: string, group: UserGroup) {
   return { ok: true };
 }
 
-export async function rejectUserAction(userId: string) {
+export async function rejectUserAction(userId: string): Promise<ActionResult> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  if (!guard.ok) return { ok: false, error: guard.error };
   const { error } = await mutationTable(guard.supabase, 'profiles')
     .update({ status: 'rejected' })
     .eq('id', userId);
   if (error) {
     console.error('[admin-approvals] reject', { userId, error });
-    return { error: '가입을 반려하지 못했습니다.' };
+    return { ok: false, error: '가입을 반려하지 못했습니다.' };
   }
   revalidatePaths(['/admin/approvals', '/admin/users', '/admin']);
   return { ok: true };

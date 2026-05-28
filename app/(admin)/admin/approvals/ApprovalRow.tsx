@@ -39,7 +39,7 @@ export function ApprovalRow({ profile }: { profile: Profile }) {
     if (!group) return;
     start(async () => {
       const r = await approveUserAction(profile.id, group);
-      if (r.error) {
+      if (!r.ok) {
         toast({ title: '실패', description: r.error, variant: 'destructive' });
       } else {
         toast({ title: '승인 완료' });
@@ -51,7 +51,7 @@ export function ApprovalRow({ profile }: { profile: Profile }) {
   function reject() {
     start(async () => {
       const r = await rejectUserAction(profile.id);
-      if (r.error) {
+      if (!r.ok) {
         toast({ title: '실패', description: r.error, variant: 'destructive' });
       } else {
         toast({ title: '반려 완료' });

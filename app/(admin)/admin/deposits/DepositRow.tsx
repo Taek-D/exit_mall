@@ -29,7 +29,7 @@ export function DepositRow({ request }: Props) {
   function runConfirm() {
     start(async () => {
       const r = await confirmDepositAction(request.id);
-      if (r.error) toast({ title: '실패', description: r.error, variant: 'destructive' });
+      if (!r.ok) toast({ title: '실패', description: r.error, variant: 'destructive' });
       else {
         toast({ title: '입금 확인 완료' });
         router.refresh();
@@ -50,7 +50,7 @@ export function DepositRow({ request }: Props) {
     if (!res.ok) return;
     start(async () => {
       const r = await rejectDepositAction(request.id, res.reason);
-      if (r.error) toast({ title: '실패', description: r.error, variant: 'destructive' });
+      if (!r.ok) toast({ title: '실패', description: r.error, variant: 'destructive' });
       else {
         toast({ title: '반려 완료' });
         router.refresh();

@@ -2,7 +2,7 @@
 import { productSchema } from '@/lib/schemas';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/actions/_guards';
-import { formatZodPathError, mutationTable, revalidatePaths } from '@/lib/actions/_shared';
+import { formatZodPathError, mutationTable, revalidatePaths, type ActionResult, type RedirectAction } from '@/lib/actions/_shared';
 
 function parseForm(fd: FormData) {
   const rawLimit = (fd.get('perUserLimit') as string | null)?.trim() ?? '';
@@ -26,7 +26,7 @@ function parseForm(fd: FormData) {
   });
 }
 
-export async function createProductAction(fd: FormData) {
+export async function createProductAction(fd: FormData): RedirectAction {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
@@ -48,7 +48,7 @@ export async function createProductAction(fd: FormData) {
   redirect('/admin/products');
 }
 
-export async function updateProductAction(id: string, fd: FormData) {
+export async function updateProductAction(id: string, fd: FormData): RedirectAction {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
   const parsed = parseForm(fd);
@@ -70,9 +70,9 @@ export async function updateProductAction(id: string, fd: FormData) {
   redirect('/admin/products');
 }
 
-export async function deleteProductAction(id: string) {
+export async function deleteProductAction(id: string): Promise<ActionResult> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  if (!guard.ok) return { ok: false, error: guard.error };
   const { error } = await mutationTable(guard.supabase, 'products')
     .update({
       is_active: false,
@@ -83,15 +83,15 @@ export async function deleteProductAction(id: string) {
     .is('deleted_at', null);
   if (error) {
     console.error('[admin-products] delete', { id, error });
-    return { error: '상품을 삭제하지 못했습니다.' };
+    return { ok: false, error: '상품을 삭제하지 못했습니다.' };
   }
   revalidatePaths(['/admin/products', '/shop']);
   return { ok: true };
 }
 
-export async function restoreProductAction(id: string) {
+export async function restoreProductAction(id: string): Promise<ActionResult> {
   const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  if (!guard.ok) return { ok: false, error: guard.error };
   const { error } = await mutationTable(guard.supabase, 'products')
     .update({
       deleted_at: null,
@@ -101,7 +101,7 @@ export async function restoreProductAction(id: string) {
     .not('deleted_at', 'is', null);
   if (error) {
     console.error('[admin-products] restore', { id, error });
-    return { error: '상품을 복구하지 못했습니다.' };
+    return { ok: false, error: '상품을 복구하지 못했습니다.' };
   }
   revalidatePaths(['/admin/products', '/shop']);
   return { ok: true };
