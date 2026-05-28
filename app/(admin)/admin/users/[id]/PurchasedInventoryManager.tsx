@@ -155,10 +155,10 @@ export function PurchasedInventoryManager({
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[980px] table-fixed text-sm">
               <colgroup>
-                <col className="w-[36%]" />
-                <col className="w-[18%]" />
+                <col className="w-[34%]" />
+                <col className="w-[21%]" />
                 <col className="w-[5%]" />
-                <col className="w-[7%]" />
+                <col className="w-[6%]" />
                 <col className="w-[6%]" />
                 <col className="w-[9%]" />
                 <col className="w-[13%]" />
@@ -214,7 +214,7 @@ export function PurchasedInventoryManager({
                       <td className="px-3 py-2">
                         <Input
                           type="number"
-                          className="px-2"
+                          className="px-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           min={row.reserved_quantity}
                           value={Number.isFinite(state.remainingQuantity) ? state.remainingQuantity : 0}
                           onChange={(e) =>
