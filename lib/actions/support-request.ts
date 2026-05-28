@@ -1,6 +1,7 @@
 'use server';
 
 import { randomUUID } from 'crypto';
+import { redirect } from 'next/navigation';
 import {
   callRpc,
   formatZodError,
@@ -305,10 +306,10 @@ export async function submitSupportRequestAction(
   }
 
   revalidatePaths(['/support-requests', '/admin/support-requests']);
-  // 네비게이션과 성공 토스트는 클라이언트(NewSupportRequestForm)가 성공 state를 받아 처리한다.
-  // 서버 redirect를 두면 useFormState가 성공 state를 받지 못해 클라이언트 토스트/이동이
-  // 죽은 코드가 되므로 결과만 반환한다.
-  return { ok: true, requestId };
+  // 서버 redirect로 네비게이션을 처리한다 — progressive enhancement로 JS/하이드레이션
+  // 여부와 무관하게 동작한다. 클라이언트 중복 네비게이션(과거 useEffect router.push)은
+  // 폼에서 제거됐다. 성공 경로는 throw(never)이므로 호출 측 state는 갱신되지 않는다.
+  redirect(`/support-requests/${requestId}`);
 }
 
 export async function cancelSupportRequestAction(requestId: string): Promise<ActionResult> {

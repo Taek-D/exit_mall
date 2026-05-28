@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import {
   submitSupportRequestAction,
   type SubmitSupportResult,
@@ -12,10 +10,10 @@ import {
 
 const ATTACHMENT_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.xlsx,.xls,.docx,.txt';
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending || disabled}>
+    <Button type="submit" disabled={pending}>
       {pending ? '등록 중...' : '등록'}
     </Button>
   );
@@ -26,23 +24,13 @@ export function NewSupportRequestForm() {
     submitSupportRequestAction,
     null,
   );
-  const router = useRouter();
-  const { toast } = useToast();
-  const [redirecting, setRedirecting] = useState(false);
   const [attachmentSummary, setAttachmentSummary] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (state?.ok) {
-      setRedirecting(true);
-      toast({ title: '문의가 등록되었습니다.' });
-      router.push(`/support-requests/${state.requestId}`);
-      router.refresh();
-    }
-  }, [state, router, toast]);
-
+  // 성공 시 서버 액션이 상세 페이지로 redirect 한다(progressive enhancement).
+  // 실패 시에만 아래 state.error 가 렌더된다.
   return (
     <form action={formAction} className="rounded-lg border bg-card p-5 space-y-4">
-      <fieldset disabled={redirecting} className="space-y-4 disabled:opacity-70">
+      <fieldset className="space-y-4">
       <div className="space-y-1.5">
         <label htmlFor="category" className="text-sm font-medium">
           문의 유형 *
@@ -157,7 +145,7 @@ export function NewSupportRequestForm() {
       )}
 
       <div className="flex justify-end">
-        <SubmitButton disabled={redirecting} />
+        <SubmitButton />
       </div>
     </form>
   );

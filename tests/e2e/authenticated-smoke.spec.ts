@@ -98,6 +98,21 @@ test.describe('authenticated smoke', () => {
     );
     await expect(page.getByRole('heading', { name: '최근 업로드' })).toBeVisible();
   });
+
+  test('customer submits a support request and lands on its detail page (S-12)', async ({
+    page,
+  }) => {
+    await login(page, seed.customer.email, seed.credential);
+    await page.goto('/support-requests/new');
+
+    await page.locator('input#title').fill('E2E 문의 제목');
+    await page.locator('textarea#body').fill('E2E 문의 내용입니다. 자동 검증용.');
+    await page.getByRole('button', { name: /^등록$/ }).click();
+
+    // 서버 redirect(progressive enhancement)로 상세 페이지(/support-requests/{uuid})로
+    // 이동해야 한다. /new 에 머무르면 제출 실패.
+    await page.waitForURL(/\/support-requests\/[0-9a-fA-F-]{36}$/);
+  });
 });
 
 async function login(page: Page, email: string, password: string) {
@@ -226,6 +241,12 @@ async function cleanupQaSeed(supabase: SupabaseClient<Database>, qaSeed: QaSeed)
   const recordError = (label: string, error: { message: string } | null) => {
     if (error) cleanupErrors.push(`${label}: ${error.message}`);
   };
+
+  const { error: supportError } = await supabase
+    .from('support_requests')
+    .delete()
+    .eq('user_id', qaSeed.customer.id);
+  recordError('support_requests', supportError);
 
   const { error: orderError } = await supabase
     .from('stock_orders')
