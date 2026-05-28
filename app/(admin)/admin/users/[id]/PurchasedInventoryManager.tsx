@@ -153,7 +153,17 @@ export function PurchasedInventoryManager({
           <p className="text-sm text-muted-foreground">등록된 사입재고가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto rounded-md border">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[980px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[34%]" />
+                <col className="w-[11%]" />
+                <col className="w-[6%]" />
+                <col className="w-[7%]" />
+                <col className="w-[6%]" />
+                <col className="w-[9%]" />
+                <col className="w-[16%]" />
+                <col className="w-[11%]" />
+              </colgroup>
               <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr className="border-b">
                   <th className="px-3 py-2 text-left font-medium">상품명</th>
@@ -204,6 +214,7 @@ export function PurchasedInventoryManager({
                       <td className="px-3 py-2">
                         <Input
                           type="number"
+                          className="px-2"
                           min={row.reserved_quantity}
                           value={Number.isFinite(state.remainingQuantity) ? state.remainingQuantity : 0}
                           onChange={(e) =>
