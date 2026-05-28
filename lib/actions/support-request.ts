@@ -1,7 +1,6 @@
 'use server';
 
 import { randomUUID } from 'crypto';
-import { redirect } from 'next/navigation';
 import {
   callRpc,
   formatZodError,
@@ -306,9 +305,10 @@ export async function submitSupportRequestAction(
   }
 
   revalidatePaths(['/support-requests', '/admin/support-requests']);
-  // NOTE: NewSupportRequestForm의 useEffect router.push와 이중 navigate 문제는
-  // 안전망 테스트(S-12)에서 계약으로 고정되어 있으며, Phase 3에서 한쪽을 제거한다.
-  redirect(`/support-requests/${requestId}`);
+  // 네비게이션과 성공 토스트는 클라이언트(NewSupportRequestForm)가 성공 state를 받아 처리한다.
+  // 서버 redirect를 두면 useFormState가 성공 state를 받지 못해 클라이언트 토스트/이동이
+  // 죽은 코드가 되므로 결과만 반환한다.
+  return { ok: true, requestId };
 }
 
 export async function cancelSupportRequestAction(requestId: string): Promise<ActionResult> {

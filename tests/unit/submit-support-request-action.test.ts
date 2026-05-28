@@ -320,12 +320,12 @@ describe('submitSupportRequestAction - RPC/첨부 실패 + cleanup', () => {
 // ============================================================================
 
 describe('submitSupportRequestAction - 정상 경로 + redirect 계약', () => {
-  it('S-10: 첨부 없는 정상 경로 → RPC 호출 + redirect 호출 (이중 navigate 버그 계약)', async () => {
+  it('S-10: 첨부 없는 정상 경로 → RPC 호출 + { ok, requestId } 반환 (서버 redirect 없음)', async () => {
     const sb = buildSupabase();
     setSignedIn(sb.client);
     mocks.callRpc.mockResolvedValue({ data: REQUEST_ID, error: null });
 
-    await submitSupportRequestAction(null, buildFormData());
+    const result = await submitSupportRequestAction(null, buildFormData());
 
     expect(mocks.callRpc).toHaveBeenCalledWith(
       sb.client,
@@ -338,10 +338,12 @@ describe('submitSupportRequestAction - 정상 경로 + redirect 계약', () => {
       }),
     );
     expect(mocks.revalidatePaths).toHaveBeenCalled();
-    expect(mocks.redirect).toHaveBeenCalledWith(`/support-requests/${REQUEST_ID}`);
+    // ★ S-12 수정: 네비게이션은 클라이언트가 성공 state로 처리. 서버 redirect는 호출되지 않는다.
+    expect(result).toEqual({ ok: true, requestId: REQUEST_ID });
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it('S-11: 첨부 있는 정상 경로 → storage upload + metadata insert + redirect 순서', async () => {
+  it('S-11: 첨부 있는 정상 경로 → storage upload + metadata insert + { ok, requestId } 반환', async () => {
     const upload = vi.fn().mockResolvedValue({ error: null });
     const sb = buildSupabase({ storage: { upload } });
     setSignedIn(sb.client);
@@ -350,7 +352,7 @@ describe('submitSupportRequestAction - 정상 경로 + redirect 계약', () => {
     const insertChain = { insert: vi.fn().mockResolvedValue({ error: null }) };
     mocks.mutationTable.mockReturnValue(insertChain);
 
-    await submitSupportRequestAction(
+    const result = await submitSupportRequestAction(
       null,
       buildFormData({ attachments: [makeJpegFile('a.jpg'), makeJpegFile('b.jpg')] }),
     );
@@ -360,6 +362,7 @@ describe('submitSupportRequestAction - 정상 경로 + redirect 계약', () => {
     const firstInsertArg = insertChain.insert.mock.calls[0][0];
     expect(firstInsertArg.request_id).toBe(REQUEST_ID);
     expect(firstInsertArg.user_id).toBe(USER_ID);
-    expect(mocks.redirect).toHaveBeenCalledWith(`/support-requests/${REQUEST_ID}`);
+    expect(result).toEqual({ ok: true, requestId: REQUEST_ID });
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });
