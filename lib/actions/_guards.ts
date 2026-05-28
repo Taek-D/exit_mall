@@ -2,6 +2,20 @@
 import { createClient } from '@/lib/supabase/server';
 import type { User } from '@supabase/supabase-js';
 
+/**
+ * 액션 인증 가드 정책.
+ *
+ * - requireAdmin      : role='admin' && status='active' (관리자 전용 액션)
+ * - requireUserGroup1 : status='active' && group2 차단 (구매/주문 등 group1 한정)
+ * - requireSignedIn   : status='active'만 (group 무관, 모든 활성 사용자)
+ *
+ * 가드를 생략하고 RLS만으로 권한을 보장하는 액션도 있다. RPC가 자체적으로
+ * 작성자/관리자/활성 여부를 검증하고 user.id가 직접 필요 없는 경우
+ * (예: *CommentAction의 add 계열, setStatus/markRead)에는 createClient()만
+ * 사용하고 해당 액션에 "RLS가 검증" 주석을 남긴다. 반면 user.id로 추가 검증이
+ * 필요한 액션(예: 댓글 수정/삭제의 작성자 확인)은 반드시 가드를 사용한다.
+ */
+
 export type SupabaseServerClient = ReturnType<typeof createClient>;
 
 export type AdminContext = {

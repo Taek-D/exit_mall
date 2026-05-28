@@ -8,7 +8,14 @@
  *   - _revalidate-paths.ts (revalidatePaths + 도메인 경로 상수)
  *
  * 기존 import 호환을 위해 이 파일은 4개 모듈의 re-export 역할을 유지한다.
- * 신규 코드는 가능한 한 구체 모듈에서 직접 import 할 것.
+ *
+ * import 컨벤션:
+ *   - 코어 헬퍼(ActionResult, RedirectAction, actionError, formatZodError,
+ *     formatZodPathError, callRpc, mutationTable, revalidatePaths)는
+ *     이 배럴(_shared)에서 import 한다.
+ *   - 도메인별 revalidate 경로 상수(shippingUploadAllPaths/adminTrackingPaths/
+ *     supportDetailPaths/inboundDetailPaths/inboundListPaths)는 _shared가
+ *     re-export 하지 않으므로 _revalidate-paths 에서 직접 import 한다.
  *
  * ## 신규 액션 작성 시 선택 가이드
  *
