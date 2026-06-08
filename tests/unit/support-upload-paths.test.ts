@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { supportAttachmentPath, supportCleanupPaths } from '@/lib/support/upload-paths';
+import {
+  supportAttachmentPath,
+  supportCleanupPaths,
+  supportCommentImagePath,
+} from '@/lib/support/upload-paths';
 import { safeSupportFilename } from '@/lib/support/storage';
 
 describe('safeSupportFilename', () => {
@@ -22,6 +26,20 @@ describe('supportAttachmentPath', () => {
         originalName: '교환 증빙.png',
       }),
     ).toBe('user-1/request-1/attachments/attachment-1-교환_증빙.png');
+  });
+});
+
+describe('supportCommentImagePath', () => {
+  it('builds a canonical private storage path for one comment image', () => {
+    expect(
+      supportCommentImagePath({
+        userId: 'admin-1',
+        requestId: 'request-1',
+        commentId: 'comment-1',
+        imageId: 'image-1',
+        originalName: 'reply proof.png',
+      }),
+    ).toBe('admin-1/request-1/comments/comment-1/image-1-reply_proof.png');
   });
 });
 

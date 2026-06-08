@@ -1,4 +1,5 @@
 import { Shield, User as UserIcon } from 'lucide-react';
+import { getSupportCommentImageUrlAction } from '@/lib/actions/support-request';
 import { formatShortDateTimeKR } from '@/lib/dates';
 import type { SupportCommentRow } from '@/lib/support/queries';
 import { cn } from '@/lib/utils';
@@ -11,10 +12,20 @@ type Props = {
   locked?: boolean;
 };
 
-export function SupportCommentList({ comments, currentUserId, isAdmin, locked = false }: Props) {
+export async function SupportCommentList({ comments, currentUserId, isAdmin, locked = false }: Props) {
   if (comments.length === 0) {
     return <p className="py-4 text-sm text-muted-foreground">아직 댓글이 없습니다.</p>;
   }
+
+  const signedImages = new Map(
+    await Promise.all(
+      comments.map(async (comment) => {
+        if (!comment.image) return [comment.id, null] as const;
+        const result = await getSupportCommentImageUrlAction(comment.request_id, comment.image.id);
+        return [comment.id, result.ok ? result.url : null] as const;
+      }),
+    ),
+  );
 
   return (
     <ul className="space-y-4">
@@ -46,13 +57,30 @@ export function SupportCommentList({ comments, currentUserId, isAdmin, locked = 
                 {comment.updated_at !== comment.created_at && <span>(수정됨)</span>}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm">{comment.body}</p>
+              {comment.image && signedImages.get(comment.id) && (
+                <a
+                  href={signedImages.get(comment.id) ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 block h-32 w-32 overflow-hidden rounded-md border bg-muted"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={signedImages.get(comment.id) ?? ''}
+                    alt={comment.image.original_name}
+                    className="h-full w-full object-cover"
+                  />
+                </a>
+              )}
               {!locked && (
                 <CommentRowActions
                   commentId={comment.id}
                   createdAt={comment.created_at}
                   isAuthor={isAuthor}
                   isAdmin={isAdmin}
+                  canEditImage={isAdmin && isAdminAuthor}
                   body={comment.body}
+                  image={comment.image}
                 />
               )}
             </div>

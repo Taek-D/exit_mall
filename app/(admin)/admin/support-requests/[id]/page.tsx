@@ -80,6 +80,7 @@ export default async function AdminSupportRequestDetailPage({
         <SupportCommentForm
           requestId={request.id}
           disabled={locked}
+          allowImage
           disabledReason={locked ? '종결된 문의에는 댓글을 작성할 수 없습니다.' : undefined}
         />
       </section>

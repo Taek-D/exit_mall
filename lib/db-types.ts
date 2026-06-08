@@ -1202,6 +1202,64 @@ export type Database = {
           },
         ]
       }
+      support_request_comment_images: {
+        Row: {
+          comment_id: string
+          content_type: string
+          created_at: string
+          id: string
+          original_name: string
+          request_id: string
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          original_name: string
+          request_id: string
+          size_bytes: number
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          original_name?: string
+          request_id?: string
+          size_bytes?: number
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_request_comment_images_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: true
+            referencedRelation: "support_request_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_request_comment_images_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_request_comment_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_request_comments: {
         Row: {
           author_id: string
@@ -1416,6 +1474,7 @@ export type Database = {
         Args: {
           p_request_id: string
           p_body: string
+          p_has_image?: boolean
         }
         Returns: string
       }

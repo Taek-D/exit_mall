@@ -28,6 +28,18 @@ export type SupportAttachmentRow = {
   created_at: string;
 };
 
+export type SupportCommentImageRow = {
+  id: string;
+  comment_id: string;
+  request_id: string;
+  user_id: string;
+  storage_path: string;
+  original_name: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+};
+
 export type SupportRequestDetail = SupportListRow & {
   body: string;
   reference_type: SupportReferenceType;
@@ -44,6 +56,7 @@ export type SupportCommentRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  image?: SupportCommentImageRow | null;
 };
 
 type SearchSupportRow = {
@@ -131,6 +144,7 @@ export async function fetchSupportRequest(id: string): Promise<{
     { data: request, error: requestError },
     { data: attachments, error: attachmentsError },
     { data: comments, error: commentsError },
+    { data: commentImages, error: commentImagesError },
   ] = await Promise.all([
     supabase
       .from('support_requests')
@@ -147,6 +161,11 @@ export async function fetchSupportRequest(id: string): Promise<{
     supabase
       .from('support_request_comments')
       .select('id,request_id,author_id,author_role,body,created_at,updated_at,deleted_at')
+      .eq('request_id', id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('support_request_comment_images')
+      .select('id,comment_id,request_id,user_id,storage_path,original_name,content_type,size_bytes,created_at')
       .eq('request_id', id)
       .order('created_at', { ascending: true }),
   ]);
@@ -166,13 +185,27 @@ export async function fetchSupportRequest(id: string): Promise<{
   if (commentsError) {
     console.error('[support] fetchSupportRequest comments', commentsError);
   }
+  if (commentImagesError) {
+    console.error('[support] fetchSupportRequest comment images', commentImagesError);
+  }
+
+  const imageByCommentId = new Map(
+    (commentImagesError ? [] : ((commentImages ?? []) as unknown as SupportCommentImageRow[])).map(
+      (image) => [image.comment_id, image] as const,
+    ),
+  );
 
   return {
     request: {
       ...(request as unknown as Omit<SupportRequestDetail, 'attachments'>),
       attachments: attachmentsError ? [] : (attachments ?? []) as unknown as SupportAttachmentRow[],
     },
-    comments: commentsError ? [] : (comments ?? []) as unknown as SupportCommentRow[],
+    comments: commentsError
+      ? []
+      : ((comments ?? []) as unknown as SupportCommentRow[]).map((comment) => ({
+          ...comment,
+          image: imageByCommentId.get(comment.id) ?? null,
+        })),
   };
 }
 

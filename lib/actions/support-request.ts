@@ -21,11 +21,16 @@ import {
   mapSupportStatusError,
 } from '@/lib/support/action-errors';
 import { getSupportCommentAccessError, isSupportLocked } from '@/lib/support/permissions';
-import { supportAttachmentPath, supportCleanupPaths } from '@/lib/support/upload-paths';
+import {
+  supportAttachmentPath,
+  supportCleanupPaths,
+  supportCommentImagePath,
+} from '@/lib/support/upload-paths';
 import type { SupportStatus } from '@/lib/types';
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_COMMENT_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_EXT = [
   '.jpg',
   '.jpeg',
@@ -37,6 +42,7 @@ const ALLOWED_ATTACHMENT_EXT = [
   '.docx',
   '.txt',
 ];
+const ALLOWED_COMMENT_IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 const ATTACHMENT_CONTENT_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -55,6 +61,8 @@ type PreparedAttachment = {
   buffer: Buffer;
   contentType: string;
 };
+
+type PreparedCommentImage = PreparedAttachment;
 
 export type SubmitSupportResult =
   | { ok: true; requestId: string }
@@ -130,6 +138,64 @@ async function collectAttachments(fd: FormData): Promise<PreparedAttachment[] | 
   return prepared;
 }
 
+function commentImageExtension(file: File): string | null {
+  const name = lower(file.name);
+  return ALLOWED_COMMENT_IMAGE_EXT.find((ext) => name.endsWith(ext)) ?? null;
+}
+
+async function collectCommentImage(
+  fd: FormData,
+): Promise<PreparedCommentImage | null | { error: string }> {
+  const files = fd
+    .getAll('image')
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+  if (files.length === 0) return null;
+  if (files.length > 1) {
+    return { error: '댓글 이미지는 1장만 첨부할 수 있습니다.' };
+  }
+
+  const file = files[0];
+  if (file.size > MAX_COMMENT_IMAGE_BYTES) {
+    return { error: '댓글 이미지는 5MB 이하만 첨부할 수 있습니다.' };
+  }
+
+  const ext = commentImageExtension(file);
+  if (!ext) {
+    return { error: '댓글 이미지는 jpg/jpeg/png/webp 형식만 첨부할 수 있습니다.' };
+  }
+
+  const buffer = await fileToBuffer(file);
+  if (!isValidAttachmentBuffer(ext, buffer)) {
+    return { error: '댓글 이미지 형식과 내용이 일치하지 않습니다.' };
+  }
+
+  return {
+    file,
+    buffer,
+    contentType: ATTACHMENT_CONTENT_TYPES[ext],
+  };
+}
+
+function validateSupportCommentBody({
+  body,
+  hasImage,
+  isAdmin,
+}: {
+  body: string;
+  hasImage: boolean;
+  isAdmin: boolean;
+}): ActionResult<{ body: string }> {
+  const trimmed = body.trim();
+  if (trimmed.length === 0 && isAdmin && hasImage) {
+    return { ok: true, body: '' };
+  }
+
+  const parsed = supportCommentSchema.safeParse({ body });
+  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
+  return { ok: true, body: parsed.data.body };
+}
+
 type SupportUploadProgress = { uploadedPaths: string[]; insertedAttachmentIds: string[] };
 type SupportUploadError = Error & { partial?: SupportUploadProgress };
 
@@ -184,6 +250,76 @@ async function uploadSupportAttachments(
       error instanceof Error ? error : new Error(String(error));
     err.partial = { uploadedPaths, insertedAttachmentIds };
     throw err;
+  }
+}
+
+type CommentImageUploadResult = {
+  imageId: string;
+  storagePath: string;
+};
+
+async function uploadSupportCommentImage({
+  supabase,
+  userId,
+  requestId,
+  commentId,
+  image,
+}: {
+  supabase: SignedInContext['supabase'];
+  userId: string;
+  requestId: string;
+  commentId: string;
+  image: PreparedCommentImage;
+}): Promise<CommentImageUploadResult> {
+  const imageId = randomUUID();
+  const storagePath = supportCommentImagePath({
+    userId,
+    requestId,
+    commentId,
+    imageId,
+    originalName: image.file.name,
+  });
+
+  const { error: uploadErr } = await supabase.storage
+    .from('support-requests')
+    .upload(storagePath, image.buffer, {
+      contentType: image.contentType,
+      upsert: false,
+    });
+  if (uploadErr) throw uploadErr;
+
+  const { error: metaErr } = await mutationTable(supabase, 'support_request_comment_images').insert({
+    id: imageId,
+    comment_id: commentId,
+    request_id: requestId,
+    user_id: userId,
+    storage_path: storagePath,
+    original_name: image.file.name,
+    content_type: image.contentType,
+    size_bytes: image.file.size,
+  });
+  if (metaErr) {
+    const { error: cleanupError } = await supabase.storage
+      .from('support-requests')
+      .remove([storagePath]);
+    if (cleanupError) {
+      console.error('[support] comment image upload cleanup failed', cleanupError);
+    }
+    throw metaErr;
+  }
+
+  return { imageId, storagePath };
+}
+
+async function cleanupCommentImageStorage(
+  supabase: ReturnType<typeof createClient>,
+  paths: string[],
+): Promise<void> {
+  const cleanupPaths = supportCleanupPaths(paths);
+  if (cleanupPaths.length === 0) return;
+  const { error } = await supabase.storage.from('support-requests').remove(cleanupPaths);
+  if (error) {
+    console.error('[support] comment image storage cleanup failed', error);
   }
 }
 
@@ -365,17 +501,32 @@ export async function markSupportReadAction(
 
 export async function addSupportCommentAction(
   requestId: string,
-  body: string,
+  fd: FormData,
 ): Promise<ActionResult<{ id: string }>> {
-  // 권한은 add_support_comment RPC + RLS가 검증한다(작성자/관리자/활성 계정).
-  // user.id가 직접 필요 없어 requireSignedIn 가드를 생략한다(update/delete는 가드 사용).
-  const supabase = createClient();
-  const parsed = supportCommentSchema.safeParse({ body });
-  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
+  // 권한은 add_support_comment RPC + RLS가 검증하고, 이미지 첨부는 아래 admin guard가 제한한다.
+  const guard = await requireSignedIn();
+  if (!guard.ok) return { ok: false, error: guard.error };
+  const { supabase, user, profile } = guard;
+
+  const image = await collectCommentImage(fd);
+  if (image && !('file' in image)) return { ok: false, error: image.error };
+  const hasImage = Boolean(image);
+  const isAdmin = profile.role === 'admin';
+  if (hasImage && !isAdmin) {
+    return { ok: false, error: '관리자만 댓글 이미지를 첨부할 수 있습니다.' };
+  }
+
+  const parsed = validateSupportCommentBody({
+    body: String(fd.get('body') ?? ''),
+    hasImage,
+    isAdmin,
+  });
+  if (!parsed.ok) return parsed;
 
   const { data, error } = await callRpc(supabase, 'add_support_comment', {
     p_request_id: requestId,
-    p_body: parsed.data.body,
+    p_body: parsed.body,
+    p_has_image: hasImage,
   });
   if (error) {
     const mapped = mapSupportCommentError(error.message);
@@ -383,11 +534,51 @@ export async function addSupportCommentAction(
     console.error('[support] addComment', { requestId, error });
     return { ok: false, error: '댓글 작성에 실패했습니다.' };
   }
+  const commentId = String(data);
+  if (image && 'file' in image) {
+    try {
+      await uploadSupportCommentImage({
+        supabase,
+        userId: user.id,
+        requestId,
+        commentId,
+        image,
+      });
+    } catch (uploadError) {
+      const { error: rollbackError } = await callRpc(supabase, 'delete_support_comment', {
+        p_comment_id: commentId,
+      });
+      if (rollbackError) {
+        console.error('[support] rollback comment after image upload failed', {
+          commentId,
+          rollbackError,
+        });
+      }
+      console.error('[support] comment image upload failed', { requestId, commentId, uploadError });
+      return { ok: false, error: '댓글 이미지 업로드에 실패했습니다. 다시 시도해주세요.' };
+    }
+  }
   revalidatePaths(supportDetailPaths(requestId));
-  return { ok: true, id: String(data) };
+  return { ok: true, id: commentId };
 }
 
-type CommentRow = { author_id: string; created_at: string; request_id: string };
+type CommentRow = {
+  author_id: string;
+  author_role: 'admin' | 'user';
+  created_at: string;
+  request_id: string;
+};
+type ExistingCommentImageRow = {
+  id: string;
+  comment_id: string;
+  request_id: string;
+  user_id: string;
+  storage_path: string;
+  original_name: string;
+  content_type: string;
+  size_bytes: number;
+};
+type CommentImageRow = ExistingCommentImageRow | null;
 type SupportRequestStatusRow = { status: SupportStatus };
 
 async function assertSupportRequestEditable(
@@ -417,18 +608,15 @@ async function assertSupportRequestEditable(
 
 export async function updateSupportCommentAction(
   commentId: string,
-  body: string,
+  fd: FormData,
 ): Promise<ActionResult> {
   const guard = await requireSignedIn();
   if (!guard.ok) return { ok: false, error: guard.error };
   const { supabase, user, profile } = guard;
 
-  const parsed = supportCommentSchema.safeParse({ body });
-  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
-
   const { data: row } = (await supabase
     .from('support_request_comments')
-    .select('author_id, created_at, request_id')
+    .select('author_id, author_role, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
@@ -445,13 +633,149 @@ export async function updateSupportCommentAction(
   const editable = await assertSupportRequestEditable(supabase, row.request_id);
   if (!editable.ok) return editable;
 
+  const isAdmin = profile.role === 'admin';
+  const hasSubmittedImage = fd
+    .getAll('image')
+    .some((entry) => entry instanceof File && entry.size > 0);
+  const removeImage = fd.get('removeImage') === '1';
+  if ((hasSubmittedImage || removeImage) && row.author_role !== 'admin') {
+    return { ok: false, error: '관리자 댓글에만 이미지를 첨부할 수 있습니다.' };
+  }
+
+  const image = await collectCommentImage(fd);
+  if (image && !('file' in image)) return { ok: false, error: image.error };
+  if ((image || removeImage) && !isAdmin) {
+    return { ok: false, error: '관리자만 댓글 이미지를 수정할 수 있습니다.' };
+  }
+
+  const { data: currentImage } = (await supabase
+    .from('support_request_comment_images')
+    .select('id,comment_id,request_id,user_id,storage_path,original_name,content_type,size_bytes')
+    .eq('comment_id', commentId)
+    .maybeSingle()) as { data: CommentImageRow; error: unknown };
+
+  const willHaveImage = Boolean(image || (currentImage && !removeImage));
+  const parsed = validateSupportCommentBody({
+    body: String(fd.get('body') ?? ''),
+    hasImage: willHaveImage,
+    isAdmin,
+  });
+  if (!parsed.ok) return parsed;
+
+  let uploadedPath: string | null = null;
+  let oldPathToCleanup: string | null = null;
+  let changedImageId: string | null = null;
+  let shouldRestoreRemovedImage = false;
+  if (image && 'file' in image) {
+    const imageId = currentImage?.id ?? randomUUID();
+    changedImageId = imageId;
+    uploadedPath = supportCommentImagePath({
+      userId: user.id,
+      requestId: row.request_id,
+      commentId,
+      imageId,
+      originalName: image.file.name,
+    });
+
+    const { error: uploadErr } = await supabase.storage
+      .from('support-requests')
+      .upload(uploadedPath, image.buffer, {
+        contentType: image.contentType,
+        upsert: false,
+      });
+    if (uploadErr) {
+      console.error('[support] update comment image upload', { commentId, uploadErr });
+      return { ok: false, error: '댓글 이미지 업로드에 실패했습니다. 다시 시도해주세요.' };
+    }
+
+    const imagePayload = {
+      id: imageId,
+      comment_id: commentId,
+      request_id: row.request_id,
+      user_id: user.id,
+      storage_path: uploadedPath,
+      original_name: image.file.name,
+      content_type: image.contentType,
+      size_bytes: image.file.size,
+    };
+    const imageMutation = currentImage
+      ? await mutationTable(supabase, 'support_request_comment_images')
+          .update(imagePayload)
+          .eq('id', currentImage.id)
+      : await mutationTable(supabase, 'support_request_comment_images').insert(imagePayload);
+    if (imageMutation.error) {
+      await cleanupCommentImageStorage(supabase, [uploadedPath]);
+      console.error('[support] update comment image metadata', {
+        commentId,
+        error: imageMutation.error,
+      });
+      return { ok: false, error: '댓글 이미지 저장에 실패했습니다. 다시 시도해주세요.' };
+    }
+    oldPathToCleanup = currentImage?.storage_path ?? null;
+  } else if (removeImage && currentImage) {
+    const { error: deleteImageError } = await mutationTable(
+      supabase,
+      'support_request_comment_images',
+    )
+      .delete()
+      .eq('id', currentImage.id);
+    if (deleteImageError) {
+      console.error('[support] delete comment image metadata', { commentId, deleteImageError });
+      return { ok: false, error: '댓글 이미지 삭제에 실패했습니다. 다시 시도해주세요.' };
+    }
+    shouldRestoreRemovedImage = true;
+    oldPathToCleanup = currentImage.storage_path;
+  }
+
   const { error } = await mutationTable(supabase, 'support_request_comments')
-    .update({ body: parsed.data.body, updated_at: new Date().toISOString() })
+    .update({ body: parsed.body, updated_at: new Date().toISOString() })
     .eq('id', commentId);
   if (error) {
+    let cleanupUploadedPath = Boolean(uploadedPath);
+    if (uploadedPath && currentImage) {
+      const { error: restoreError } = await mutationTable(
+        supabase,
+        'support_request_comment_images',
+      )
+        .update(currentImage)
+        .eq('id', currentImage.id);
+      if (restoreError) {
+        console.error('[support] restore previous comment image metadata failed', {
+          commentId,
+          restoreError,
+        });
+        cleanupUploadedPath = false;
+      }
+    } else if (uploadedPath && changedImageId) {
+      const { error: deleteInsertedImageError } = await mutationTable(
+        supabase,
+        'support_request_comment_images',
+      )
+        .delete()
+        .eq('id', changedImageId);
+      if (deleteInsertedImageError) {
+        console.error('[support] rollback inserted comment image metadata failed', {
+          commentId,
+          deleteInsertedImageError,
+        });
+      }
+    } else if (shouldRestoreRemovedImage && currentImage) {
+      const { error: restoreDeletedImageError } = await mutationTable(
+        supabase,
+        'support_request_comment_images',
+      ).insert(currentImage);
+      if (restoreDeletedImageError) {
+        console.error('[support] restore deleted comment image metadata failed', {
+          commentId,
+          restoreDeletedImageError,
+        });
+      }
+    }
+    if (uploadedPath && cleanupUploadedPath) await cleanupCommentImageStorage(supabase, [uploadedPath]);
     console.error('[support] updateComment', { commentId, error });
     return { ok: false, error: '댓글 수정에 실패했습니다.' };
   }
+  if (oldPathToCleanup) await cleanupCommentImageStorage(supabase, [oldPathToCleanup]);
   revalidatePaths([`/support-requests/${row.request_id}`, `/admin/support-requests/${row.request_id}`]);
   return { ok: true };
 }
@@ -463,7 +787,7 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
 
   const { data: row } = (await supabase
     .from('support_request_comments')
-    .select('author_id, created_at, request_id')
+    .select('author_id, author_role, created_at, request_id')
     .eq('id', commentId)
     .maybeSingle()) as { data: CommentRow | null; error: unknown };
   if (!row) return { ok: false, error: '댓글을 찾을 수 없습니다.' };
@@ -480,6 +804,11 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
   const editable = await assertSupportRequestEditable(supabase, row.request_id);
   if (!editable.ok) return editable;
 
+  const { data: images } = (await supabase
+    .from('support_request_comment_images')
+    .select('storage_path')
+    .eq('comment_id', commentId)) as { data: { storage_path: string }[] | null; error: unknown };
+
   const { error } = await callRpc(supabase, 'delete_support_comment', {
     p_comment_id: commentId,
   });
@@ -489,6 +818,10 @@ export async function deleteSupportCommentAction(commentId: string): Promise<Act
     console.error('[support] deleteComment', { commentId, error });
     return { ok: false, error: '댓글 삭제에 실패했습니다.' };
   }
+  await cleanupCommentImageStorage(
+    supabase,
+    (images ?? []).map((image) => image.storage_path),
+  );
   revalidatePaths(supportDetailPaths(row.request_id));
   return { ok: true };
 }
@@ -513,6 +846,28 @@ export async function getSupportAttachmentUrlAction(
   const { data, error } = await supabase.storage
     .from('support-requests')
     .createSignedUrl(attachment.storage_path, SUPPORT_ATTACHMENT_SIGNED_URL_SECONDS);
+  if (error || !data?.signedUrl) {
+    return { ok: false, error: error?.message ?? '서명 URL 생성 실패' };
+  }
+  return { ok: true, url: data.signedUrl };
+}
+
+export async function getSupportCommentImageUrlAction(
+  requestId: string,
+  imageId: string,
+): Promise<SupportAttachmentUrlResult> {
+  const supabase = createClient();
+  const { data: image } = (await supabase
+    .from('support_request_comment_images')
+    .select('id,request_id,storage_path')
+    .eq('id', imageId)
+    .eq('request_id', requestId)
+    .maybeSingle()) as { data: { storage_path: string } | null; error: unknown };
+  if (!image) return { ok: false, error: '댓글 이미지를 찾을 수 없습니다.' };
+
+  const { data, error } = await supabase.storage
+    .from('support-requests')
+    .createSignedUrl(image.storage_path, SUPPORT_ATTACHMENT_SIGNED_URL_SECONDS);
   if (error || !data?.signedUrl) {
     return { ok: false, error: error?.message ?? '서명 URL 생성 실패' };
   }

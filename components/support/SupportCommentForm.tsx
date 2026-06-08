@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -11,21 +11,29 @@ import {
   updateSupportCommentAction,
 } from '@/lib/actions/support-request';
 import { SUPPORT_COMMENT_EDIT_WINDOW_MS } from '@/lib/support/permissions';
+import type { SupportCommentImageRow } from '@/lib/support/queries';
+
+const COMMENT_IMAGE_ACCEPT = '.jpg,.jpeg,.png,.webp';
 
 export function SupportCommentForm({
   requestId,
   disabled,
   disabledReason,
+  allowImage = false,
 }: {
   requestId: string;
   disabled: boolean;
   disabledReason?: string;
+  allowImage?: boolean;
 }) {
   const [body, setBody] = useState('');
+  const [imageName, setImageName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const canSubmit = body.trim().length > 0 || Boolean(imageName);
 
   if (disabled) {
     return (
@@ -40,18 +48,21 @@ export function SupportCommentForm({
       onSubmit={(event) => {
         event.preventDefault();
         const trimmed = body.trim();
-        if (!trimmed || submitting) return;
+        if ((!trimmed && !imageName) || submitting) return;
+        const fd = new FormData(event.currentTarget);
 
         async function submit() {
           setSubmitting(true);
           setError(null);
           try {
-            const result = await addSupportCommentAction(requestId, trimmed);
+            const result = await addSupportCommentAction(requestId, fd);
             if (!result.ok) {
               setError(result.error);
               return;
             }
             setBody('');
+            setImageName(null);
+            formRef.current?.reset();
             toast({ title: '댓글을 등록했습니다.' });
             router.refresh();
           } finally {
@@ -61,9 +72,11 @@ export function SupportCommentForm({
 
         void submit();
       }}
+      ref={formRef}
       className="space-y-2"
     >
       <textarea
+        name="body"
         value={body}
         onChange={(event) => setBody(event.target.value)}
         rows={3}
@@ -77,8 +90,24 @@ export function SupportCommentForm({
           {error}
         </p>
       )}
+      {allowImage && (
+        <div className="space-y-1">
+          <input
+            name="image"
+            type="file"
+            accept={COMMENT_IMAGE_ACCEPT}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0] ?? null;
+              setImageName(file?.name ?? null);
+            }}
+            className="block w-full text-sm"
+            aria-label="댓글 이미지 첨부"
+          />
+          {imageName && <p className="text-xs text-muted-foreground">{imageName}</p>}
+        </div>
+      )}
       <div className="flex justify-end">
-        <Button type="submit" disabled={submitting || body.trim().length === 0}>
+        <Button type="submit" disabled={submitting || !canSubmit}>
           {submitting ? '등록 중...' : '댓글 등록'}
         </Button>
       </div>
@@ -91,20 +120,27 @@ export function CommentRowActions({
   createdAt,
   isAuthor,
   isAdmin,
+  canEditImage = false,
   body,
+  image,
 }: {
   commentId: string;
   createdAt: string;
   isAuthor: boolean;
   isAdmin: boolean;
+  canEditImage?: boolean;
   body: string;
+  image?: SupportCommentImageRow | null;
 }) {
   const created = useMemo(() => new Date(createdAt).getTime(), [createdAt]);
   const [now, setNow] = useState(() => Date.now());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(body);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [replacementImageName, setReplacementImageName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const replacementImageRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const { confirm, element } = useConfirm();
@@ -116,7 +152,11 @@ export function CommentRowActions({
   }, [isAdmin, isAuthor]);
 
   useEffect(() => {
-    if (!editing) setDraft(body);
+    if (!editing) {
+      setDraft(body);
+      setRemoveImage(false);
+      setReplacementImageName(null);
+    }
   }, [body, editing]);
 
   const editable = isAdmin || (isAuthor && now - created < SUPPORT_COMMENT_EDIT_WINDOW_MS);
@@ -150,22 +190,33 @@ export function CommentRowActions({
 
   async function onSave() {
     const trimmed = draft.trim();
-    if (!trimmed || saving) return;
+    const replacementImage = canEditImage ? (replacementImageRef.current?.files?.[0] ?? null) : null;
+    const willHaveImage = Boolean(replacementImage || (image && !removeImage));
+    if ((!trimmed && !willHaveImage) || saving) return;
 
     setSaving(true);
     try {
-      const result = await updateSupportCommentAction(commentId, trimmed);
+      const fd = new FormData();
+      fd.set('body', draft);
+      if (canEditImage && removeImage) fd.set('removeImage', '1');
+      if (replacementImage) fd.set('image', replacementImage);
+      const result = await updateSupportCommentAction(commentId, fd);
       if (!result.ok) {
         toast({ title: '수정 실패', description: result.error, variant: 'destructive' });
         return;
       }
       setEditing(false);
+      setRemoveImage(false);
+      setReplacementImageName(null);
       toast({ title: '수정했습니다.' });
       router.refresh();
     } finally {
       setSaving(false);
     }
   }
+
+  const editWillHaveImage = Boolean(replacementImageName || (image && !removeImage));
+  const canSaveEdit = draft.trim().length > 0 || editWillHaveImage;
 
   if (editing) {
     return (
@@ -179,11 +230,39 @@ export function CommentRowActions({
             className="w-full resize-y rounded-md border bg-background p-2 text-sm"
             aria-label="댓글 수정"
           />
+          {canEditImage && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+              {image && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={removeImage}
+                    disabled={Boolean(replacementImageName)}
+                    onChange={(event) => setRemoveImage(event.currentTarget.checked)}
+                  />
+                  <span>기존 이미지 삭제: {image.original_name}</span>
+                </label>
+              )}
+              <input
+                ref={replacementImageRef}
+                type="file"
+                accept={COMMENT_IMAGE_ACCEPT}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  setReplacementImageName(file?.name ?? null);
+                  if (file) setRemoveImage(false);
+                }}
+                className="block w-full text-sm"
+                aria-label="댓글 이미지 교체"
+              />
+              {replacementImageName && <p>{replacementImageName}</p>}
+            </div>
+          )}
           <div className="flex gap-2">
             <Button
               type="button"
               size="sm"
-              disabled={saving || draft.trim().length === 0}
+              disabled={saving || !canSaveEdit}
               onClick={() => void onSave()}
               aria-label="댓글 수정 저장"
             >
@@ -198,6 +277,9 @@ export function CommentRowActions({
               onClick={() => {
                 setEditing(false);
                 setDraft(body);
+                setRemoveImage(false);
+                setReplacementImageName(null);
+                if (replacementImageRef.current) replacementImageRef.current.value = '';
               }}
             >
               취소
@@ -218,6 +300,8 @@ export function CommentRowActions({
           aria-label="댓글 수정"
           onClick={() => {
             setDraft(body);
+            setRemoveImage(false);
+            setReplacementImageName(null);
             setEditing(true);
           }}
         >
