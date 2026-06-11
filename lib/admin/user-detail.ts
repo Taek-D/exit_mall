@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import type { UserGroup } from '@/lib/auth/user-groups';
+import {
+  isPurchasedLotVisibleForShipping,
+  sumPurchasedReservationsByLot,
+} from '@/lib/purchased-shipping';
 
 export type AdminUserProfile = {
   id: string;
@@ -189,13 +193,7 @@ export function summarizePurchasedInventoryReservations(
   reservations: AdminPurchasedInventoryReservationRow[],
   memoRows: AdminPurchasedInventoryMemoRow[] = [],
 ): AdminPurchasedInventoryRow[] {
-  const reservedByLot = new Map<string, number>();
-  for (const reservation of reservations) {
-    reservedByLot.set(
-      reservation.lot_id,
-      (reservedByLot.get(reservation.lot_id) ?? 0) + Number(reservation.quantity ?? 0),
-    );
-  }
+  const reservedByLot = sumPurchasedReservationsByLot(reservations);
 
   const latestMemoByLot = new Map<string, AdminPurchasedInventoryMemoRow>();
   for (const row of memoRows) {
@@ -216,12 +214,6 @@ export function summarizePurchasedInventoryReservations(
 type AdminPurchasedInventoryLotQueryRow = AdminPurchasedInventoryLotRow & {
   inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
 };
-
-function getInboundRequestStatus(row: AdminPurchasedInventoryLotQueryRow): string | null {
-  const inbound = row.inbound_requests;
-  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
-  return inbound?.status ?? null;
-}
 
 export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDetail | null> {
   const supabase = createClient();
@@ -300,7 +292,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   const shippingRows = (shippingUploads ?? []) as unknown as AdminUserShippingUploadInput[];
   const legacyRows = (legacyOrders ?? []) as unknown as AdminUserLegacyOrderInput[];
   const visiblePurchasedLots = ((purchasedLots ?? []) as AdminPurchasedInventoryLotQueryRow[])
-    .filter((row) => row.source_type === 'admin_manual' || getInboundRequestStatus(row) === 'completed')
+    .filter(isPurchasedLotVisibleForShipping)
     .map<AdminPurchasedInventoryLotRow>((row) => ({
       id: row.id,
       product_name: row.product_name,

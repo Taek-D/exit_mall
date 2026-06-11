@@ -8,6 +8,7 @@ import {
 import { formatShortDateTimeKR } from '@/lib/dates';
 import { fetchRecentShippingUploads } from '@/lib/orders/queries';
 import {
+  isPurchasedLotVisibleForShipping,
   summarizePurchasedInventory,
   type PurchasedInventoryReservation,
   type PurchasedInventorySummaryLot,
@@ -21,19 +22,6 @@ type PurchasedInventorySummaryQueryLot = PurchasedInventorySummaryLot & {
   source_type: 'inbound_request' | 'admin_manual';
   inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
 };
-
-function getInboundRequestStatus(row: PurchasedInventorySummaryQueryLot): string | null {
-  const inbound = row.inbound_requests;
-  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
-  return inbound?.status ?? null;
-}
-
-function isVisiblePurchasedInventoryLot(row: PurchasedInventorySummaryQueryLot): boolean {
-  return (
-    row.source_type === 'admin_manual' ||
-    (row.source_type === 'inbound_request' && getInboundRequestStatus(row) === 'completed')
-  );
-}
 
 async function fetchPurchasedInventoryRows(userId: string) {
   const supabase = createClient();
@@ -62,7 +50,7 @@ async function fetchPurchasedInventoryRows(userId: string) {
   }
 
   const visibleLots = ((lotsData ?? []) as PurchasedInventorySummaryQueryLot[])
-    .filter(isVisiblePurchasedInventoryLot)
+    .filter(isPurchasedLotVisibleForShipping)
     .map<PurchasedInventorySummaryLot>((row) => ({
       id: row.id,
       product_name: row.product_name,
