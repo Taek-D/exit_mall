@@ -355,7 +355,7 @@ function supportActivities(rows: SupportActivityRow[]): RawDashboardActivity[] {
   }));
 }
 
-export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
+export async function fetchAdminDashboardCounts(): Promise<AdminDashboardCounts> {
   const supabase = createClient();
 
   const [
@@ -368,12 +368,6 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
     unreadInboundRequests,
     openSupportRequests,
     unreadSupportRequests,
-    profiles,
-    deposits,
-    stockOrders,
-    uploads,
-    inbound,
-    support,
   ] = await Promise.all([
     safeCount(
       'pending approvals count',
@@ -431,6 +425,32 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
       'unread support requests count',
       callRpc(supabase, 'count_support_unread', { p_role: 'admin' }),
     ),
+  ]);
+
+  return {
+    pendingApprovals,
+    pendingDeposits,
+    pendingStockOrders,
+    pendingExitmallUploads,
+    pendingPurchasedUploads,
+    openInboundRequests,
+    unreadInboundRequests,
+    openSupportRequests,
+    unreadSupportRequests,
+  };
+}
+
+export async function fetchAdminDashboardActivities(): Promise<RawDashboardActivity[]> {
+  const supabase = createClient();
+
+  const [
+    profiles,
+    deposits,
+    stockOrders,
+    uploads,
+    inbound,
+    support,
+  ] = await Promise.all([
     safeRows<ProfileActivityRow>(
       'recent pending approvals',
       supabase
@@ -488,25 +508,21 @@ export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
     ),
   ]);
 
-  return composeDashboardData(
-    {
-      pendingApprovals,
-      pendingDeposits,
-      pendingStockOrders,
-      pendingExitmallUploads,
-      pendingPurchasedUploads,
-      openInboundRequests,
-      unreadInboundRequests,
-      openSupportRequests,
-      unreadSupportRequests,
-    },
-    [
-      ...profileActivities(profiles),
-      ...depositActivities(deposits),
-      ...stockOrderActivities(stockOrders),
-      ...uploadActivities(uploads),
-      ...inboundActivities(inbound),
-      ...supportActivities(support),
-    ],
-  );
+  return [
+    ...profileActivities(profiles),
+    ...depositActivities(deposits),
+    ...stockOrderActivities(stockOrders),
+    ...uploadActivities(uploads),
+    ...inboundActivities(inbound),
+    ...supportActivities(support),
+  ];
+}
+
+export async function fetchAdminDashboardData(): Promise<AdminDashboardData> {
+  const [counts, activities] = await Promise.all([
+    fetchAdminDashboardCounts(),
+    fetchAdminDashboardActivities(),
+  ]);
+
+  return composeDashboardData(counts, activities);
 }
