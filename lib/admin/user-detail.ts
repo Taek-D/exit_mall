@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { UserGroup } from '@/lib/auth/user-groups';
+import { mutationTable } from '@/lib/actions/_shared';
 import {
   isPurchasedLotVisibleForShipping,
   sumPurchasedReservationsByLot,
@@ -272,7 +273,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .select('id, name, quantity, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false }),
-    (supabase.from as any)('purchased_inventory_lots')
+    mutationTable(supabase, 'purchased_inventory_lots')
       .select(
         'id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, updated_at, inbound_requests(status)',
       )
@@ -310,7 +311,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
 
   let purchasedReservations: AdminPurchasedInventoryReservationRow[] = [];
   if (pendingPurchasedUploadIds.length > 0) {
-    const { data } = await (supabase.from as any)('purchased_shipping_allocations')
+    const { data } = await mutationTable(supabase, 'purchased_shipping_allocations')
       .select('lot_id, quantity')
       .eq('user_id', userId)
       .in('upload_id', pendingPurchasedUploadIds);
@@ -320,7 +321,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   let purchasedMemoRows: AdminPurchasedInventoryMemoRow[] = [];
   const visiblePurchasedLotIds = visiblePurchasedLots.map((row) => row.id);
   if (visiblePurchasedLotIds.length > 0) {
-    const { data } = await (supabase.from as any)('purchased_inventory_lot_adjustments')
+    const { data } = await mutationTable(supabase, 'purchased_inventory_lot_adjustments')
       .select('lot_id, after_admin_memo, created_at')
       .eq('user_id', userId)
       .in('lot_id', visiblePurchasedLotIds)

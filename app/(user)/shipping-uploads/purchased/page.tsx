@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { mutationTable } from '@/lib/actions/_shared';
 import { formatKRW } from '@/lib/money';
 import {
   type ShippingUploadStatus,
@@ -25,7 +26,7 @@ type PurchasedInventorySummaryQueryLot = PurchasedInventorySummaryLot & {
 
 async function fetchPurchasedInventoryRows(userId: string) {
   const supabase = createClient();
-  const { data: lotsData } = await (supabase.from as any)('purchased_inventory_lots')
+  const { data: lotsData } = await mutationTable(supabase, 'purchased_inventory_lots')
     .select(
       'id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, inbound_requests(status)',
     )
@@ -42,7 +43,7 @@ async function fetchPurchasedInventoryRows(userId: string) {
   const pendingIds = ((pendingUploads ?? []) as Array<{ id: string }>).map((row) => row.id);
   let reservations: PurchasedInventoryReservation[] = [];
   if (pendingIds.length > 0) {
-    const { data: reservationData } = await (supabase.from as any)('purchased_shipping_allocations')
+    const { data: reservationData } = await mutationTable(supabase, 'purchased_shipping_allocations')
       .select('lot_id, quantity')
       .eq('user_id', userId)
       .in('upload_id', pendingIds);
