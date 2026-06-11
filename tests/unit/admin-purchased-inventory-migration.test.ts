@@ -139,9 +139,10 @@ describe('admin purchased inventory management migration', () => {
 
     expect(action).not.toContain('inbound_requests!inner(status)');
     expect(action).toContain('source_type, inbound_requests(status)');
-    expect(purchasedShipping).toContain("lot.source_type === 'admin_manual'");
-    expect(purchasedShipping).toContain("lot.source_type === 'inbound_request'");
-    expect(purchasedShipping).toContain("inboundRequest?.status === 'completed'");
+    expect(purchasedShipping).toContain('isPurchasedLotVisibleForShipping');
+    expect(purchasedShipping).toContain("row.source_type === 'admin_manual'");
+    expect(purchasedShipping).toContain("row.source_type === 'inbound_request'");
+    expect(purchasedShipping).toContain("getPurchasedLotInboundStatus(row) === 'completed'");
     expect(action).not.toContain(".eq('inbound_requests.status', 'completed')");
   });
 });
