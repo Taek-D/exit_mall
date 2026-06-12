@@ -1,5 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import type { UserGroup } from '@/lib/auth/user-groups';
+import { mutationTable } from '@/lib/actions/_shared';
+import {
+  isPurchasedLotVisibleForShipping,
+  sumPurchasedReservationsByLot,
+} from '@/lib/purchased-shipping';
 
 export type AdminUserProfile = {
   id: string;
@@ -189,13 +194,7 @@ export function summarizePurchasedInventoryReservations(
   reservations: AdminPurchasedInventoryReservationRow[],
   memoRows: AdminPurchasedInventoryMemoRow[] = [],
 ): AdminPurchasedInventoryRow[] {
-  const reservedByLot = new Map<string, number>();
-  for (const reservation of reservations) {
-    reservedByLot.set(
-      reservation.lot_id,
-      (reservedByLot.get(reservation.lot_id) ?? 0) + Number(reservation.quantity ?? 0),
-    );
-  }
+  const reservedByLot = sumPurchasedReservationsByLot(reservations);
 
   const latestMemoByLot = new Map<string, AdminPurchasedInventoryMemoRow>();
   for (const row of memoRows) {
@@ -216,12 +215,6 @@ export function summarizePurchasedInventoryReservations(
 type AdminPurchasedInventoryLotQueryRow = AdminPurchasedInventoryLotRow & {
   inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
 };
-
-function getInboundRequestStatus(row: AdminPurchasedInventoryLotQueryRow): string | null {
-  const inbound = row.inbound_requests;
-  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
-  return inbound?.status ?? null;
-}
 
 export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDetail | null> {
   const supabase = createClient();
@@ -280,7 +273,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       .select('id, name, quantity, updated_at')
       .eq('user_id', userId)
       .order('updated_at', { ascending: false }),
-    (supabase.from as any)('purchased_inventory_lots')
+    mutationTable(supabase, 'purchased_inventory_lots')
       .select(
         'id, product_name, option_name, initial_quantity, remaining_quantity, source_type, created_at, updated_at, inbound_requests(status)',
       )
@@ -300,7 +293,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   const shippingRows = (shippingUploads ?? []) as unknown as AdminUserShippingUploadInput[];
   const legacyRows = (legacyOrders ?? []) as unknown as AdminUserLegacyOrderInput[];
   const visiblePurchasedLots = ((purchasedLots ?? []) as AdminPurchasedInventoryLotQueryRow[])
-    .filter((row) => row.source_type === 'admin_manual' || getInboundRequestStatus(row) === 'completed')
+    .filter(isPurchasedLotVisibleForShipping)
     .map<AdminPurchasedInventoryLotRow>((row) => ({
       id: row.id,
       product_name: row.product_name,
@@ -318,7 +311,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
 
   let purchasedReservations: AdminPurchasedInventoryReservationRow[] = [];
   if (pendingPurchasedUploadIds.length > 0) {
-    const { data } = await (supabase.from as any)('purchased_shipping_allocations')
+    const { data } = await mutationTable(supabase, 'purchased_shipping_allocations')
       .select('lot_id, quantity')
       .eq('user_id', userId)
       .in('upload_id', pendingPurchasedUploadIds);
@@ -328,7 +321,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   let purchasedMemoRows: AdminPurchasedInventoryMemoRow[] = [];
   const visiblePurchasedLotIds = visiblePurchasedLots.map((row) => row.id);
   if (visiblePurchasedLotIds.length > 0) {
-    const { data } = await (supabase.from as any)('purchased_inventory_lot_adjustments')
+    const { data } = await mutationTable(supabase, 'purchased_inventory_lot_adjustments')
       .select('lot_id, after_admin_memo, created_at')
       .eq('user_id', userId)
       .in('lot_id', visiblePurchasedLotIds)

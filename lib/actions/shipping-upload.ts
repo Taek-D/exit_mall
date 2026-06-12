@@ -10,6 +10,7 @@ import {
   allocatePurchasedInventoryFifo,
   buildPurchasedLotsForUpload,
   detectPurchasedInventoryAmbiguities,
+  sumPurchasedReservationsByLot,
   type PurchasedInventoryLot,
   type PurchasedLotForUploadRow,
   type PurchasedShippingDemand,
@@ -232,7 +233,7 @@ async function fetchPurchasedLotsForUpload(
   supabase: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<PurchasedInventoryLot[]> {
-  const { data: lotData, error: lotErr } = await (supabase.from as any)('purchased_inventory_lots')
+  const { data: lotData, error: lotErr } = await mutationTable(supabase, 'purchased_inventory_lots')
     .select('id, product_name, option_name, remaining_quantity, created_at, source_type, inbound_requests(status)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true });
@@ -250,21 +251,19 @@ async function fetchPurchasedLotsForUpload(
   if (pendingErr) throw new Error(`대기 중인 배송대행 업로드 조회에 실패했습니다: ${pendingErr.message}`);
 
   const pendingIds = ((pendingUploads ?? []) as Array<{ id: string }>).map((row) => row.id);
-  const reservedByLot = new Map<string, number>();
+  let reservedByLot = new Map<string, number>();
   if (pendingIds.length > 0) {
-    const { data: allocations, error: allocationsErr } = await (supabase.from as any)('purchased_shipping_allocations')
+    const { data: allocations, error: allocationsErr } = await mutationTable(
+      supabase,
+      'purchased_shipping_allocations',
+    )
       .select('lot_id, quantity')
       .eq('user_id', userId)
       .in('upload_id', pendingIds);
     if (allocationsErr) {
       throw new Error(`대기 중인 사입재고 배정 조회에 실패했습니다: ${allocationsErr.message}`);
     }
-    for (const allocation of (allocations ?? []) as PurchasedAllocationRow[]) {
-      reservedByLot.set(
-        allocation.lot_id,
-        (reservedByLot.get(allocation.lot_id) ?? 0) + Number(allocation.quantity),
-      );
-    }
+    reservedByLot = sumPurchasedReservationsByLot((allocations ?? []) as PurchasedAllocationRow[]);
   }
 
   return buildPurchasedLotsForUpload(lotRows, reservedByLot);

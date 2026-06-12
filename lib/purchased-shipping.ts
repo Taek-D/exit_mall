@@ -66,6 +66,11 @@ export type PurchasedInventoryReservation = {
   quantity: number;
 };
 
+export type PurchasedLotInboundStatusRow = {
+  source_type: string;
+  inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
+};
+
 export type PurchasedInventorySummaryRow = {
   product_name: string;
   option_name: string;
@@ -216,19 +221,38 @@ export function detectPurchasedInventoryAmbiguities(
     }));
 }
 
+export function getPurchasedLotInboundStatus(row: PurchasedLotInboundStatusRow): string | null {
+  const inbound = row.inbound_requests;
+  if (Array.isArray(inbound)) return inbound[0]?.status ?? null;
+  return inbound?.status ?? null;
+}
+
+export function isPurchasedLotVisibleForShipping(row: PurchasedLotInboundStatusRow): boolean {
+  return (
+    row.source_type === 'admin_manual' ||
+    (row.source_type === 'inbound_request' && getPurchasedLotInboundStatus(row) === 'completed')
+  );
+}
+
+export function sumPurchasedReservationsByLot(
+  reservations: Array<{ lot_id: string; quantity: number | string | null | undefined }>,
+): Map<string, number> {
+  const reservedByLot = new Map<string, number>();
+  for (const reservation of reservations) {
+    reservedByLot.set(
+      reservation.lot_id,
+      (reservedByLot.get(reservation.lot_id) ?? 0) + Number(reservation.quantity ?? 0),
+    );
+  }
+  return reservedByLot;
+}
+
 export function buildPurchasedLotsForUpload(
   lotRows: PurchasedLotForUploadRow[],
   reservationsByLot: ReadonlyMap<string, number>,
 ): PurchasedInventoryLot[] {
   return lotRows
-    .filter((lot) => {
-      if (lot.source_type === 'admin_manual') return true;
-
-      const inboundRequest = Array.isArray(lot.inbound_requests)
-        ? lot.inbound_requests[0]
-        : lot.inbound_requests;
-      return lot.source_type === 'inbound_request' && inboundRequest?.status === 'completed';
-    })
+    .filter(isPurchasedLotVisibleForShipping)
     .map((lot) => ({
       id: lot.id,
       product_name: lot.product_name,
@@ -295,13 +319,7 @@ export function summarizePurchasedInventory(
   lots: PurchasedInventorySummaryLot[],
   reservations: PurchasedInventoryReservation[],
 ): PurchasedInventorySummaryRow[] {
-  const reservedByLot = new Map<string, number>();
-  for (const reservation of reservations) {
-    reservedByLot.set(
-      reservation.lot_id,
-      (reservedByLot.get(reservation.lot_id) ?? 0) + reservation.quantity,
-    );
-  }
+  const reservedByLot = sumPurchasedReservationsByLot(reservations);
 
   const byItem = new Map<string, PurchasedInventorySummaryRow>();
   for (const lot of lots) {

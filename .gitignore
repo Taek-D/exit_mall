@@ -12,6 +12,7 @@ supabase/.temp
 .bkit
 .omc
 .claude
+.dryforge/
 SECURITY_AUDIT.md
 
 .vercel
