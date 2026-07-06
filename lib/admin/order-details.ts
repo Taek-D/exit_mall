@@ -22,6 +22,7 @@ export type AdminStockOrderDetail = {
 
 export type AdminShippingUploadItem = {
   no: number;
+  internal_code: string | null;
   recipient: string;
   phone: string;
   address: string;

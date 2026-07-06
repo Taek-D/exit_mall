@@ -53,6 +53,7 @@ export function Group1Guide() {
           <ol>
             <li><Link href="/shipping-uploads/exitmall">엑시트몰 배송대행</Link>에서 양식 엑셀을 내려받습니다.</li>
             <li>받는 사람 명단을 적습니다. <strong>한 줄에 한 명씩</strong> 작성해 주세요.</li>
+            <li>맨 앞 <strong>&quot;내품코드&quot;</strong> 칸에는 신청자(주문자) 이름을 적어 주세요. 택배사에서 누구 물건인지 확인하는 용도입니다.</li>
             <li>엑셀을 올리면 행마다 상품이 잘 맞춰졌는지, 오류가 없는지 미리 보여 드립니다.</li>
             <li>&quot;검토 요청&quot;을 누르면 보낼 상품이 승인 전까지 잠시 묶이고, 배송비는 안내 금액으로 표시됩니다.</li>
             <li>관리자가 승인하면 내 재고에서 그만큼 빠지고, 배송비는 안내 금액으로만 표시됩니다.</li>

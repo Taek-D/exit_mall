@@ -80,6 +80,7 @@ export default async function AdminShippingUploadDetail({
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
+              <th className="font-medium px-3">내품코드</th>
               <th className="font-medium px-3">받는사람</th>
               <th className="font-medium px-3">상품명 / 옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
@@ -91,6 +92,7 @@ export default async function AdminShippingUploadDetail({
             {upload.items.map((item) => (
               <tr key={item.no} className="border-t">
                 <td className="px-4 py-2 font-mono text-xs">{item.no}</td>
+                <td className="px-3 py-2">{item.internal_code ?? '-'}</td>
                 <td className="px-3 py-2">
                   {item.recipient}
                   <p className="text-xs text-muted-foreground">
@@ -111,7 +113,7 @@ export default async function AdminShippingUploadDetail({
           </tbody>
           <tfoot>
             <tr className="border-t bg-surface-muted/40">
-              <td colSpan={3} className="px-4 py-3 text-right font-medium">
+              <td colSpan={4} className="px-4 py-3 text-right font-medium">
                 {upload.items.length}건 · 배송비 합계
               </td>
               <td></td>

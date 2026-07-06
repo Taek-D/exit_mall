@@ -31,6 +31,7 @@ export function Group2Guide() {
           <ol>
             <li><Link href="/shipping-uploads/purchased">사입재고 배송대행</Link>에서 양식 엑셀을 내려받습니다.</li>
             <li>받는 사람 명단과 직접 사 두신 상품 정보를 적습니다.</li>
+            <li>맨 앞 <strong>&quot;내품코드&quot;</strong> 칸에는 신청자(주문자) 이름을 적어 주세요. 택배사에서 누구 물건인지 확인하는 용도입니다.</li>
             <li>엑셀 올리기 → 검토 요청 → 관리자 승인 → 송장 표시 순으로 진행됩니다.</li>
           </ol>
           <p>관리자 승인 후 입고완료 재고가 차감되며, 배송비는 안내만 표시되고 예치금에서는 차감되지 않습니다.</p>

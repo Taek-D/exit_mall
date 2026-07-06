@@ -185,6 +185,7 @@ describe('parseShippingExcel - valid', () => {
       tracking_number: null,
     });
     expect(r.items[0]).not.toHaveProperty('customer_order_number');
+    expect(r.items[0]!.internal_code).toBeNull();
     expect(r.uploader_company).toBeNull();
     expect(r.uploader_phone).toBeNull();
     expect(r.request_memo).toBeNull();
@@ -199,6 +200,69 @@ describe('parseShippingExcel - valid', () => {
       ),
     );
     expect(r.items[0]?.tracking_number).toBe('521853092894');
+  });
+});
+
+describe('parseShippingExcel - internal code (신양식)', () => {
+  const INTERNAL_CODE_HEADER = [
+    '내품코드',
+    '고객주문번호',
+    '받는분성명',
+    '받는분전화번호',
+    '받는분주소(전체, 분할)',
+    '품목명',
+    '내품명',
+    '내품수량',
+    '배송메세지1',
+    '송장번호',
+  ];
+
+  it('parses and stores the internal code column from fixtures', async () => {
+    const r = await parseShippingExcel(load('shipping-internal-code-valid.xlsx'));
+    expect(r.items).toHaveLength(2);
+    expect(r.items[0]).toMatchObject({
+      internal_code: '김신청',
+      recipient: '홍길동',
+      product_code: '스니커즈',
+      quantity: 1,
+    });
+    expect(r.items[1]).toMatchObject({ internal_code: '이신청', recipient: '김철수', quantity: 2 });
+  });
+
+  it('rejects a new-format row whose internal code is blank', async () => {
+    await expect(parseShippingExcel(load('shipping-internal-code-missing.xlsx'))).rejects.toThrow(
+      /내품코드가 비어있습니다/,
+    );
+  });
+
+  it('does not silently skip a row that has only the internal code filled', async () => {
+    await expect(
+      parseShippingExcel(
+        await workbookBufferFromFirstRow(INTERNAL_CODE_HEADER, [
+          ['장은진', '', '', '', '', '', '', '', '', ''],
+        ]),
+      ),
+    ).rejects.toThrow(/받는사람/);
+  });
+
+  it('parses the internal code from an inline first-row workbook', async () => {
+    const r = await parseShippingExcel(
+      await workbookBufferFromFirstRow(INTERNAL_CODE_HEADER, [
+        [
+          '박신청',
+          '20260518-001',
+          '홍길동',
+          '010-1234-5678',
+          '서울시 강남구 1',
+          '스니커즈',
+          '270',
+          2,
+          '문 앞',
+          '',
+        ],
+      ]),
+    );
+    expect(r.items[0]).toMatchObject({ internal_code: '박신청', recipient: '홍길동', quantity: 2 });
   });
 });
 

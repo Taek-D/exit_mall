@@ -25,6 +25,9 @@ const INBOUND_HEADERS = [
   '비고',
 ];
 
+// 신양식 배송대행은 위 shipping 헤더 앞(A열)에 "내품코드" 열이 하나 붙는다.
+const SHIPPING_INTERNAL_CODE_KEYS = ['내품코드'];
+
 function rawCellValue(value: ExcelJS.CellValue): unknown {
   if (value && typeof value === 'object') {
     if ('text' in value) return value.text;
@@ -80,12 +83,16 @@ export function detectKnownExcelTemplateKind(
   const inboundHeader = normalizedRow(ws, 1, INBOUND_HEADERS.length);
   if (matchesHeaderList(inboundHeader, INBOUND_HEADERS)) return 'inbound';
 
-  const firstColumnShippingKeys = SHIPPING_HEADER_KEYS[0]!.map(normalizeExcelHeader);
+  const anchorKeys = SHIPPING_HEADER_KEYS[0]!.map(normalizeExcelHeader);
+  const internalCodeKeys = SHIPPING_INTERNAL_CODE_KEYS.map(normalizeExcelHeader);
   for (let rowNumber = 1; rowNumber <= ws.rowCount; rowNumber += 1) {
-    const row = normalizedRow(ws, rowNumber, SHIPPING_HEADER_KEYS.length);
+    const row = normalizedRow(ws, rowNumber, 1 + SHIPPING_HEADER_KEYS.length);
+    // 신양식이면 A열 "내품코드"를 건너뛰고 B열부터 매칭한다.
+    const offset =
+      internalCodeKeys.includes(row[0] ?? '') && anchorKeys.includes(row[1] ?? '') ? 1 : 0;
     if (
-      firstColumnShippingKeys.includes(row[0] ?? '') &&
-      matchesHeaderAlternatives(row, SHIPPING_HEADER_KEYS, 7)
+      anchorKeys.includes(row[offset] ?? '') &&
+      matchesHeaderAlternatives(row.slice(offset), SHIPPING_HEADER_KEYS, 7)
     ) {
       return 'shipping';
     }
