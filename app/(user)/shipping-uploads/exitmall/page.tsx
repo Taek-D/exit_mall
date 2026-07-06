@@ -30,7 +30,10 @@ export default async function ShippingUploadsPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">엑셀 양식 다운로드</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            &quot;내품코드(=신청자 이름) / 고객주문번호(쿠팡,스스) / 받는 분 성명 / 받는 분 전화번호 / 주소 / 품목명 / 내품명(=옵션) / 수량&quot; 을 행마다 입력해주세요. 맨 앞 <strong>내품코드</strong> 칸에는 신청자(주문자) 이름을 적어주세요 — 택배사에서 누구 물건인지 확인하는 용도입니다.
+            &quot;내품코드(=신청자 이름) / 고객주문번호(쿠팡,스스) / 받는 분 성명 / 받는 분 전화번호 / 주소 / 품목명 / 내품명(=옵션) / 수량&quot; 을 행마다 입력해주세요.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            맨 앞 <strong>내품코드</strong> 칸에는 신청자(주문자) 이름을 적어주세요 — 택배사에서 누구 물건인지 확인하는 용도입니다.
           </p>
         </div>
         <a

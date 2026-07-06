@@ -93,7 +93,10 @@ export default async function PurchasedShippingPage() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">배송대행 양식 다운로드</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            엑시트몰 배송대행과 같은 양식입니다. 품목명과 내품명은 아래 재고 목록과 맞춰주세요. 맨 앞 <strong>내품코드</strong> 칸에는 신청자(주문자) 이름을 적어주세요 — 택배사에서 누구 물건인지 확인하는 용도입니다.
+            엑시트몰 배송대행과 같은 양식입니다. 품목명과 내품명은 아래 재고 목록과 맞춰주세요.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            맨 앞 <strong>내품코드</strong> 칸에는 신청자(주문자) 이름을 적어주세요 — 택배사에서 누구 물건인지 확인하는 용도입니다.
           </p>
         </div>
         <a
