@@ -6,6 +6,8 @@ export const SHIPPING_FEE_PER_ROW = 3_300;
 
 export type ParsedShippingItem = {
   no: number;
+  /** 신양식(내품코드 열)의 신청자 이름. 구양식(내품코드 열 없음)은 null. */
+  internal_code: string | null;
   recipient: string;
   phone: string;
   address: string;
@@ -37,6 +39,9 @@ const HEADER_KEYS = [
   ['메모', '배송메세지1'],
   ['송장번호'],
 ];
+
+// 신양식은 위 9개 논리 컬럼 앞(A열)에 "내품코드"(신청자 이름) 열이 하나 붙는다.
+const INTERNAL_CODE_KEYS = ['내품코드'];
 
 export function computeShippingFee(rows: number): number {
   return Math.max(0, rows) * SHIPPING_FEE_PER_ROW;
@@ -110,27 +115,44 @@ export async function parseShippingExcel(
     );
   }
 
+  // 헤더 행과 컬럼 오프셋을 함께 판별한다.
+  //  - A열이 앵커("No"/"고객주문번호")면 구양식(offset 0, 내품코드 없음)
+  //  - A열이 "내품코드"이고 B열이 앵커면 신양식(offset 1, 내품코드 있음)
+  const anchorKeys = HEADER_KEYS[0]!.map(normalizeHeader);
+  const internalCodeKeys = INTERNAL_CODE_KEYS.map(normalizeHeader);
   let headerRow = -1;
-  const firstColumnHeaderKeys = HEADER_KEYS[0]!.map(normalizeHeader);
+  let columnOffset = 0;
+  let hasInternalCode = false;
   for (let rowNumber = 1; rowNumber <= ws.rowCount; rowNumber += 1) {
-    const first = cellString(ws.getRow(rowNumber).getCell(1).value);
-    if (first && firstColumnHeaderKeys.includes(normalizeHeader(first))) {
+    const c0 = normalizeHeader(cellString(ws.getRow(rowNumber).getCell(1).value) ?? '');
+    const c1 = normalizeHeader(cellString(ws.getRow(rowNumber).getCell(2).value) ?? '');
+    if (anchorKeys.includes(c0)) {
       headerRow = rowNumber;
+      columnOffset = 0;
+      hasInternalCode = false;
+      break;
+    }
+    if (internalCodeKeys.includes(c0) && anchorKeys.includes(c1)) {
+      headerRow = rowNumber;
+      columnOffset = 1;
+      hasInternalCode = true;
       break;
     }
   }
   if (headerRow < 0) {
-    throw new Error('양식의 헤더 행을 찾을 수 없습니다 (첫 컬럼 "No" 또는 "고객주문번호").');
+    throw new Error('양식의 헤더 행을 찾을 수 없습니다 (첫 컬럼 "내품코드"·"No" 또는 "고객주문번호").');
   }
 
-  const headerCells = rowValues(ws, headerRow, HEADER_KEYS.length).map((value) =>
+  const headerCells = rowValues(ws, headerRow, columnOffset + HEADER_KEYS.length).map((value) =>
     normalizeHeader(cellString(value) ?? ''),
   );
   for (let i = 0; i < HEADER_KEYS.length; i += 1) {
     const expected = HEADER_KEYS[i]!;
-    const actual = headerCells[i] ?? '';
+    const actual = headerCells[columnOffset + i] ?? '';
     if (i < 7 && !expected.map(normalizeHeader).includes(actual)) {
-      throw new Error(`양식 헤더가 다릅니다 (${i + 1}열: "${actual}" → "${expected[0]}" 기대).`);
+      throw new Error(
+        `양식 헤더가 다릅니다 (${columnOffset + i + 1}열: "${actual}" → "${expected[0]}" 기대).`,
+      );
     }
   }
 
@@ -151,18 +173,22 @@ export async function parseShippingExcel(
 
   const items: ParsedShippingItem[] = [];
   for (let rowNumber = headerRow + 1; rowNumber <= ws.rowCount; rowNumber += 1) {
-    const cells = rowValues(ws, rowNumber, HEADER_KEYS.length);
-    const recipient = cellString(cells[1]);
-    const phone = cellString(cells[2]);
-    const address = cellString(cells[3]);
-    const product_code = cellString(cells[4]);
-    const product_name = cellString(cells[5]);
-    const quantity = cellInt(cells[6]);
-    const memo = cellString(cells[7]);
-    const tracking_number = cellTrackingNumber(cells[8]);
+    const cells = rowValues(ws, rowNumber, columnOffset + HEADER_KEYS.length);
+    const internal_code = hasInternalCode ? cellString(cells[0]) : null;
+    const recipient = cellString(cells[columnOffset + 1]);
+    const phone = cellString(cells[columnOffset + 2]);
+    const address = cellString(cells[columnOffset + 3]);
+    const product_code = cellString(cells[columnOffset + 4]);
+    const product_name = cellString(cells[columnOffset + 5]);
+    const quantity = cellInt(cells[columnOffset + 6]);
+    const memo = cellString(cells[columnOffset + 7]);
+    const tracking_number = cellTrackingNumber(cells[columnOffset + 8]);
 
     if (!recipient && !phone && !address && !product_code && quantity === null) continue;
 
+    if (hasInternalCode && !internal_code) {
+      throw new Error(`${rowNumber}행 내품코드가 비어있습니다.`);
+    }
     if (!recipient) throw new Error(`${rowNumber}행 받는사람이 비어있습니다.`);
     if (!phone) throw new Error(`${rowNumber}행 연락처가 비어있습니다.`);
     if (!address) throw new Error(`${rowNumber}행 주소가 비어있습니다.`);
@@ -173,6 +199,7 @@ export async function parseShippingExcel(
 
     items.push({
       no: items.length + 1,
+      internal_code,
       recipient,
       phone,
       address,

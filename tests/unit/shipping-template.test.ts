@@ -5,6 +5,7 @@ import { parseShippingExcel } from '@/lib/shipping-upload-parser';
 
 const TEMPLATE_PATH = path.resolve(process.cwd(), 'public', 'shipping-template.xlsx');
 const EXPECTED_HEADER = [
+  '내품코드',
   '고객주문번호',
   '받는분성명',
   '받는분전화번호',
@@ -35,14 +36,15 @@ describe('public shipping template', () => {
     const wb = await loadTemplate();
     const ws = wb.worksheets[0]!;
 
-    expect(ws.getColumn(9).numFmt).toBeUndefined();
-    expect(ws.getRow(2).getCell(9).numFmt).toBeUndefined();
+    expect(ws.getColumn(10).numFmt).toBeUndefined();
+    expect(ws.getRow(2).getCell(10).numFmt).toBeUndefined();
   });
 
   it('parses blank tracking number in the customer template as null', async () => {
     const wb = await loadTemplate();
     const ws = wb.worksheets[0]!;
     ws.addRow([
+      '김신청',
       '20260518-001',
       '홍길동',
       '010-1234-5678',
@@ -57,6 +59,7 @@ describe('public shipping template', () => {
     const parsed = await parseShippingExcel(Buffer.from(buffer as ArrayBuffer));
 
     expect(parsed.items[0]).toMatchObject({
+      internal_code: '김신청',
       recipient: '홍길동',
       tracking_number: null,
     });

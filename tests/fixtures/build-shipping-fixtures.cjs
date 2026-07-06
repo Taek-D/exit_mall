@@ -33,6 +33,18 @@ async function build(name, rowsAfterHeader) {
   console.log('Wrote', outPath);
 }
 
+// 신양식: A열 "내품코드"가 붙은 first-row 헤더(실 배송대행 양식과 동일 구조).
+const INTERNAL_CODE_HEADER_ROW = ['내품코드', ...HEADER_ROW];
+
+async function buildFirstRow(name, rowsAfterHeader) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Sheet1');
+  ws.addRows([INTERNAL_CODE_HEADER_ROW, ...rowsAfterHeader]);
+  const outPath = path.resolve(__dirname, name);
+  await wb.xlsx.writeFile(outPath);
+  console.log('Wrote', outPath);
+}
+
 async function main() {
   await build('shipping-valid.xlsx', [
     [1, '홍길동', '010-1234-5678', '서울시 강남구 1', '스니커즈', '270', 1, '문 앞', ''],
@@ -55,6 +67,15 @@ async function main() {
     [1, '홍길동', '010-1234-5678', '서울시 1', '스니커즈', '270', 1, '', '632012345678'],
     [2, '김철수', '010-2222-3333', '서울시 2', '스니커즈', '280', 1, '', ''],
     [3, '박영희', '010-4444-5555', '부산시 3', '티셔츠', 'L', 1, '', '632099998888'],
+  ]);
+
+  // 신양식(내품코드 열 포함) — 저장/필수 검증용
+  await buildFirstRow('shipping-internal-code-valid.xlsx', [
+    ['김신청', 1, '홍길동', '010-1234-5678', '서울시 강남구 1', '스니커즈', '270', 1, '문 앞', ''],
+    ['이신청', 2, '김철수', '010-2222-3333', '서울시 마포구 2', '스니커즈', '280', 2, '', ''],
+  ]);
+  await buildFirstRow('shipping-internal-code-missing.xlsx', [
+    ['', 1, '홍길동', '010-1234-5678', '서울시 강남구 1', '스니커즈', '270', 1, '문 앞', ''],
   ]);
 }
 
