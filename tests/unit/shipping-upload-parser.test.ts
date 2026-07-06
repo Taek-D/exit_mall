@@ -235,6 +235,16 @@ describe('parseShippingExcel - internal code (신양식)', () => {
     );
   });
 
+  it('does not silently skip a row that has only the internal code filled', async () => {
+    await expect(
+      parseShippingExcel(
+        await workbookBufferFromFirstRow(INTERNAL_CODE_HEADER, [
+          ['장은진', '', '', '', '', '', '', '', '', ''],
+        ]),
+      ),
+    ).rejects.toThrow(/받는사람/);
+  });
+
   it('parses the internal code from an inline first-row workbook', async () => {
     const r = await parseShippingExcel(
       await workbookBufferFromFirstRow(INTERNAL_CODE_HEADER, [

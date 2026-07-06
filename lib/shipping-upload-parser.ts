@@ -184,7 +184,18 @@ export async function parseShippingExcel(
     const memo = cellString(cells[columnOffset + 7]);
     const tracking_number = cellTrackingNumber(cells[columnOffset + 8]);
 
-    if (!recipient && !phone && !address && !product_code && quantity === null) continue;
+    // 완전히 빈 행만 건너뛴다. 신양식에서 내품코드만 입력된 행은 데이터 행으로 보고
+    // 아래 필수 검증(받는사람 등)에서 행별 오류를 띄운다. (구양식은 internal_code가
+    // 항상 null이라 기존 동작과 동일하다.)
+    if (
+      !recipient &&
+      !phone &&
+      !address &&
+      !product_code &&
+      quantity === null &&
+      !internal_code
+    )
+      continue;
 
     if (hasInternalCode && !internal_code) {
       throw new Error(`${rowNumber}행 내품코드가 비어있습니다.`);
