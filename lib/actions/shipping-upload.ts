@@ -3,7 +3,13 @@ import { createClient } from '@/lib/supabase/server';
 import { parseShippingExcel, computeShippingFee } from '@/lib/shipping-upload-parser';
 import { callRpc, mutationTable, revalidatePaths, type ActionResult } from '@/lib/actions/_shared';
 import { requireSignedIn, type SignedInContext } from '@/lib/actions/_guards';
-import { matchInventoryRefs, normalizeProductMatchKey } from '@/lib/shipping-match';
+import {
+  matchInventoryRefs,
+  normalizeProductMatchKey,
+  collectPendingOrderProductIds,
+  mergeProductCandidates,
+  buildInventoryMatchError,
+} from '@/lib/shipping-match';
 import type { Json } from '@/lib/db-types';
 import { safeStorageName, validateExcelUpload } from '@/lib/files/excel';
 import {
@@ -28,56 +34,100 @@ export type RequestShippingUploadResult =
 
 type ProductCandidate = { id: string; name: string };
 
-/** ① 활성 카탈로그 + 사용자 보유 재고 + 커스텀 인벤토리 3-way 후보 조회. */
+/**
+ * ① 배송대행 후보 조회. 후보는 정확히 세 소스의 합집합이다:
+ *   1) 보유 재고 — user_inventory에서 수량 > 0인 행, 현재 상품명으로 해석(수량 0으로 소진된 상품은 후보 아님).
+ *   2) 진행 중인 구매요청 — status='pending' stock_orders의 items[].product_id, 현재 상품명으로 해석.
+ *   3) 수기 재고 — user_custom_inventory.
+ * 활성 카탈로그 전체는 후보가 아니라, 매칭 실패 메시지 분기를 위한 진단(catalogNames)으로만 쓴다.
+ */
 async function fetchProductCandidates(
   supabase: SignedInContext['supabase'],
   userId: string,
 ): Promise<
-  | { ok: true; mergedProducts: ProductCandidate[]; customRows: Array<{ id: string; name: string }> }
+  | {
+      ok: true;
+      mergedProducts: ProductCandidate[];
+      customRows: Array<{ id: string; name: string }>;
+      catalogNames: string[];
+    }
   | { ok: false; error: string }
 > {
   const [
-    { data: productRows, error: productErr },
+    { data: catalogRows, error: catalogErr },
     { data: ownedInventoryRows, error: ownedErr },
     { data: customRows, error: customErr },
+    { data: pendingOrderRows, error: pendingErr },
   ] = await Promise.all([
+    // 진단 전용: 활성+삭제되지 않은 카탈로그 이름. 후보 자격을 부여하지 않는다.
     supabase
       .from('products')
       .select('id, name')
       .eq('is_active', true)
       .is('deleted_at', null),
+    // 소스1: 보유 재고 — 수량 > 0인 행만(수량 0으로 소진된 상품은 후보 아님, 재고가 있어야 배송대행 성립).
     supabase
       .from('user_inventory')
       .select('products(id, name)')
-      .eq('user_id', userId),
+      .eq('user_id', userId)
+      .gt('quantity', 0),
+    // 소스3: 수기 재고.
     supabase
       .from('user_custom_inventory')
       .select('id, name')
       .eq('user_id', userId),
+    // 소스2: 진행 중인 구매요청.
+    supabase
+      .from('stock_orders')
+      .select('status, items')
+      .eq('user_id', userId)
+      .eq('status', 'pending'),
   ]);
-  if (productErr || ownedErr || customErr) {
-    const message = productErr?.message ?? ownedErr?.message ?? customErr?.message ?? 'unknown';
+  if (catalogErr || ownedErr || customErr || pendingErr) {
+    const message =
+      catalogErr?.message ?? ownedErr?.message ?? customErr?.message ?? pendingErr?.message ?? 'unknown';
     return { ok: false, error: `상품 후보 조회에 실패했습니다: ${message}` };
   }
 
-  // 활성+삭제되지 않은 카탈로그 외에, 사용자가 user_inventory 로 이미 보유 중인
-  // 상품도 후보에 포함한다 (사후 비활성화된 상품도 보유 시 처리 가능).
-  const productById = new Map<string, ProductCandidate>();
-  for (const row of (productRows ?? []) as ProductCandidate[]) {
-    productById.set(row.id, row);
-  }
+  // 소스1: 보유 재고 상품(현재 상품명).
+  const ownedInventoryProducts: ProductCandidate[] = [];
+  const ownedIds = new Set<string>();
   for (const row of (ownedInventoryRows ?? []) as Array<{
     products: ProductCandidate | ProductCandidate[] | null;
   }>) {
     const product = Array.isArray(row.products) ? row.products[0] : row.products;
-    if (product && !productById.has(product.id)) {
-      productById.set(product.id, { id: product.id, name: product.name });
+    if (product && !ownedIds.has(product.id)) {
+      ownedIds.add(product.id);
+      ownedInventoryProducts.push({ id: product.id, name: product.name });
     }
   }
+
+  // 소스2: 진행 중인 구매요청의 상품 id → 현재 상품명으로 해석.
+  //   is_active/deleted_at 필터 없이 조회한다(요청 이후 비활성/소프트삭제된 상품도 후보 유지).
+  //   products 행이 아예 없어 이름을 얻을 수 없는 경우에만 제외한다. 진단 카탈로그 쿼리를 재사용하지 않는다.
+  const pendingProductIds = collectPendingOrderProductIds(
+    (pendingOrderRows ?? []) as Array<{ status: string; items: unknown }>,
+  );
+  const missingPendingIds = pendingProductIds.filter((id) => !ownedIds.has(id));
+  const pendingOrderProducts: ProductCandidate[] = [];
+  if (missingPendingIds.length > 0) {
+    const { data: pendingProducts, error: pendingProductsErr } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', missingPendingIds);
+    if (pendingProductsErr) {
+      return { ok: false, error: `상품 후보 조회에 실패했습니다: ${pendingProductsErr.message}` };
+    }
+    for (const row of (pendingProducts ?? []) as ProductCandidate[]) {
+      pendingOrderProducts.push({ id: row.id, name: row.name });
+    }
+  }
+
   return {
     ok: true,
-    mergedProducts: Array.from(productById.values()),
+    mergedProducts: mergeProductCandidates({ ownedInventoryProducts, pendingOrderProducts }),
     customRows: (customRows ?? []) as Array<{ id: string; name: string }>,
+    catalogNames: ((catalogRows ?? []) as ProductCandidate[]).map((row) => row.name),
   };
 }
 
@@ -86,23 +136,14 @@ function resolveInventoryReferences(
   parsedItems: Awaited<ReturnType<typeof parseShippingExcel>>['items'],
   mergedProducts: ProductCandidate[],
   customRows: Array<{ id: string; name: string }>,
+  catalogNames: string[],
 ):
   | { ok: true; itemsWithRef: Array<Record<string, unknown>> }
   | { ok: false; error: string } {
   const productNames = Array.from(new Set(parsedItems.map((it) => it.product_code)));
   const match = matchInventoryRefs(productNames, mergedProducts, customRows);
   if (!match.ok) {
-    if (match.duplicates.length > 0) {
-      const shown = match.duplicates.slice(0, 3).join(', ');
-      const more = match.duplicates.length > 3 ? ' …' : '';
-      return {
-        ok: false,
-        error: `같은 상품명의 상품이 여러 개입니다(상품 관리에서 중복 정리 필요): ${shown}${more}`,
-      };
-    }
-    const shown = match.unknown.slice(0, 3).join(', ');
-    const more = match.unknown.length > 3 ? ' …' : '';
-    return { ok: false, error: `존재하지 않는 상품명이 있습니다: ${shown}${more}` };
+    return { ok: false, error: buildInventoryMatchError(match, catalogNames) };
   }
 
   const productNameById = new Map(mergedProducts.map((row) => [row.id, row.name]));
@@ -173,6 +214,7 @@ export async function requestShippingUploadAction(
     parsed.items,
     candidates.mergedProducts,
     candidates.customRows,
+    candidates.catalogNames,
   );
   if (!resolved.ok) return resolved;
 
