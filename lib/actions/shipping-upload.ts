@@ -36,7 +36,7 @@ type ProductCandidate = { id: string; name: string };
 
 /**
  * ① 배송대행 후보 조회. 후보는 정확히 세 소스의 합집합이다:
- *   1) 보유 재고 — user_inventory의 모든 행(수량 0 포함), 현재 상품명으로 해석.
+ *   1) 보유 재고 — user_inventory에서 수량 > 0인 행, 현재 상품명으로 해석(수량 0으로 소진된 상품은 후보 아님).
  *   2) 진행 중인 구매요청 — status='pending' stock_orders의 items[].product_id, 현재 상품명으로 해석.
  *   3) 수기 재고 — user_custom_inventory.
  * 활성 카탈로그 전체는 후보가 아니라, 매칭 실패 메시지 분기를 위한 진단(catalogNames)으로만 쓴다.
@@ -65,11 +65,12 @@ async function fetchProductCandidates(
       .select('id, name')
       .eq('is_active', true)
       .is('deleted_at', null),
-    // 소스1: 보유 재고 — 수량 필터 없음(수량 0 행도 후보).
+    // 소스1: 보유 재고 — 수량 > 0인 행만(수량 0으로 소진된 상품은 후보 아님, 재고가 있어야 배송대행 성립).
     supabase
       .from('user_inventory')
       .select('products(id, name)')
-      .eq('user_id', userId),
+      .eq('user_id', userId)
+      .gt('quantity', 0),
     // 소스3: 수기 재고.
     supabase
       .from('user_custom_inventory')
