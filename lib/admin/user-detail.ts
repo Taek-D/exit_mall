@@ -358,7 +358,33 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       purchasedReservations,
       purchasedMemoRows,
     ),
-    products: (products ?? []) as unknown as AdminUserProductOption[],
+    products: buildInventoryProductOptions(
+      (inventory ?? []) as unknown as AdminUserInventoryRow[],
+      (products ?? []) as unknown as AdminUserProductOption[],
+    ),
     totalSpent,
   };
+}
+
+/**
+ * 재고 수동 조정 드롭다운 목록.
+ *
+ * 판매중지·삭제된 상품이라도 보유 재고가 남아 있으면 조정할 수 있어야 하므로
+ * 보유분을 먼저 싣고, 그 뒤에 미보유 판매중 상품(신규 가산용)을 잇는다.
+ * 보유분은 user_inventory 조회가 이미 수량 0 초과만 가져온다.
+ */
+export function buildInventoryProductOptions(
+  inventory: AdminUserInventoryRow[],
+  sellableProducts: AdminUserProductOption[],
+): AdminUserProductOption[] {
+  const byName = (a: AdminUserProductOption, b: AdminUserProductOption) =>
+    a.name.localeCompare(b.name, 'ko');
+  const ownedIds = new Set(inventory.map((row) => row.product_id));
+
+  return [
+    ...inventory
+      .map((row) => ({ id: row.product_id, name: getInventoryProductName(row) }))
+      .sort(byName),
+    ...sellableProducts.filter((p) => !ownedIds.has(p.id)).sort(byName),
+  ];
 }
