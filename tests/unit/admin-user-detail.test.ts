@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildInventoryProductOptions,
   mergeUserOrders,
   summarizePurchasedInventoryReservations,
   sumNonCancelledAmounts,
@@ -8,6 +9,46 @@ import {
   type AdminUserShippingUploadInput,
   type AdminUserLegacyOrderInput,
 } from '@/lib/admin/user-detail';
+
+describe('buildInventoryProductOptions', () => {
+  // 판매중지된 상품이라도 보유 재고가 남아 있으면 수동 조정 목록에 떠야 한다.
+  // 목록이 판매중 상품만 담고 있어 운영자가 차감하지 못한 사고가 있었다.
+  const owned = [
+    { product_id: 'p-stopped', quantity: 3, products: { name: '안국약품 토비콤' } },
+    { product_id: 'p-live', quantity: 1, products: { name: '가나다 크림' } },
+  ];
+  const sellable = [
+    { id: 'p-live', name: '가나다 크림' },
+    { id: 'p-other', name: '나나나 세럼' },
+  ];
+
+  it('판매중 목록에 없는 보유 상품도 포함한다', () => {
+    const options = buildInventoryProductOptions(owned, sellable);
+
+    expect(options.map((o) => o.id)).toContain('p-stopped');
+  });
+
+  it('보유분을 앞에 두고 각 구간을 이름순으로 정렬한다', () => {
+    const options = buildInventoryProductOptions(owned, sellable);
+
+    expect(options.map((o) => o.id)).toEqual(['p-live', 'p-stopped', 'p-other']);
+  });
+
+  it('보유 중인 상품을 판매중 목록과 중복해서 싣지 않는다', () => {
+    const ids = buildInventoryProductOptions(owned, sellable).map((o) => o.id);
+
+    expect(ids).toHaveLength(new Set(ids).size);
+  });
+
+  it('상품명 조인이 비어도 목록에서 빠지지 않는다', () => {
+    const options = buildInventoryProductOptions(
+      [{ product_id: 'p-noname', quantity: 2, products: null }],
+      [],
+    );
+
+    expect(options).toEqual([{ id: 'p-noname', name: '(이름 없음)' }]);
+  });
+});
 
 describe('mergeUserOrders', () => {
   it('merges three sources sorted by created_at desc', () => {
