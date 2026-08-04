@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,10 @@ import {
   addPurchasedInventoryLotAction,
   updatePurchasedInventoryLotAction,
 } from '@/lib/actions/admin-purchased-inventory';
-import type { AdminPurchasedInventoryRow } from '@/lib/admin/user-detail';
+import type {
+  AdminPurchasedInventoryRow,
+  PurchasedInventorySummaryRow,
+} from '@/lib/admin/user-detail';
 
 type EditState = {
   productName: string;
@@ -34,9 +37,11 @@ function sourceTypeLabel(sourceType: AdminPurchasedInventoryRow['source_type']) 
 export function PurchasedInventoryManager({
   userId,
   rows,
+  summary,
 }: {
   userId: string;
   rows: AdminPurchasedInventoryRow[];
+  summary: PurchasedInventorySummaryRow[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -47,6 +52,12 @@ export function PurchasedInventoryManager({
   const [memo, setMemo] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, startAdd] = useTransition();
+
+  const [hideEmpty, setHideEmpty] = useState(true);
+  const visibleRows = useMemo(
+    () => (hideEmpty ? rows.filter((row) => row.remaining_quantity > 0) : rows),
+    [rows, hideEmpty],
+  );
 
   const [editing, setEditing] = useState<Record<string, EditState>>({});
   const [rowError, setRowError] = useState<Record<string, string | null>>({});
@@ -147,10 +158,46 @@ export function PurchasedInventoryManager({
         {addError && <p className="text-sm text-destructive">{addError}</p>}
       </div>
 
+      {summary.length > 0 && (
+        <div className="rounded-md bg-muted p-3">
+          <p className="text-xs text-muted-foreground">상품별 잔여 수량</p>
+          <ul className="mt-2 divide-y text-sm">
+            {summary.map((row) => (
+              <li key={row.key} className="flex items-baseline justify-between gap-3 py-1.5">
+                <span>{row.label}</span>
+                <span className="whitespace-nowrap font-mono tabular text-lg font-medium">
+                  {row.remaining}
+                  {row.reserved > 0 && (
+                    <span className="ml-1 font-sans text-xs font-normal text-muted-foreground">
+                      (예약 {row.reserved})
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">현재 사입재고</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            현재 사입재고 {visibleRows.length}건
+          </p>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5"
+              checked={hideEmpty}
+              onChange={(e) => setHideEmpty(e.target.checked)}
+            />
+            잔여 0 숨기기
+          </label>
+        </div>
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">등록된 사입재고가 없습니다.</p>
+        ) : visibleRows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">잔여 수량이 있는 사입재고가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[980px] table-fixed text-sm">
@@ -177,7 +224,7 @@ export function PurchasedInventoryManager({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {rows.map((row) => {
+                {visibleRows.map((row) => {
                   const state = editing[row.id] ?? toEditState(row);
                   const hasReservations = row.reserved_quantity > 0;
                   const invalidQuantity = state.remainingQuantity < row.reserved_quantity;
