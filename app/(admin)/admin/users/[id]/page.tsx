@@ -33,6 +33,7 @@ import {
   fetchAdminUserDetail,
   getInventoryProductName,
   isPositiveTransaction,
+  summarizePurchasedInventoryByProduct,
 } from '@/lib/admin/user-detail';
 import { HistoryTable, Metric } from '@/components/admin/DetailPanels';
 
@@ -151,7 +152,11 @@ export default async function AdminUserDetailPage({
 
       <InventoryAdjuster userId={user.id} products={products} />
       <CustomInventoryManager userId={user.id} rows={customInventory} />
-      <PurchasedInventoryManager userId={user.id} rows={purchasedInventory} />
+      <PurchasedInventoryManager
+        userId={user.id}
+        rows={purchasedInventory}
+        summary={summarizePurchasedInventoryByProduct(purchasedInventory)}
+      />
 
       <Tabs defaultValue="orders" className="space-y-3">
         <TabsList>

@@ -212,6 +212,41 @@ export function summarizePurchasedInventoryReservations(
   }));
 }
 
+export type PurchasedInventorySummaryRow = {
+  key: string;
+  label: string;
+  remaining: number;
+  reserved: number;
+};
+
+/**
+ * 사입재고 로트를 상품명+옵션명 기준으로 합친 잔여 수량 요약.
+ *
+ * 운영자가 로트를 눈으로 더하던 작업을 대신한다. 옵션이 다르면 다른 물건이라 따로 센다.
+ * 예약 수량도 함께 합쳐야 배송대행에 이미 잡힌 분을 가용 재고로 오해하지 않는다.
+ */
+export function summarizePurchasedInventoryByProduct(
+  rows: AdminPurchasedInventoryRow[],
+): PurchasedInventorySummaryRow[] {
+  const byKey = new Map<string, PurchasedInventorySummaryRow>();
+
+  for (const row of rows) {
+    if (row.remaining_quantity <= 0) continue;
+    const key = `${row.product_name}\u0000${row.option_name}`;
+    const entry = byKey.get(key) ?? {
+      key,
+      label: row.option_name ? `${row.product_name} (${row.option_name})` : row.product_name,
+      remaining: 0,
+      reserved: 0,
+    };
+    entry.remaining += row.remaining_quantity;
+    entry.reserved += row.reserved_quantity;
+    byKey.set(key, entry);
+  }
+
+  return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+}
+
 type AdminPurchasedInventoryLotQueryRow = AdminPurchasedInventoryLotRow & {
   inbound_requests?: { status?: string | null } | Array<{ status?: string | null }> | null;
 };

@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   buildInventoryProductOptions,
   mergeUserOrders,
+  summarizePurchasedInventoryByProduct,
   summarizePurchasedInventoryReservations,
   sumNonCancelledAmounts,
   type AdminPurchasedInventoryLotRow,
+  type AdminPurchasedInventoryRow,
   type AdminUserStockOrderInput,
   type AdminUserShippingUploadInput,
   type AdminUserLegacyOrderInput,
@@ -47,6 +49,70 @@ describe('buildInventoryProductOptions', () => {
     );
 
     expect(options).toEqual([{ id: 'p-noname', name: '(이름 없음)' }]);
+  });
+});
+
+describe('summarizePurchasedInventoryByProduct', () => {
+  // 운영자가 로트를 눈으로 더하던 작업을 대신한다.
+  const lot = (over: Partial<AdminPurchasedInventoryRow>): AdminPurchasedInventoryRow => ({
+    id: 'lot',
+    product_name: '미백앰플',
+    option_name: '',
+    initial_quantity: 10,
+    remaining_quantity: 10,
+    reserved_quantity: 0,
+    source_type: 'inbound_request',
+    admin_memo: null,
+    created_at: '2026-05-20T10:00:00Z',
+    updated_at: '2026-05-20T10:00:00Z',
+    ...over,
+  });
+
+  it('같은 상품의 로트 잔여·예약 수량을 합친다', () => {
+    const summary = summarizePurchasedInventoryByProduct([
+      lot({ id: 'a', remaining_quantity: 12 }),
+      lot({ id: 'b', remaining_quantity: 20, reserved_quantity: 3 }),
+      lot({ id: 'c', remaining_quantity: 10 }),
+    ]);
+
+    expect(summary).toHaveLength(1);
+    expect(summary[0]).toMatchObject({ label: '미백앰플', remaining: 42, reserved: 3 });
+  });
+
+  it('소진된 로트는 합계에서 제외한다', () => {
+    const summary = summarizePurchasedInventoryByProduct([
+      lot({ id: 'a', remaining_quantity: 5 }),
+      lot({ id: 'b', remaining_quantity: 0 }),
+    ]);
+
+    expect(summary).toHaveLength(1);
+    expect(summary[0]?.remaining).toBe(5);
+  });
+
+  it('상품명이 같아도 옵션이 다르면 따로 센다', () => {
+    const summary = summarizePurchasedInventoryByProduct([
+      lot({ id: 'a', option_name: '50ml', remaining_quantity: 4 }),
+      lot({ id: 'b', option_name: '100ml', remaining_quantity: 7 }),
+    ]);
+
+    expect(summary.map((row) => [row.label, row.remaining])).toEqual([
+      ['미백앰플 (100ml)', 7],
+      ['미백앰플 (50ml)', 4],
+    ]);
+  });
+
+  it('상품명 순으로 정렬한다', () => {
+    const summary = summarizePurchasedInventoryByProduct([
+      lot({ id: 'a', product_name: '워터 에센스' }),
+      lot({ id: 'b', product_name: '미백앰플' }),
+      lot({ id: 'c', product_name: '바이오플러스' }),
+    ]);
+
+    expect(summary.map((row) => row.label)).toEqual(['미백앰플', '바이오플러스', '워터 에센스']);
+  });
+
+  it('전부 소진되면 빈 목록을 준다', () => {
+    expect(summarizePurchasedInventoryByProduct([lot({ remaining_quantity: 0 })])).toEqual([]);
   });
 });
 
