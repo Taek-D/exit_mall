@@ -13,7 +13,7 @@
 
 create or replace function public.inbound_tracking_numbers(p_items jsonb)
 returns text[]
-language sql immutable parallel safe as $$
+language sql immutable parallel safe set search_path = '' as $$
   select coalesce(array_agg(distinct s.t order by s.t), '{}'::text[])
     from (
       select nullif(btrim(e->>'tracking_number'), '') as t
@@ -27,7 +27,7 @@ $$;
 -- 표기 차이(하이픈·공백·대소문자)를 흡수한 비교용 값.
 create or replace function public.inbound_tracking_numbers_norm(p_items jsonb)
 returns text[]
-language sql immutable parallel safe as $$
+language sql immutable parallel safe set search_path = '' as $$
   select coalesce(array_agg(distinct s.t order by s.t), '{}'::text[])
     from (
       select nullif(regexp_replace(upper(coalesce(e->>'tracking_number', '')), '[^0-9A-Z]', '', 'g'), '') as t
@@ -51,9 +51,10 @@ create index if not exists inbound_requests_tracking_norm_idx
 
 -- === 중복 입고 감지 ==========================================================
 
--- 같은 송장번호를 쓴 요청은 전체의 절반에 가깝다(박스 하나를 상품별로 나눠
--- 등록하는 정상 사용). 그래서 송장 일치만으로는 신호가 되지 않고, 상품·옵션까지
--- 겹칠 때만 중복으로 본다. 취소된 요청은 재고를 만들지 않으므로 제외한다.
+-- 송장번호만 겹치는 요청은 취소 건을 빼도 55건 있는데(2026-08 기준, 취소
+-- 제외 1,189건 중 4.6%) 대부분 박스 하나를 상품별로 나눠 등록한 정상 사용이다.
+-- 그래서 송장 일치만으로는 신호가 되지 않고, 상품·옵션까지 겹칠 때만 중복으로
+-- 본다(22건, 1.9%). 취소된 요청은 재고를 만들지 않으므로 제외한다.
 drop function if exists public.find_inbound_duplicates(uuid);
 
 create or replace function public.find_inbound_duplicates(p_request_id uuid)
