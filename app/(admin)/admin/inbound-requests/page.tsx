@@ -124,12 +124,12 @@ export default async function AdminInboundRequestsPage({
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
-                <th className="text-left px-3 h-10 font-medium">상태</th>
-                <th className="text-left px-3 h-10 font-medium">제목</th>
-                <th className="text-left px-3 h-10 font-medium">송장번호</th>
-                <th className="text-left px-3 h-10 font-medium">작성자</th>
-                <th className="text-left px-3 h-10 font-medium">최근 활동</th>
-                <th className="text-left px-3 h-10 font-medium">작성일</th>
+                <th className="text-left px-3 h-10 font-medium whitespace-nowrap">상태</th>
+                <th className="text-left px-3 h-10 font-medium w-full">제목</th>
+                <th className="text-left px-3 h-10 font-medium whitespace-nowrap">송장번호</th>
+                <th className="text-left px-3 h-10 font-medium whitespace-nowrap">작성자</th>
+                <th className="text-left px-3 h-10 font-medium whitespace-nowrap">최근 활동</th>
+                <th className="text-left px-3 h-10 font-medium whitespace-nowrap">작성일</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -140,7 +140,7 @@ export default async function AdminInboundRequestsPage({
                   (!r.admin_last_read_at || r.last_comment_at > r.admin_last_read_at);
                 return (
                   <tr key={r.id} className="hover:bg-muted/30">
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 whitespace-nowrap">
                       <InboundStatusBadge status={r.status as InboundStatus} />
                     </td>
                     <td className="px-3 py-2">
@@ -162,13 +162,13 @@ export default async function AdminInboundRequestsPage({
                         highlight={normalizedQuery}
                       />
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                       {r.profile?.name ?? '—'}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                       {r.last_comment_at ? formatShortDateTimeKR(r.last_comment_at) : '—'}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                       {formatShortDateTimeKR(r.created_at)}
                     </td>
                   </tr>
