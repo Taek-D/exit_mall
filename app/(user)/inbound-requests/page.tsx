@@ -74,6 +74,13 @@ export default async function InboundRequestsPage() {
                     {r.title}
                   </Link>
                   <p className="text-xs text-muted-foreground mt-0.5">
+                    {r.tracking_numbers.length > 0 && (
+                      <>
+                        <span className="font-mono tabular">{r.tracking_numbers[0]}</span>
+                        {r.tracking_numbers.length > 1 && ` 외 ${r.tracking_numbers.length - 1}`}
+                        {' · '}
+                      </>
+                    )}
                     {formatShortDateTimeKR(r.created_at)}
                     {r.last_comment_at && (
                       <>
