@@ -79,12 +79,15 @@ export default async function AdminInboundRequestDetailPage({
       <section className="rounded-lg border bg-card p-5 space-y-4">
         {request.body && <p className="text-sm whitespace-pre-wrap">{request.body}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
-          <InboundAttachmentList
-            requestId={request.id}
-            excelPath={request.excel_storage_path}
-            excelOriginalName={request.excel_original_name}
-            imagePaths={request.image_paths}
-          />
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">첨부</p>
+            <InboundAttachmentList
+              requestId={request.id}
+              excelPath={request.excel_storage_path}
+              excelOriginalName={request.excel_original_name}
+              imagePaths={request.image_paths}
+            />
+          </div>
           <InboundShipmentList items={request.inbound_items} />
         </div>
         <InboundItemsTable items={request.inbound_items} status={status} />

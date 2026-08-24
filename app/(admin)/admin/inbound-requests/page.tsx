@@ -77,10 +77,15 @@ export default async function AdminInboundRequestsPage({
             검색
           </button>
         </form>
+        {q && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-mono tabular">{q}</span> 검색 결과 {rows.length}건
+          </p>
+        )}
         <Link
           href={missingHref()}
           className={cn(
-            'h-9 inline-flex items-center px-3 rounded-md border text-sm transition-colors',
+            'h-9 ml-auto inline-flex items-center px-3 rounded-md border text-sm transition-colors',
             missingTracking
               ? 'bg-warning/10 text-warning border-warning/30'
               : 'bg-background hover:bg-muted',

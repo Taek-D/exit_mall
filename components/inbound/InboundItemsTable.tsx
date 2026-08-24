@@ -24,12 +24,14 @@ export function InboundItemsTable({
 
   return (
     <div className="rounded-md border bg-background">
-      <div className="px-3 py-2 border-b text-sm font-medium flex items-center justify-between">
+      <div className="px-3 py-2 border-b text-sm font-medium flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <span>신청 품목 ({items.length}건 · 총 {totalQty}개)</span>
         {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        {/* 열이 6개라 좁은 화면에서는 표를 줄이지 않고 가로로 스크롤시킨다.
+            min-width가 없으면 상품명이 한 글자씩 접힌다. */}
+        <table className="w-full min-w-[38rem] text-sm">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-3 h-9 w-10 text-right">#</th>
