@@ -2,12 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { fetchInboundRequest } from '@/lib/inbound/queries';
+import { fetchInboundDuplicates, fetchInboundRequest } from '@/lib/inbound/queries';
 import { InboundStatusBadge } from '@/components/StatusBadge';
 import { InboundAttachmentList } from '@/components/inbound/InboundAttachmentList';
 import { InboundCommentList } from '@/components/inbound/InboundCommentList';
 import { InboundCommentForm } from '@/components/inbound/InboundCommentForm';
 import { InboundItemsTable } from '@/components/inbound/InboundItemsTable';
+import { InboundShipmentList } from '@/components/inbound/InboundShipmentList';
+import { InboundDuplicateBanner } from '@/components/inbound/InboundDuplicateBanner';
 import { CancelInboundButton } from './CancelInboundButton';
 import { formatShortDateTimeKR } from '@/lib/dates';
 import { isLocked } from '@/lib/inbound/permissions';
@@ -32,6 +34,7 @@ export default async function InboundRequestDetailPage({
 
   const status = request.status as InboundStatus;
   const locked = isLocked(status);
+  const duplicates = locked ? [] : await fetchInboundDuplicates(request.id);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -56,14 +59,23 @@ export default async function InboundRequestDetailPage({
         {status === 'open' && <CancelInboundButton requestId={request.id} />}
       </header>
 
+      <InboundDuplicateBanner
+        duplicates={duplicates}
+        variant="user"
+        cancellable={status === 'open'}
+      />
+
       <section className="rounded-lg border bg-card p-5 space-y-4">
         {request.body && <p className="text-sm whitespace-pre-wrap">{request.body}</p>}
-        <InboundAttachmentList
-          requestId={request.id}
-          excelPath={request.excel_storage_path}
-          excelOriginalName={request.excel_original_name}
-          imagePaths={request.image_paths}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InboundAttachmentList
+            requestId={request.id}
+            excelPath={request.excel_storage_path}
+            excelOriginalName={request.excel_original_name}
+            imagePaths={request.image_paths}
+          />
+          <InboundShipmentList items={request.inbound_items} />
+        </div>
         <InboundItemsTable items={request.inbound_items} status={status} />
       </section>
 

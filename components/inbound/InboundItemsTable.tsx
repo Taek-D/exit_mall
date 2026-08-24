@@ -36,6 +36,8 @@ export function InboundItemsTable({
               <th className="font-medium px-3">상품명</th>
               <th className="font-medium px-3">옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
+              <th className="font-medium px-3">택배사</th>
+              <th className="font-medium px-3">송장번호</th>
             </tr>
           </thead>
           <tbody>
@@ -47,6 +49,12 @@ export function InboundItemsTable({
                 <td className="px-3 py-2 font-medium">{item.product_name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{item.option_name || '-'}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">{item.quantity}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  {item.carrier || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap font-mono tabular text-muted-foreground">
+                  {item.tracking_number || '-'}
+                </td>
               </tr>
             ))}
           </tbody>

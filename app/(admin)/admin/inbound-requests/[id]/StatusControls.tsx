@@ -17,9 +17,15 @@ type Transition = {
 export function StatusControls({
   requestId,
   status,
+  duplicateWarning,
 }: {
   requestId: string;
   status: InboundStatus;
+  /**
+   * 중복 입고 경고 문구. 배너는 스크롤로 지나칠 수 있지만 완료 확인
+   * 다이얼로그는 못 지나치므로, 재고가 실제로 생성되는 지점에서 한 번 더 막는다.
+   */
+  duplicateWarning?: string;
 }) {
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -86,7 +92,16 @@ export function StatusControls({
           <Button
             size="sm"
             disabled={pending}
-            onClick={() => go({ next: 'completed', title: '완료 처리할까요?' })}
+            onClick={() =>
+              go({
+                next: 'completed',
+                title: '완료 처리할까요?',
+                description: duplicateWarning
+                  ? `${duplicateWarning} 완료하면 사입재고가 생성되고 되돌릴 수 없습니다.`
+                  : '완료하면 사입재고가 생성되고 되돌릴 수 없습니다.',
+                tone: duplicateWarning ? 'destructive' : 'default',
+              })
+            }
           >
             완료 처리
           </Button>

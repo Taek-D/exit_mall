@@ -13,7 +13,19 @@ export type InboundListRow = {
   admin_last_read_at: string | null;
   created_at: string;
   updated_at: string;
+  tracking_numbers: string[];
   profile?: { name: string } | null;
+};
+
+/** 같은 송장번호 + 같은 상품이 겹치는 다른 입고요청. */
+export type InboundDuplicateRow = {
+  id: string;
+  title: string;
+  status: InboundStatus;
+  created_at: string;
+  shared_tracking: string[];
+  shared_products: string[];
+  overlap_count: number;
 };
 
 export type InboundRequestItem = {
@@ -37,6 +49,7 @@ export type InboundRequestDetail = {
   excel_original_name: string;
   image_paths: string[];
   inbound_items: InboundRequestItem[];
+  tracking_numbers: string[];
   last_comment_at: string | null;
   last_comment_by_role: 'user' | 'admin' | null;
   user_last_read_at: string | null;
@@ -63,7 +76,7 @@ export async function fetchMyInboundRequests(limit = 50): Promise<InboundListRow
   const supabase = createClient();
   const { data, error } = await supabase.from('inbound_requests')
     .select(
-      'id,user_id,title,status,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
+      'id,user_id,title,status,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at,tracking_numbers',
     )
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -85,6 +98,7 @@ type SearchInboundRow = {
   admin_last_read_at: string | null;
   created_at: string;
   updated_at: string;
+  tracking_numbers: string[] | null;
   profile_name: string;
   profile_email: string;
 };
@@ -93,12 +107,14 @@ export async function fetchAllInboundRequests(
   status: InboundStatus | 'all' = 'all',
   limit = 100,
   search?: string,
+  missingTracking = false,
 ): Promise<InboundListRow[]> {
   const supabase = createClient();
   const { data, error } = await callRpc(supabase, 'search_inbound_requests', {
     p_q: search?.trim() || null,
     p_status: status === 'all' ? null : status,
     p_limit: limit,
+    p_missing_tracking: missingTracking,
   });
   if (error) {
     console.error('[inbound] fetchAllInboundRequests', error);
@@ -116,8 +132,23 @@ export async function fetchAllInboundRequests(
     admin_last_read_at: row.admin_last_read_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    tracking_numbers: row.tracking_numbers ?? [],
     profile: { name: row.profile_name },
   }));
+}
+
+export async function fetchInboundDuplicates(
+  requestId: string,
+): Promise<InboundDuplicateRow[]> {
+  const supabase = createClient();
+  const { data, error } = await callRpc(supabase, 'find_inbound_duplicates', {
+    p_request_id: requestId,
+  });
+  if (error) {
+    console.error('[inbound] fetchInboundDuplicates', error);
+    return [];
+  }
+  return (data ?? []) as unknown as InboundDuplicateRow[];
 }
 
 export async function fetchInboundRequest(id: string): Promise<{
@@ -129,7 +160,7 @@ export async function fetchInboundRequest(id: string): Promise<{
     supabase
       .from('inbound_requests')
       .select(
-        'id,user_id,title,body,status,excel_storage_path,excel_original_name,image_paths,inbound_items,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
+        'id,user_id,title,body,status,excel_storage_path,excel_original_name,image_paths,inbound_items,tracking_numbers,last_comment_at,last_comment_by_role,user_last_read_at,admin_last_read_at,created_at,updated_at',
       )
       .eq('id', id)
       .maybeSingle(),
@@ -151,7 +182,11 @@ export async function fetchInboundRequest(id: string): Promise<{
     ? (rawRequest.inbound_items as InboundRequestItem[])
     : [];
   return {
-    request: { ...rawRequest, inbound_items: items } as InboundRequestDetail,
+    request: {
+      ...rawRequest,
+      inbound_items: items,
+      tracking_numbers: rawRequest.tracking_numbers ?? [],
+    } as InboundRequestDetail,
     comments: (cs ?? []) as unknown as InboundCommentRow[],
   };
 }
