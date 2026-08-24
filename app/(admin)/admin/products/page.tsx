@@ -93,7 +93,7 @@ export default async function ProductsPage({
       ) : (
         <div className="rounded-lg border bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm whitespace-nowrap">
               <thead className="bg-surface-muted">
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="font-medium px-4 h-10 w-16"></th>

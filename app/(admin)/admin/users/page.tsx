@@ -140,13 +140,13 @@ export default async function AdminUsersPage({
             <table className="w-full text-sm">
               <thead className="bg-surface-muted">
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="font-medium px-4 h-10">이름</th>
-                  <th className="font-medium px-3">이메일</th>
-                  <th className="font-medium px-3 text-right">잔액</th>
-                  <th className="font-medium px-3 text-right">임계치</th>
-                  <th className="font-medium px-3">상태</th>
-                  <th className="font-medium px-3">그룹</th>
-                  <th className="font-medium px-3">역할</th>
+                  <th className="font-medium px-4 h-10 whitespace-nowrap">이름</th>
+                  <th className="font-medium px-3 w-full">이메일</th>
+                  <th className="font-medium px-3 text-right whitespace-nowrap">잔액</th>
+                  <th className="font-medium px-3 text-right whitespace-nowrap">임계치</th>
+                  <th className="font-medium px-3 whitespace-nowrap">상태</th>
+                  <th className="font-medium px-3 whitespace-nowrap">그룹</th>
+                  <th className="font-medium px-3 whitespace-nowrap">역할</th>
                   <th className="font-medium px-3 w-8"></th>
                 </tr>
               </thead>
@@ -159,7 +159,7 @@ export default async function AdminUsersPage({
                       key={u.id}
                       className="border-t h-11 hover:bg-surface-muted/50 transition-colors"
                     >
-                      <td className="px-4">
+                      <td className="px-4 whitespace-nowrap">
                         <Link
                           href={`/admin/users/${u.id}`}
                           className="font-medium hover:underline"
@@ -170,19 +170,19 @@ export default async function AdminUsersPage({
                       <td className="px-3 text-muted-foreground truncate max-w-[220px]">{u.email}</td>
                       <td
                         className={cn(
-                          'px-3 text-right font-mono tabular',
+                          'px-3 text-right font-mono tabular whitespace-nowrap',
                           low && 'text-destructive font-medium',
                         )}
                       >
                         {formatKRW(Number(u.deposit_balance))}
                       </td>
-                      <td className="px-3 text-right font-mono tabular text-muted-foreground">
+                      <td className="px-3 text-right font-mono tabular text-muted-foreground whitespace-nowrap">
                         {formatKRW(Number(u.low_balance_threshold))}
                       </td>
-                      <td className="px-3">
+                      <td className="px-3 whitespace-nowrap">
                         <UserStatusBadge status={u.status as UserStatus} />
                       </td>
-                      <td className="px-3">
+                      <td className="px-3 whitespace-nowrap">
                         {u.role === 'admin' ? (
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : isUserGroup(u.user_group) ? (
@@ -193,7 +193,7 @@ export default async function AdminUsersPage({
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-3">
+                      <td className="px-3 whitespace-nowrap">
                         {u.role === 'admin' ? (
                           <StatusPill tone="info">관리자</StatusPill>
                         ) : (

@@ -64,12 +64,12 @@ export default async function AdminStockOrdersPage({
             <table className="w-full text-sm">
               <thead className="bg-surface-muted">
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="font-medium px-4 h-10">주문 번호</th>
-                  <th className="font-medium px-3">고객</th>
-                  <th className="font-medium px-3">상품 (요약)</th>
-                  <th className="font-medium px-3 text-right">금액</th>
-                  <th className="font-medium px-3">상태</th>
-                  <th className="font-medium px-3">요청 시각</th>
+                  <th className="font-medium px-4 h-10 whitespace-nowrap">주문 번호</th>
+                  <th className="font-medium px-3 whitespace-nowrap">고객</th>
+                  <th className="font-medium px-3 w-full">상품 (요약)</th>
+                  <th className="font-medium px-3 text-right whitespace-nowrap">금액</th>
+                  <th className="font-medium px-3 whitespace-nowrap">상태</th>
+                  <th className="font-medium px-3 whitespace-nowrap">요청 시각</th>
                   <th className="font-medium px-3 w-8" aria-label="이동"></th>
                 </tr>
               </thead>
@@ -89,7 +89,7 @@ export default async function AdminStockOrdersPage({
                           {o.id.slice(0, 8)}
                         </Link>
                       </td>
-                      <td className="px-3">
+                      <td className="px-3 whitespace-nowrap">
                         {o.profiles?.name ?? (
                           <span className="text-muted-foreground font-mono text-xs">
                             {o.user_id.slice(0, 8)}
@@ -99,10 +99,10 @@ export default async function AdminStockOrdersPage({
                       <td className="px-3 text-muted-foreground truncate max-w-[240px]">
                         {summary}
                       </td>
-                      <td className="px-3 text-right font-mono tabular">
+                      <td className="px-3 text-right font-mono tabular whitespace-nowrap">
                         {formatKRW(Number(o.total_amount))}
                       </td>
-                      <td className="px-3">
+                      <td className="px-3 whitespace-nowrap">
                         <StockOrderStatusBadge status={o.status as StockOrderStatus} />
                       </td>
                       <td className="px-3 text-xs text-muted-foreground whitespace-nowrap">

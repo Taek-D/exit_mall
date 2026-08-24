@@ -138,7 +138,7 @@ export default async function AdminSupportRequestsPage({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm whitespace-nowrap">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
                 <th className="h-10 px-3 text-left font-medium">상태</th>
