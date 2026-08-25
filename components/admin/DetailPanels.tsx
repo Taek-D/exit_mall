@@ -40,7 +40,9 @@ export function HistoryTable({
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      {/* 열 구성이 호출부마다 달라 흡수할 열을 정할 수 없다. 표를 줄이는 대신
+          가로로 스크롤시킨다(docs/standards.md). */}
+      <table className="w-full text-sm whitespace-nowrap">
         <thead className="bg-surface-muted">
           <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
             {headers.map((header, index) => (

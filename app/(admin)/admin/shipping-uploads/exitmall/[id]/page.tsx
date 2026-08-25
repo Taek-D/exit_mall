@@ -75,8 +75,10 @@ export default async function AdminShippingUploadDetail({
         배송비는 행 수 기준 안내 금액으로만 표시합니다. 승인 시 예치금은 차감하지 않습니다.
       </section>
 
-      <section className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
+      <section className="rounded-lg border bg-card overflow-x-auto">
+        {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+            주소·상품명만 줄바꿈을 허용하고 나머지는 한 줄로 고정한다. */}
+        <table className="w-full min-w-[64rem] text-sm whitespace-nowrap">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
@@ -93,13 +95,13 @@ export default async function AdminShippingUploadDetail({
               <tr key={item.no} className="border-t">
                 <td className="px-4 py-2 font-mono text-xs">{item.no}</td>
                 <td className="px-3 py-2">{item.internal_code ?? '-'}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 whitespace-normal">
                   {item.recipient}
                   <p className="text-xs text-muted-foreground">
                     {item.phone} · {item.address}
                   </p>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 whitespace-normal">
                   <span>{item.product_code}</span>
                   {item.product_name && (
                     <span className="text-muted-foreground"> / {item.product_name}</span>

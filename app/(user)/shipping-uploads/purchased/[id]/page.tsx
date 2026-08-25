@@ -85,8 +85,10 @@ export default async function PurchasedShippingUploadDetail({
         </div>
       </header>
 
-      <section className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
+      <section className="rounded-lg border bg-card overflow-x-auto">
+        {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+            주소·상품명만 줄바꿈을 허용하고 나머지는 한 줄로 고정한다. */}
+        <table className="w-full min-w-[56rem] text-sm whitespace-nowrap">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10">#</th>
@@ -101,13 +103,13 @@ export default async function PurchasedShippingUploadDetail({
             {data.items.map((it) => (
               <tr key={it.no} className="border-t">
                 <td className="px-4 py-2 font-mono tabular text-xs">{it.no}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 whitespace-normal">
                   {it.recipient}
                   <p className="text-xs text-muted-foreground">
                     {it.phone} · {it.address}
                   </p>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 whitespace-normal">
                   <span>{it.product_code}</span>
                   {it.product_name && (
                     <span className="text-muted-foreground"> / {it.product_name}</span>

@@ -125,11 +125,13 @@ export default async function InventoryPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-lg border bg-card overflow-x-auto">
+          {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+              상품명만 줄바꿈을 허용하고 수량 열은 한 줄로 고정한다. */}
+          <table className="w-full text-sm whitespace-nowrap">
             <thead className="bg-surface-muted">
               <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="font-medium px-5 h-10">상품</th>
+                <th className="font-medium px-5 h-10 w-full">상품</th>
                 <th className="font-medium px-3 text-right">가용</th>
                 <th className="font-medium px-3 text-right">검토대기 예약</th>
                 <th className="font-medium px-3 text-right">총 보유</th>
@@ -139,7 +141,7 @@ export default async function InventoryPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={keyToReactKey(r.key)} className="border-t">
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3 whitespace-normal">
                     <div className="flex items-center gap-2">
                       <Boxes className="h-4 w-4 text-muted-foreground" aria-hidden />
                       <span>{r.product_name}</span>

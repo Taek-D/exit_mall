@@ -126,14 +126,15 @@ export default async function DepositListPage() {
         ) : (
           <div className="rounded-lg border bg-card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md). */}
+              <table className="w-full text-sm whitespace-nowrap">
                 <thead className="bg-surface-muted">
                   <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="font-medium px-4 h-10">요청일시</th>
                     <th className="font-medium px-3 text-right">금액</th>
                     <th className="font-medium px-3">입금자명</th>
                     <th className="font-medium px-3">상태</th>
-                    <th className="font-medium px-3">메모</th>
+                    <th className="font-medium px-3 w-full">메모</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -115,11 +115,12 @@ export default async function AdminDashboard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md). */}
+              <table className="w-full text-sm whitespace-nowrap">
                 <thead className="bg-surface-muted">
                   <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="h-10 px-5 font-medium">업무</th>
-                    <th className="px-3 font-medium">내용</th>
+                    <th className="px-3 font-medium w-full">내용</th>
                     <th className="px-3 font-medium">고객</th>
                     <th className="px-3 font-medium">상태</th>
                     <th className="px-3 font-medium">시간</th>

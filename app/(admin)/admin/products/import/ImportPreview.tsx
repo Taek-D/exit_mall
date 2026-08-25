@@ -115,7 +115,9 @@ function ImportPreviewTable({ rows }: { rows: PlannedProductImportRow[] }) {
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+        {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+            상품명·메시지만 줄바꿈을 허용한다. */}
+        <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-4 h-10 w-16">행</th>
@@ -135,7 +137,7 @@ function ImportPreviewTable({ rows }: { rows: PlannedProductImportRow[] }) {
                 <td className="px-3 py-3">
                   <ProductImportActionPill action={row.action} />
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 whitespace-normal">
                   <p className="font-medium">{row.displayName || '-'}</p>
                   {row.existingProductName && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -153,7 +155,7 @@ function ImportPreviewTable({ rows }: { rows: PlannedProductImportRow[] }) {
                     {row.hasImage ? '있음' : '없음'}
                   </StatusPill>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 whitespace-normal">
                   <MessageList errors={row.errors} warnings={row.warnings} />
                 </td>
               </tr>

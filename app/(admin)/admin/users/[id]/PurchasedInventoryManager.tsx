@@ -201,26 +201,29 @@ export function PurchasedInventoryManager({
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[980px] table-fixed text-sm">
+              {/* 초기·잔여·예약은 5~6%면 좌우 여백을 빼고 25~35px만 남아
+                  한글 두 글자와 폭이 거의 같다. 7%로 올리고 nowrap을 걸어
+                  "초/기"처럼 접히지 않게 한다(docs/standards.md). */}
               <colgroup>
-                <col className="w-[34%]" />
-                <col className="w-[21%]" />
-                <col className="w-[5%]" />
-                <col className="w-[6%]" />
-                <col className="w-[6%]" />
+                <col className="w-[30%]" />
+                <col className="w-[19%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
                 <col className="w-[9%]" />
-                <col className="w-[13%]" />
+                <col className="w-[15%]" />
                 <col className="w-[6%]" />
               </colgroup>
               <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr className="border-b">
                   <th className="px-3 py-2 text-left font-medium">상품명</th>
                   <th className="px-3 py-2 text-left font-medium">옵션명</th>
-                  <th className="px-3 py-2 text-right font-medium">초기</th>
-                  <th className="px-3 py-2 text-right font-medium">잔여</th>
-                  <th className="px-3 py-2 text-right font-medium">예약</th>
-                  <th className="px-3 py-2 text-left font-medium">출처</th>
+                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">초기</th>
+                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">잔여</th>
+                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">예약</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">출처</th>
                   <th className="px-3 py-2 text-left font-medium">메모</th>
-                  <th className="px-3 py-2 text-right font-medium">저장</th>
+                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">저장</th>
                 </tr>
               </thead>
               <tbody className="divide-y">

@@ -44,13 +44,16 @@ export default async function FaqManagePage({
           등록된 FAQ가 없습니다.
         </p>
       ) : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+              질문만 남는 폭을 흡수하고 나머지는 한 줄로 고정한다. */}
+          <table className="w-full text-sm whitespace-nowrap">
           <thead className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-2 py-2">대상</th>
               <th className="px-2 py-2">카테고리</th>
               <th className="px-2 py-2">노출 그룹</th>
-              <th className="px-2 py-2">질문</th>
+              <th className="px-2 py-2 w-full">질문</th>
               <th className="px-2 py-2">순서</th>
               <th className="px-2 py-2"></th>
             </tr>
@@ -71,6 +74,7 @@ export default async function FaqManagePage({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

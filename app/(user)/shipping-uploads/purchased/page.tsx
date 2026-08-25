@@ -117,11 +117,13 @@ export default async function PurchasedShippingPage() {
             <p className="text-sm text-muted-foreground">배송 가능한 사입재고가 없습니다.</p>
           </div>
         ) : (
-          <div className="rounded-lg border bg-card overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border bg-card overflow-x-auto">
+            {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+                상품명만 줄바꿈을 허용하고 옵션·수량은 한 줄로 고정한다. */}
+            <table className="w-full text-sm whitespace-nowrap">
               <thead className="bg-surface-muted">
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="font-medium px-4 h-10">상품명</th>
+                  <th className="font-medium px-4 h-10 w-full">상품명</th>
                   <th className="font-medium px-3">옵션</th>
                   <th className="font-medium px-3 text-right">가능</th>
                   <th className="font-medium px-3 text-right">검토대기 예약</th>
@@ -131,7 +133,7 @@ export default async function PurchasedShippingPage() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={`${row.product_name}:${row.option_name}`} className="border-t">
-                    <td className="px-4 py-2 font-medium">{row.product_name}</td>
+                    <td className="px-4 py-2 font-medium whitespace-normal">{row.product_name}</td>
                     <td className="px-3 py-2 text-muted-foreground">{row.option_name || '-'}</td>
                     <td className="px-3 py-2 text-right font-mono tabular">
                       {row.available_quantity}

@@ -60,10 +60,13 @@ export default async function AdminStockOrderDetail({ params }: { params: { id: 
           <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
           <h2 className="font-medium">주문 항목</h2>
         </header>
-        <table className="w-full text-sm">
+        {/* 표를 줄이지 말고 가로로 스크롤시킨다(docs/standards.md).
+            상품명만 줄바꿈을 허용하고 수량·금액은 한 줄로 고정한다. */}
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm whitespace-nowrap">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="font-medium px-5 h-10">상품</th>
+              <th className="font-medium px-5 h-10 w-full">상품</th>
               <th className="font-medium px-3 text-right">수량</th>
               <th className="font-medium px-3 text-right">단가</th>
               <th className="font-medium px-3 text-right">소계</th>
@@ -72,7 +75,7 @@ export default async function AdminStockOrderDetail({ params }: { params: { id: 
           <tbody>
             {order.items.map((item, index) => (
               <tr key={index} className="border-t">
-                <td className="px-5 py-2">{item.product_name}</td>
+                <td className="px-5 py-2 whitespace-normal">{item.product_name}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">{item.qty}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">
                   {formatKRW(item.unit_price)}
@@ -94,6 +97,7 @@ export default async function AdminStockOrderDetail({ params }: { params: { id: 
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
 
       {order.status === 'rejected' && order.admin_memo && (
