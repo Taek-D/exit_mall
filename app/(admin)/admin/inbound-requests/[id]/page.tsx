@@ -8,7 +8,6 @@ import { InboundAttachmentList } from '@/components/inbound/InboundAttachmentLis
 import { InboundCommentList } from '@/components/inbound/InboundCommentList';
 import { InboundCommentForm } from '@/components/inbound/InboundCommentForm';
 import { InboundItemsTable } from '@/components/inbound/InboundItemsTable';
-import { InboundShipmentList } from '@/components/inbound/InboundShipmentList';
 import { InboundDuplicateBanner } from '@/components/inbound/InboundDuplicateBanner';
 import { StatusControls } from './StatusControls';
 import { formatShortDateKR, formatShortDateTimeKR } from '@/lib/dates';
@@ -78,18 +77,12 @@ export default async function AdminInboundRequestDetailPage({
 
       <section className="rounded-lg border bg-card p-5 space-y-4">
         {request.body && <p className="text-sm whitespace-pre-wrap">{request.body}</p>}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">첨부</p>
-            <InboundAttachmentList
-              requestId={request.id}
-              excelPath={request.excel_storage_path}
-              excelOriginalName={request.excel_original_name}
-              imagePaths={request.image_paths}
-            />
-          </div>
-          <InboundShipmentList items={request.inbound_items} />
-        </div>
+        <InboundAttachmentList
+          requestId={request.id}
+          excelPath={request.excel_storage_path}
+          excelOriginalName={request.excel_original_name}
+          imagePaths={request.image_paths}
+        />
         <InboundItemsTable items={request.inbound_items} status={status} />
       </section>
 

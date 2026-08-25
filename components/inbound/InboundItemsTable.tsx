@@ -1,3 +1,5 @@
+import { TrackingNumberCopy } from '@/components/inbound/TrackingNumberCopy';
+import { groupInboundShipments } from '@/lib/inbound/tracking';
 import type { InboundRequestItem } from '@/lib/inbound/queries';
 import type { InboundStatus } from '@/lib/types';
 
@@ -21,11 +23,17 @@ export function InboundItemsTable({
     (sum, item) => sum + (Number.isFinite(item.quantity) ? Number(item.quantity) : 0),
     0,
   );
+  // 박스 개수는 배송 정보 블록을 없애면서 이 제목으로 옮겼다. 송장이 여러 개인
+  // 요청(전체의 35%, 최대 23개)에서 열을 위아래로 세지 않아도 되게 한다.
+  const { shipments } = groupInboundShipments(items);
 
   return (
     <div className="rounded-md border bg-background">
       <div className="px-3 py-2 border-b text-sm font-medium flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <span>신청 품목 ({items.length}건 · 총 {totalQty}개)</span>
+        <span>
+          신청 품목 ({items.length}건 · 총 {totalQty}개
+          {shipments.length > 0 && ` · 박스 ${shipments.length}개`})
+        </span>
         {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
       </div>
       <div className="overflow-x-auto">
@@ -54,8 +62,12 @@ export function InboundItemsTable({
                 <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                   {item.carrier || '-'}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap font-mono tabular text-muted-foreground">
-                  {item.tracking_number || '-'}
+                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  {item.tracking_number ? (
+                    <TrackingNumberCopy value={item.tracking_number} />
+                  ) : (
+                    <span className="font-mono tabular">-</span>
+                  )}
                 </td>
               </tr>
             ))}
