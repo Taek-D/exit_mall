@@ -23,8 +23,9 @@ export function InboundItemsTable({
     (sum, item) => sum + (Number.isFinite(item.quantity) ? Number(item.quantity) : 0),
     0,
   );
-  // 박스 개수는 배송 정보 블록을 없애면서 이 제목으로 옮겼다. 송장이 여러 개인
-  // 요청(전체의 35%, 최대 23개)에서 열을 위아래로 세지 않아도 되게 한다.
+  // 송장 건수는 배송 정보 블록을 없애면서 이 제목으로 옮겼다. 송장이 하나뿐인
+  // 요청이 55%인데 그때는 표에 한 줄로 보이므로 알려줄 게 없다. 여러 개일 때만
+  // 노출해서(35%, 최대 23개) 열을 위아래로 세지 않아도 되게 한다.
   const { shipments } = groupInboundShipments(items);
 
   return (
@@ -32,7 +33,7 @@ export function InboundItemsTable({
       <div className="px-3 py-2 border-b text-sm font-medium flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <span>
           신청 품목 ({items.length}건 · 총 {totalQty}개
-          {shipments.length > 0 && ` · 박스 ${shipments.length}개`})
+          {shipments.length > 1 && ` · 송장 ${shipments.length}건`})
         </span>
         {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
       </div>
