@@ -38,13 +38,16 @@ export function InboundItemsTable({
         {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
       </div>
       <div className="overflow-x-auto">
-        {/* 열이 6개라 좁은 화면에서는 표를 줄이지 않고 가로로 스크롤시킨다.
-            min-width가 없으면 상품명이 한 글자씩 접힌다. */}
-        <table className="w-full min-w-[38rem] text-sm">
+        {/* 표 전체를 nowrap으로 두고 좁아지면 가로로 스크롤시킨다. 그러지 않으면
+            상품명이 길 때 브라우저가 수량·택배사 같은 좁은 열의 폭을 뺏어
+            헤더가 "수/량", "택/배/사"처럼 글자 단위로 접힌다.
+            남는 폭을 흡수하는 건 상품명 하나뿐이다. 옵션까지 normal로 풀면
+            이번엔 옵션이 눌려 "실/버"처럼 접힌다. */}
+        <table className="w-full min-w-[38rem] text-sm whitespace-nowrap">
           <thead className="bg-surface-muted">
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="font-medium px-3 h-9 w-10 text-right">#</th>
-              <th className="font-medium px-3">상품명</th>
+              <th className="font-medium px-3 w-full">상품명</th>
               <th className="font-medium px-3">옵션</th>
               <th className="font-medium px-3 text-right">수량</th>
               <th className="font-medium px-3">택배사</th>
@@ -57,13 +60,11 @@ export function InboundItemsTable({
                 <td className="px-3 py-2 text-right text-muted-foreground font-mono tabular">
                   {index + 1}
                 </td>
-                <td className="px-3 py-2 font-medium">{item.product_name}</td>
+                <td className="px-3 py-2 font-medium whitespace-normal">{item.product_name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{item.option_name || '-'}</td>
                 <td className="px-3 py-2 text-right font-mono tabular">{item.quantity}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                  {item.carrier || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                <td className="px-3 py-2 text-muted-foreground">{item.carrier || '-'}</td>
+                <td className="px-3 py-2 text-muted-foreground">
                   {item.tracking_number ? (
                     <TrackingNumberCopy value={item.tracking_number} />
                   ) : (
