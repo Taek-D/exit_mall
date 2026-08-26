@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download, FileSpreadsheet } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,6 +64,29 @@ export default async function ProductImportPage({
           <Link href="/admin/products/import">새 파일</Link>
         </Button>
       </header>
+
+      <section className="rounded-lg border bg-surface-muted/40 p-4 flex items-start gap-3">
+        <div className="h-10 w-10 rounded-md bg-background grid place-items-center border shrink-0">
+          <FileSpreadsheet className="h-5 w-5 text-accent" aria-hidden />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">엑셀 양식 다운로드</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            양식의 첫 줄에 <strong>*</strong> 가 붙은 <strong>상품명 · 옵션 · 고객 판매가</strong>만 필수이고, 나머지는 비워두어도 됩니다.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            제품이미지는 A열 셀에 그림을 직접 붙여넣으면 함께 등록됩니다. 열 순서와 첫 줄은 바꾸지 말아주세요.
+          </p>
+        </div>
+        <a
+          href="/product-template.xlsx"
+          download
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border bg-background text-sm hover:bg-muted transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" aria-hidden />
+          양식 받기
+        </a>
+      </section>
 
       <ImportUploadForm />
 
