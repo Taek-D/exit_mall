@@ -40,3 +40,7 @@ SECURITY_AUDIT.md
 /배송대행 업로드 엑셀양식.xlsx
 /입고리스트 양식.xlsx
 /엑시트몰*견적서*.xlsx
+
+# Local improvement notes (초안, 공유 전)
+/docs/improvement-proposals.md
+/docs/improvement-implementation-plans.md
